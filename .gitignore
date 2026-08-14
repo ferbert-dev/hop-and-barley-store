@@ -10,6 +10,10 @@
 /docs/07 Project M4-1.md
 /docs/hop-and-barley-monorepo-plan.md
 
+# Local HTML design reference supplied for implementation planning. Keep the
+# source and its assets on disk, but do not publish the reference bundle.
+/docs/Hop-and-Barley-main/
+
 # Dependencies and package-manager caches
 node_modules/
 .pnpm-store/

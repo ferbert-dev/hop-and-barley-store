@@ -1,4 +1,7 @@
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
+import { StorefrontShell } from '../components/storefront/storefront-shell';
+import '../styles/design-tokens.css';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -6,10 +9,16 @@ export const metadata: Metadata = {
   description: 'A working storefront foundation for Hop & Barley.',
 };
 
-export default function RootLayout({ children }: LayoutProps<'/'>) {
+type RootLayoutProps = Readonly<{
+  children: ReactNode;
+}>;
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en-GB">
-      <body>{children}</body>
+      <body>
+        <StorefrontShell>{children}</StorefrontShell>
+      </body>
     </html>
   );
 }

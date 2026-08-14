@@ -1,50 +1,41 @@
-import { formatPrice } from '../lib/format-price';
+import type {
+  LegacyCatalogProduct,
+  PagedCatalogProduct,
+} from '@hop-and-barley/api-client';
+import Image from 'next/image';
 
-type Product = {
-  currency: string;
-  description: string;
-  id: string;
-  name: string;
-  priceMinor: number;
-  slug: string;
-};
+import {
+  Badge,
+  EmptyState,
+  ErrorState,
+  Price,
+  ProductCard,
+} from '../components/ui';
+import { assets, type AssetDefinition } from '../design-system/assets';
+import { loadCatalog } from '../lib/catalog';
 
 export const dynamic = 'force-dynamic';
 
-async function getProducts(): Promise<{
-  connected: boolean;
-  products: Product[];
-}> {
-  const apiUrl = process.env.API_INTERNAL_URL ?? 'http://127.0.0.1:3001/api/v1';
-
-  try {
-    const response = await fetch(`${apiUrl}/products`, { cache: 'no-store' });
-
-    if (!response.ok) {
-      throw new Error(`Catalog request failed with ${response.status}`);
-    }
-
-    return {
-      connected: true,
-      products: (await response.json()) as Product[],
-    };
-  } catch {
-    return { connected: false, products: [] };
-  }
-}
+const productAssetsBySlug: Readonly<Record<string, AssetDefinition>> = {
+  'caramel-malt': assets.caramelMalt,
+  'cascade-hops': assets.cascadeHops,
+  'centennial-hops': assets.centennialHops,
+  'citra-hops': assets.citraHops,
+  'imperial-yeast': assets.imperialYeast,
+  'maris-otter-malt': assets.marisOtterMalt,
+  'mosaic-hops': assets.mosaicHops,
+  'pilsner-malt': assets.pilsnerMalt,
+  'saaz-hops': assets.saazHops,
+  'safale-us05-yeast': assets.safaleUs05Yeast,
+  'unmalted-wheat': assets.unmaltedWheat,
+  'west-coast-ipa-kit': assets.westCoastIpaKit,
+};
 
 export default async function Home() {
-  const { connected, products } = await getProducts();
+  const { catalog, connected } = await loadCatalog();
 
   return (
-    <main>
-      <header className="site-header">
-        <a className="brand" href="#top" aria-label="Hop and Barley home">
-          H<span>&</span>B
-        </a>
-        <p>Independent beer, thoughtfully selected.</p>
-      </header>
-
+    <>
       <section className="hero" id="top">
         <div>
           <p className="eyebrow">Local stack · first pour</p>
@@ -54,10 +45,13 @@ export default async function Home() {
             dependable development environment.
           </p>
         </div>
-        <div className={`status ${connected ? 'online' : 'offline'}`}>
+        <p
+          className={`status ${connected ? 'online' : 'offline'}`}
+          role="status"
+        >
           <span aria-hidden="true" />
           {connected ? 'API connected' : 'API unavailable'}
-        </div>
+        </p>
       </section>
 
       <section className="catalog" aria-labelledby="catalog-title">
@@ -66,32 +60,87 @@ export default async function Home() {
           <h2 id="catalog-title">Current selection</h2>
         </div>
 
-        {products.length > 0 ? (
-          <div className="product-grid">
-            {products.map((product, index) => (
-              <article className="product-card" key={product.id}>
-                <div className="can" aria-hidden="true">
-                  <span>{String(index + 1).padStart(2, '0')}</span>
-                  <strong>H&amp;B</strong>
-                </div>
-                <div>
-                  <h3>{product.name}</h3>
-                  <p>{product.description}</p>
-                  <strong className="price">
-                    {formatPrice(product.priceMinor, product.currency)}
-                  </strong>
-                </div>
-              </article>
-            ))}
-          </div>
+        {!connected || catalog === null ? (
+          <ErrorState title="Products unavailable">
+            Start the local stack and confirm the API is ready before trying
+            again.
+          </ErrorState>
+        ) : catalog.items.length === 0 ? (
+          <EmptyState title="No products found">
+            The current catalog query returned no active USD products.
+          </EmptyState>
         ) : (
-          <p className="empty-state">
-            Start the local stack to load products from PostgreSQL.
-          </p>
+          <div className="product-grid">
+            {catalog.kind === 'paged'
+              ? catalog.items.map((product) => (
+                  <PagedProductCard key={product.id} product={product} />
+                ))
+              : catalog.items.map((product) => (
+                  <LegacyProductCard key={product.id} product={product} />
+                ))}
+          </div>
         )}
       </section>
+    </>
+  );
+}
 
-      <footer>Hop &amp; Barley · Platform foundation</footer>
-    </main>
+function PagedProductCard({ product }: { product: PagedCatalogProduct }) {
+  return (
+    <ProductCard
+      badge={
+        <Badge
+          tone={product.availability === 'in-stock' ? 'success' : 'warning'}
+        >
+          {product.availability === 'in-stock' ? 'In stock' : 'Out of stock'}
+        </Badge>
+      }
+      description={product.teaser}
+      href={`/product/${product.slug}`}
+      media={<ProductMedia name={product.name} slug={product.slug} />}
+      name={product.name}
+      price={
+        <>
+          <Price currency="USD" minorUnits={product.priceMinor} />{' '}
+          <span>{product.priceQualifier}</span>
+        </>
+      }
+    />
+  );
+}
+
+function LegacyProductCard({ product }: { product: LegacyCatalogProduct }) {
+  return (
+    <ProductCard
+      badge={<Badge tone="neutral">Availability unavailable</Badge>}
+      description={product.description}
+      href={`/product/${product.slug}`}
+      media={<ProductMedia name={product.name} slug={product.slug} />}
+      name={product.name}
+      price={<Price currency="USD" minorUnits={product.priceMinor} />}
+    />
+  );
+}
+
+function ProductMedia({ name, slug }: { name: string; slug: string }) {
+  const asset = productAssetsBySlug[slug];
+  if (!asset) {
+    return (
+      <span
+        className="product-media-fallback"
+        role="img"
+        aria-label={`${name} image unavailable`}
+      />
+    );
+  }
+
+  return (
+    <Image
+      alt={asset.alt}
+      height={asset.height}
+      sizes={asset.sizes}
+      src={asset.src}
+      width={asset.width}
+    />
   );
 }

@@ -5,7 +5,7 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "default": "./dist/index.js"
     }
   },
@@ -13,6 +13,7 @@
     "build": "tsc -p tsconfig.json",
     "clean": "rimraf dist",
     "generate": "openapi-typescript ../../apps/api/openapi.json -o src/generated/schema.ts",
+    "test:unit": "node --test test/*.test.mjs && tsc --noEmit -p tsconfig.test.json",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

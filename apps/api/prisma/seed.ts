@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client';
+import { catalogCategories, catalogProducts } from './catalog-fixtures';
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -12,34 +13,46 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
 });
 
-const products = [
-  {
-    currency: 'EUR',
-    description: 'Clean, crisp and brewed for long afternoons.',
-    name: 'House Lager',
-    priceMinor: 499,
-    slug: 'house-lager',
-  },
-  {
-    currency: 'EUR',
-    description: 'Citrus-forward pale ale with a balanced finish.',
-    name: 'Citrus Pale Ale',
-    priceMinor: 549,
-    slug: 'citrus-pale-ale',
-  },
-];
+export async function seedCatalog(client: PrismaClient): Promise<void> {
+  await client.$transaction(
+    async (transaction) => {
+      for (const category of catalogCategories) {
+        await transaction.category.upsert({
+          create: category,
+          update: category,
+          where: { slug: category.slug },
+        });
+      }
 
-async function main() {
-  for (const product of products) {
-    await prisma.product.upsert({
-      create: product,
-      update: product,
-      where: { slug: product.slug },
-    });
-  }
+      await transaction.product.deleteMany({
+        where: { slug: { in: ['house-lager', 'citrus-pale-ale'] } },
+      });
+
+      for (const product of catalogProducts) {
+        const { categorySlug, ...data } = product;
+
+        await transaction.product.upsert({
+          create: {
+            ...data,
+            category: { connect: { slug: categorySlug } },
+          },
+          update: {
+            ...data,
+            category: { connect: { slug: categorySlug } },
+          },
+          where: { slug: product.slug },
+        });
+      }
+
+      await transaction.category.deleteMany({
+        where: { slug: 'legacy-foundation' },
+      });
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
 }
 
-main()
+seedCatalog(prisma)
   .then(() => prisma.$disconnect())
   .catch(async (error: unknown) => {
     console.error(error);

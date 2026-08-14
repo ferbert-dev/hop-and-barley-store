@@ -11,7 +11,7 @@ The Hop & Barley backend is a NestJS modular monolith. It owns business rules an
 | `GET /`                    | Developer service console with safe API/PostgreSQL status and links |
 | `GET /api/v1/health/live`  | Process liveness                                                    |
 | `GET /api/v1/health/ready` | API readiness including a real PostgreSQL query                     |
-| `GET /api/v1/products`     | Current seeded product catalog                                      |
+| `GET /api/v1/products`     | Filtered, sorted and paged active USD catalog envelope              |
 | `GET /api/docs`            | Swagger UI generated from the NestJS OpenAPI document               |
 
 Start the complete stack from the repository root with `pnpm local:up`, then open [http://localhost:3001](http://localhost:3001) or [Swagger UI](http://localhost:3001/api/docs).
@@ -61,9 +61,29 @@ prisma/
 
 Controllers should remain transport boundaries. Database access belongs in services/repositories, and backend persistence models must not become frontend contracts by accident.
 
+### C2 catalog discovery contract
+
+`GET /api/v1/products` returns one `{items, meta}` envelope. Optional validated
+query parameters are `search`, `category`, `minPriceMinor`, `maxPriceMinor`,
+`sort`, `page` and `limit`. Search is Unicode NFC, token-AND across the product
+name, teaser and description, with literal wildcard characters rejected.
+Prices are canonical unsigned integer minor units. Page defaults to 1, limit to
+12, and the navigable result window is capped at page 200.
+
+The service builds one Prisma `where`, explicitly selects public fields, and
+reads count, page items and product-backed base category facets in one
+`RepeatableRead` transaction. Facets intentionally ignore the current filters.
+Only active USD products are public; stock quantity becomes the literal
+`in-stock`/`out-of-stock` availability and is never exposed. The DTO decorators,
+Swagger document and generated client describe the same nested envelope.
+
 ## PostgreSQL and Prisma
 
-The current schema contains a single `Product` model with UUID identity, unique slug, integer `priceMinor`, three-character currency, timestamps, and a name index. Prices are not stored as floating-point values.
+The catalog schema contains normalized `Category` and `Product` models. Products
+retain UUID identity and a unique slug, store prices as integer minor units, link
+to a category, and carry the local image path, ordered JSON specifications,
+stock quantity, and active-state metadata needed by the reference catalog.
+Prices are not stored as floating-point values.
 
 Common commands from the repository root:
 
@@ -75,6 +95,35 @@ Common commands from the repository root:
 | `pnpm db:seed`                         | Upsert deterministic local catalog data                              |
 
 Review generated SQL before accepting a migration. Do not use `prisma db push` as migration history, do not reset a database, and do not delete the Docker volume without explicit approval for the destructive action.
+
+### C1 catalog migration and rollback
+
+The C1 migration adds normalized categories and the catalog fields required by
+the reference products. It fails closed if a pre-C1 database contains a product
+slug outside the two foundation fixtures or the twelve approved target slugs.
+Approved pre-existing rows are preserved but inactive until the transactional
+seed replaces their placeholder metadata. The seed then removes only
+`house-lager` and `citrus-pale-ale`, upserts the five categories and twelve USD
+products by stable keys and IDs, and removes the temporary legacy category.
+
+Run the isolated PostgreSQL 17.6 migration contract without touching the shared
+Compose volume:
+
+```bash
+pnpm test:catalog:postgres
+```
+
+The migration directory includes `rollback.sql` as a reviewed manual structural
+rollback. In a backed-up, isolated target it preserves each product's pre-C1
+columns and rows while dropping C1-only columns, constraints, indexes and the
+category table. The script is intrinsically transactional and fails closed when
+the expected C1 objects are missing or an unexpected dependency blocks the
+rollback, leaving the pre-attempt schema intact. It intentionally does not
+rewrite Prisma's migration ledger; it also does not recreate the two deleted
+foundation fixtures or otherwise undo seed data. Restore a backup when data
+rollback is required, and coordinate ledger resolution plus a forward recovery
+migration before using the script outside an isolated rollback rehearsal. Never
+use a reset or volume deletion as rollback.
 
 ## Configuration and Security Baseline
 
@@ -98,7 +147,13 @@ pnpm --filter @hop-and-barley/api build
 pnpm api:generate
 ```
 
-The in-process API e2e suite verifies the service console, Swagger UI, health endpoints, and catalog route with Supertest, while Prisma is mocked. The live Docker readiness/catalog checks and Playwright smoke test verify the current full-stack integration, but a dedicated real-PostgreSQL integration suite is still planned for transaction-heavy features.
+The in-process API e2e suite verifies the service console, Swagger UI, health,
+raw query-key rejection, exact validation behavior and the OpenAPI catalog
+contract with Supertest. The isolated PostgreSQL 17.6 suite verifies upgrade
+and fresh migrations, repeated seeding, constraints, exact filtering/paging,
+facets, forced concurrent snapshot consistency, a captured EXPLAIN plan and
+structural rollback. Future transaction-heavy feature modules should add their
+own focused real-PostgreSQL coverage.
 
 ## Planned Modules
 

@@ -10,6 +10,7 @@ test-results
 apps/api/openapi.json
 apps/api/src/generated/prisma
 apps/web/next-env.d.ts
+apps/web/public/assets/**/*.svg
 packages/api-client/src/generated
 docs/07 Project M4-1.md
 docs/hop-and-barley-monorepo-plan.md

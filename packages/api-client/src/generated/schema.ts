@@ -63,15 +63,64 @@ export interface components {
              */
             status: "ok";
         };
+        ProductCategoryDto: {
+            slug: string;
+            name: string;
+        };
         ProductDto: {
+            /** Format: uuid */
             id: string;
             name: string;
             slug: string;
             description: string;
-            /** @example 499 */
+            /**
+             * Format: int32
+             * @example 499
+             */
             priceMinor: number;
-            /** @example EUR */
-            currency: string;
+            /** @enum {string} */
+            currency: "USD";
+            teaser: string;
+            priceQualifier: string;
+            /** @example /assets/products/cascade-hops.webp */
+            imagePath: string;
+            /** @enum {string} */
+            availability: "in-stock" | "out-of-stock";
+            category: components["schemas"]["ProductCategoryDto"];
+        };
+        CatalogFiltersDto: {
+            /** @description Normalized Unicode NFC search; null when omitted. Control characters and literal backslash, percent and underscore are forbidden. */
+            search: string | null;
+            category: string | null;
+            /** Format: int32 */
+            minPriceMinor: number | null;
+            /** Format: int32 */
+            maxPriceMinor: number | null;
+        };
+        CatalogFacetsDto: {
+            categories: components["schemas"]["ProductCategoryDto"][];
+        };
+        CatalogMetaDto: {
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            totalItems: number;
+            /** Format: int32 */
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPreviousPage: boolean;
+            /** @enum {string} */
+            sort: "name-asc" | "name-desc" | "price-asc" | "price-desc";
+            /** @enum {string} */
+            currency: "USD";
+            filters: components["schemas"]["CatalogFiltersDto"];
+            facets: components["schemas"]["CatalogFacetsDto"];
+        };
+        CatalogResponseDto: {
+            items: components["schemas"]["ProductDto"][];
+            meta: components["schemas"]["CatalogMetaDto"];
         };
     };
     responses: never;
@@ -221,7 +270,16 @@ export interface operations {
     };
     CatalogController_listProducts: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                page?: number;
+                sort?: "name-asc" | "name-desc" | "price-asc" | "price-desc";
+                maxPriceMinor?: number;
+                minPriceMinor?: number;
+                category?: string;
+                /** @description Unicode NFC search; control characters and literal backslash, percent and underscore are forbidden. */
+                search?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -233,8 +291,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProductDto"][];
+                    "application/json": components["schemas"]["CatalogResponseDto"];
                 };
+            };
+            /** @description Invalid catalog query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -22,10 +22,10 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     Browser->>Web: GET /
-    Web->>API: GET /products via API_INTERNAL_URL
+    Web->>API: generated GET /api/v1/products (no-store)
     API->>DB: Prisma query
     DB-->>API: Product rows
-    API-->>Web: Product DTOs
+    API-->>Web: {items, meta} catalog envelope
     Web-->>Browser: Rendered storefront + API status
 ```
 
@@ -66,7 +66,30 @@ Open [http://localhost:3000](http://localhost:3000). A healthy full-stack render
 
 ## API Client Status
 
-`@hop-and-barley/api-client` already generates typed paths from the backend OpenAPI document. The current home-page slice uses a local `Product` response type and a direct server-side `fetch`. Replacing that boundary with the generated client is planned next; do not claim that the runtime integration is complete until the import and tests prove it.
+`@hop-and-barley/api-client` is the runtime and type boundary for the catalog.
+`src/lib/catalog.ts` resolves either an origin or the existing terminal
+`/api/v1` environment value to one origin, preventing duplicated path prefixes.
+It calls the generated `/api/v1/products` path with `cache: 'no-store'` and
+passes the response through the shared list compatibility normalizer. The
+normalizer returns a discriminated paged or legacy branch, permits additive
+future fields, rejects malformed required structure, and never invents facets,
+pagination, availability, or category facts for the legacy branch.
+
+## Design Foundation
+
+Production-safe design tokens and the typed local asset manifest live under
+`src/styles` and `src/design-system`. The ignored HTML reference and Figma file
+are evidence only; neither is a runtime dependency. See
+[Design foundation](docs/design-foundation.md) for provenance, responsive
+breakpoints, asset behavior, accessibility rules, and validation.
+
+The cross-cutting [quality acceptance matrix](docs/quality-acceptance-matrix.md)
+defines route/state coverage, exact responsive probes, WCAG thresholds,
+evidence statuses, and the update gate for every future UI slice.
+
+Do not add runtime Google Fonts, Font Awesome, or other CDN assets. Product
+images, brand artwork, reviewer illustrations, and header controls are served
+from stable local paths under `public/assets`.
 
 ## Source Layout
 
@@ -77,9 +100,21 @@ src/
 │   ├── icon.svg
 │   ├── layout.tsx
 │   └── page.tsx
-└── lib/
-    ├── format-price.test.ts
-    └── format-price.ts
+├── design-system/
+│   ├── assets.ts
+│   ├── assets.sha256.json
+│   ├── design-foundation.test.ts
+│   └── tokens.ts
+├── lib/
+│   ├── catalog.test.ts
+│   ├── catalog.ts
+│   ├── format-price.test.ts
+│   └── format-price.ts
+├── quality/
+│   ├── acceptance-matrix.test.ts
+│   └── acceptance-matrix.ts
+└── styles/
+    └── design-tokens.css
 ```
 
 Feature-first folders should be added only with real functionality. The planned direction is `features/catalog`, `features/cart`, `features/checkout`, `features/auth`, and `features/orders`, while route files remain thin.

@@ -8,15 +8,37 @@ datasource db {
   provider = "postgresql"
 }
 
-model Product {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String
-  slug        String   @unique
-  description String
-  priceMinor  Int
-  currency    String   @default("EUR") @db.VarChar(3)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model Category {
+  id           String    @id(map: "Category_pkey") @default(uuid()) @db.Uuid
+  name         String
+  slug         String    @unique(map: "Category_slug_key")
+  displayOrder Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  products     Product[]
 
-  @@index([name])
+  @@index([displayOrder, name], map: "Category_displayOrder_name_idx")
+}
+
+model Product {
+  id             String   @id(map: "Product_pkey") @default(uuid()) @db.Uuid
+  name           String
+  slug           String   @unique(map: "Product_slug_key")
+  teaser         String
+  description    String
+  priceMinor     Int
+  priceQualifier String   @db.VarChar(64)
+  currency       String   @default("USD") @db.VarChar(3)
+  stockQuantity  Int      @default(0)
+  isActive       Boolean  @default(true)
+  imagePath      String   @db.VarChar(255)
+  specifications Json     @db.JsonB
+  categoryId     String   @db.Uuid
+  category       Category @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Product_categoryId_fkey")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([categoryId, isActive], map: "Product_categoryId_isActive_idx")
+  @@index([isActive, priceMinor], map: "Product_isActive_priceMinor_idx")
+  @@index([name], map: "Product_name_idx")
 }

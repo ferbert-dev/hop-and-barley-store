@@ -1,0 +1,254 @@
+{
+  "schemaVersion": 1,
+  "baselineDirectory": "apps/e2e/tests/__screenshots__/storefront-shell.spec.ts",
+  "baselines": [
+    {
+      "id": "baseline-api-unavailable-hero",
+      "path": "apps/e2e/tests/__screenshots__/storefront-shell.spec.ts/api-unavailable-hero.png",
+      "width": 1280,
+      "height": 630,
+      "sha256": "0a171052fd2a0e46dbb9540fda77690462295bdf5667154ff5427a8acf7c2bbe",
+      "viewport": { "id": "desktop-1280", "width": 1280, "height": 900 },
+      "states": ["api-unavailable"],
+      "checks": ["responsive-layout", "error-messaging", "contrast"]
+    },
+    {
+      "id": "baseline-canvas-footer",
+      "path": "apps/e2e/tests/__screenshots__/storefront-shell.spec.ts/canvas-at-shell-footer.png",
+      "width": 1312,
+      "height": 392,
+      "sha256": "ab021d9998cfd0c05659deb8e5de75092335843b19c4d79bd6b6a0883b5a8f8d",
+      "viewport": { "id": "canvas-at", "width": 1440, "height": 900 },
+      "states": ["default", "api-unavailable"],
+      "checks": ["responsive-layout", "overflow-and-reflow", "contrast"]
+    },
+    {
+      "id": "baseline-canvas-header",
+      "path": "apps/e2e/tests/__screenshots__/storefront-shell.spec.ts/canvas-at-shell-header.png",
+      "width": 1440,
+      "height": 117,
+      "sha256": "0e09320a701bd4e8e55429f53e7eee8446031251ad87fd33ca4b179010a3b644",
+      "viewport": { "id": "canvas-at", "width": 1440, "height": 900 },
+      "states": ["default", "api-unavailable"],
+      "checks": ["responsive-layout", "overflow-and-reflow", "contrast"]
+    },
+    {
+      "id": "baseline-compact-mobile-footer",
+      "path": "apps/e2e/tests/__screenshots__/storefront-shell.spec.ts/compact-mobile-360-shell-footer.png",
+      "width": 328,
+      "height": 285,
+      "sha256": "caa8bc61fa79d4f295f0b95620d09071f73954986a7253eb1681d75253bd9499",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      },
+      "states": ["default", "api-unavailable"],
+      "checks": ["responsive-layout", "overflow-and-reflow", "contrast"]
+    },
+    {
+      "id": "baseline-compact-mobile-header",
+      "path": "apps/e2e/tests/__screenshots__/storefront-shell.spec.ts/compact-mobile-360-shell-header.png",
+      "width": 360,
+      "height": 73,
+      "sha256": "c8eb01dcd930d84bddc718014027f381d5d35468e123cef84aba703765ec9e0c",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      },
+      "states": ["default", "api-unavailable"],
+      "checks": ["responsive-layout", "overflow-and-reflow", "contrast"]
+    },
+    {
+      "id": "baseline-desktop-footer",
+      "path": "apps/e2e/tests/__screenshots__/storefront-shell.spec.ts/desktop-1280-shell-footer.png",
+      "width": 1152,
+      "height": 392,
+      "sha256": "98af8eb1bba19076489a7a8e35d9f2de438a2ee0d73217c0df645f431a364c40",
+      "viewport": { "id": "desktop-1280", "width": 1280, "height": 900 },
+      "states": ["default", "api-unavailable"],
+      "checks": ["responsive-layout", "overflow-and-reflow", "contrast"]
+    },
+    {
+      "id": "baseline-desktop-header",
+      "path": "apps/e2e/tests/__screenshots__/storefront-shell.spec.ts/desktop-1280-shell-header.png",
+      "width": 1280,
+      "height": 117,
+      "sha256": "f1152613f3e6082b3fa3182c26ce9595f334a7f4af5ef3c17195cd51b667e102",
+      "viewport": { "id": "desktop-1280", "width": 1280, "height": 900 },
+      "states": ["default", "api-unavailable"],
+      "checks": ["responsive-layout", "overflow-and-reflow", "contrast"]
+    },
+    {
+      "id": "baseline-mobile-navigation-open",
+      "path": "apps/e2e/tests/__screenshots__/storefront-shell.spec.ts/mobile-navigation-open.png",
+      "width": 360,
+      "height": 193,
+      "sha256": "14e0aeabedddf225b6bcfc25bb916aada504c6957f5ba4163fdcc07f3a8f0794",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      },
+      "states": ["mobile-navigation-open"],
+      "checks": ["responsive-layout", "overflow-and-reflow", "contrast"]
+    },
+    {
+      "id": "baseline-mobile-visible-focus",
+      "path": "apps/e2e/tests/__screenshots__/storefront-shell.spec.ts/mobile-visible-focus.png",
+      "width": 360,
+      "height": 73,
+      "sha256": "6562a4e93f2be319028d981f65b4b72a23e77343dfa87bf2f83256809cb3db88",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      },
+      "states": ["keyboard-navigation", "api-unavailable"],
+      "checks": ["responsive-layout", "focus-visible", "contrast"]
+    },
+    {
+      "id": "baseline-tablet-footer",
+      "path": "apps/e2e/tests/__screenshots__/storefront-shell.spec.ts/tablet-768-shell-footer.png",
+      "width": 704,
+      "height": 392,
+      "sha256": "ccc551454276607648c6154e03e742ee376164fd15ab3641ba0e55d97ebc505f",
+      "viewport": { "id": "tablet-768", "width": 768, "height": 1024 },
+      "states": ["default", "api-unavailable"],
+      "checks": ["responsive-layout", "overflow-and-reflow", "contrast"]
+    },
+    {
+      "id": "baseline-tablet-header",
+      "path": "apps/e2e/tests/__screenshots__/storefront-shell.spec.ts/tablet-768-shell-header.png",
+      "width": 768,
+      "height": 73,
+      "sha256": "626f74697fc4f082ccdd3abb966c2e0971428497b9125c4751da951314d7cd70",
+      "viewport": { "id": "tablet-768", "width": 768, "height": 1024 },
+      "states": ["default", "api-unavailable"],
+      "checks": ["responsive-layout", "overflow-and-reflow", "contrast"]
+    }
+  ],
+  "evidenceSets": [
+    {
+      "id": "visual-default-responsive",
+      "state": "default",
+      "check": "responsive-layout",
+      "baselineIds": [
+        "baseline-compact-mobile-footer",
+        "baseline-compact-mobile-header",
+        "baseline-tablet-footer",
+        "baseline-tablet-header",
+        "baseline-desktop-footer",
+        "baseline-desktop-header",
+        "baseline-canvas-footer",
+        "baseline-canvas-header"
+      ]
+    },
+    {
+      "id": "visual-default-overflow",
+      "state": "default",
+      "check": "overflow-and-reflow",
+      "baselineIds": [
+        "baseline-compact-mobile-footer",
+        "baseline-compact-mobile-header",
+        "baseline-tablet-footer",
+        "baseline-tablet-header",
+        "baseline-desktop-footer",
+        "baseline-desktop-header",
+        "baseline-canvas-footer",
+        "baseline-canvas-header"
+      ]
+    },
+    {
+      "id": "visual-default-contrast",
+      "state": "default",
+      "check": "contrast",
+      "baselineIds": [
+        "baseline-compact-mobile-footer",
+        "baseline-compact-mobile-header",
+        "baseline-tablet-footer",
+        "baseline-tablet-header",
+        "baseline-desktop-footer",
+        "baseline-desktop-header",
+        "baseline-canvas-footer",
+        "baseline-canvas-header"
+      ]
+    },
+    {
+      "id": "visual-mobile-open-responsive",
+      "state": "mobile-navigation-open",
+      "check": "responsive-layout",
+      "baselineIds": ["baseline-mobile-navigation-open"]
+    },
+    {
+      "id": "visual-mobile-open-overflow",
+      "state": "mobile-navigation-open",
+      "check": "overflow-and-reflow",
+      "baselineIds": ["baseline-mobile-navigation-open"]
+    },
+    {
+      "id": "visual-mobile-open-contrast",
+      "state": "mobile-navigation-open",
+      "check": "contrast",
+      "baselineIds": ["baseline-mobile-navigation-open"]
+    },
+    {
+      "id": "visual-keyboard-focus",
+      "state": "keyboard-navigation",
+      "check": "focus-visible",
+      "baselineIds": ["baseline-mobile-visible-focus"]
+    },
+    {
+      "id": "visual-keyboard-responsive",
+      "state": "keyboard-navigation",
+      "check": "responsive-layout",
+      "baselineIds": ["baseline-mobile-visible-focus"]
+    },
+    {
+      "id": "visual-keyboard-contrast",
+      "state": "keyboard-navigation",
+      "check": "contrast",
+      "baselineIds": ["baseline-mobile-visible-focus"]
+    },
+    {
+      "id": "visual-unavailable-responsive",
+      "state": "api-unavailable",
+      "check": "responsive-layout",
+      "baselineIds": ["baseline-api-unavailable-hero"]
+    },
+    {
+      "id": "visual-unavailable-focus",
+      "state": "api-unavailable",
+      "check": "focus-visible",
+      "baselineIds": ["baseline-mobile-visible-focus"]
+    },
+    {
+      "id": "visual-unavailable-overflow",
+      "state": "api-unavailable",
+      "check": "overflow-and-reflow",
+      "baselineIds": [
+        "baseline-compact-mobile-footer",
+        "baseline-compact-mobile-header",
+        "baseline-tablet-footer",
+        "baseline-tablet-header",
+        "baseline-desktop-footer",
+        "baseline-desktop-header",
+        "baseline-canvas-footer",
+        "baseline-canvas-header"
+      ]
+    },
+    {
+      "id": "visual-unavailable-error",
+      "state": "api-unavailable",
+      "check": "error-messaging",
+      "baselineIds": ["baseline-api-unavailable-hero"]
+    },
+    {
+      "id": "visual-unavailable-contrast",
+      "state": "api-unavailable",
+      "check": "contrast",
+      "baselineIds": ["baseline-api-unavailable-hero"]
+    }
+  ]
+}

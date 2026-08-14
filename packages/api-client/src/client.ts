@@ -1,7 +1,12 @@
-import createClient from 'openapi-fetch';
+import createClient, { type ClientOptions } from 'openapi-fetch';
 
 import type { paths } from './generated/schema.js';
 
-export function createApiClient(baseUrl: string) {
-  return createClient<paths>({ baseUrl });
+export type ApiClientOptions = Omit<ClientOptions, 'baseUrl'>;
+
+export function createApiClient(
+  baseUrl: string,
+  options: ApiClientOptions = {},
+) {
+  return createClient<paths>({ ...options, baseUrl });
 }
