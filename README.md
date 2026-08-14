@@ -1,6 +1,6 @@
 # Hop & Barley Store
 
-Hop & Barley is a full-stack ecommerce portfolio project built as a professional TypeScript monorepo. The repository contains an independently buildable storefront, REST API, PostgreSQL database, generated API client, and browser test suite.
+Hop & Barley is a full-stack ecommerce portfolio project built as a professional TypeScript monorepo. The repository contains a dependency-aware storefront workspace, REST API, PostgreSQL database, generated API client, and browser test suite.
 
 > **Current status:** the executable platform foundation and first catalog vertical slice are working locally. The complete shop described in the product brief is still being built; planned features are labelled explicitly below.
 
@@ -14,6 +14,7 @@ Hop & Barley is a full-stack ecommerce portfolio project built as a professional
 - Swagger UI and an OpenAPI document for the versioned public API endpoints;
 - an OpenAPI-generated TypeScript client package;
 - a web unit-test baseline, API unit/e2e tests, and a full-stack Playwright smoke test;
+- pull-request CI for clean generation, quality/build, PostgreSQL migrations and rollback, and connected/unavailable browser flows;
 - one Docker Compose command that starts PostgreSQL, migrations/seed, API, and storefront.
 
 ## Local Services
@@ -33,7 +34,7 @@ After `pnpm local:up` completes:
 ```mermaid
 flowchart LR
     Browser["Browser"] -->|"HTTP :3000"| Web["apps/web<br/>Next.js 16 + React 19"]
-    Web -->|"server-side fetch<br/>API_INTERNAL_URL"| API["apps/api<br/>NestJS 11 REST API<br/>/api/v1"]
+    Web -->|"generated client<br/>server-side no-store"| API["apps/api<br/>NestJS 11 REST API<br/>/api/v1"]
     API -->|"Prisma 7"| DB[("PostgreSQL 17.6")]
     API --- Docs["Swagger UI<br/>/api/docs"]
     E2E["apps/e2e<br/>Playwright"] --> Browser
@@ -51,10 +52,14 @@ flowchart LR
     Generate --> OpenAPI["apps/api/openapi.json<br/>generated artifact"]
     OpenAPI --> Types["openapi-typescript"]
     Types --> Client["@hop-and-barley/api-client<br/>typed paths + openapi-fetch"]
-    Client -. "next adoption step" .-> Web["apps/web"]
+    Client --> Web["apps/web<br/>validated catalog adapter"]
 ```
 
-The contract pipeline is operational and the client package builds. The first storefront slice still uses a small local `Product` response type with a server-side `fetch`; moving it to the generated client is the next contract-hardening step. This distinction avoids presenting planned integration as completed work.
+The contract pipeline is operational end to end. The storefront calls the
+generated path through `@hop-and-barley/api-client`, keeps the current catalog
+request dynamic and `no-store`, and validates either the paged C2 envelope or
+the exact legacy six-field rollback array before rendering. Malformed payloads
+fail closed as `API unavailable` rather than appearing as an empty catalog.
 
 ## Technology Stack
 
@@ -128,7 +133,7 @@ Do not use `docker compose down -v`, delete a volume, or reset Prisma unless the
 | Command                                | Purpose                                                                   |
 | -------------------------------------- | ------------------------------------------------------------------------- |
 | `pnpm dev`                             | Run workspace development processes in parallel                           |
-| `pnpm dev:web`                         | Run only the Next.js development server                                   |
+| `pnpm dev:web`                         | Run the Next.js development server after required workspace builds        |
 | `pnpm dev:api`                         | Run only the NestJS watch server                                          |
 | `pnpm db:generate`                     | Regenerate Prisma Client after schema changes                             |
 | `pnpm db:migrate:dev -- --name <name>` | Create and apply a reviewed local migration                               |
@@ -143,8 +148,8 @@ Environment templates live at `.env.example` and inside each app. Real `.env*` f
 
 Implemented now:
 
-- `Product` database model using integer minor currency units;
-- repeatable initial migration and two seeded products;
+- `Product` and `Category` database models using integer minor currency units;
+- repeatable catalog migrations and 12 deterministic products across five categories;
 - `GET /api/v1/products`;
 - liveness/readiness endpoints;
 - database-backed storefront status and catalog rendering;
@@ -152,12 +157,12 @@ Implemented now:
 
 Planned product work:
 
-- product details and categories;
+- product detail pages;
 - cart and checkout;
 - order creation with backend-owned totals and inventory correctness;
 - authentication, account, and order history;
 - admin catalog/inventory/order flows;
-- CI and a production deployment pipeline.
+- a production deployment pipeline after a provider decision.
 
 The backend remains a modular monolith. Microservices, Kafka, and distributed transactions are intentionally out of scope until the product has evidence that they are needed.
 

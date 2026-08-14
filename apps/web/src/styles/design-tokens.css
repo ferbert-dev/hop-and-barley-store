@@ -1,0 +1,103 @@
+:root {
+  color-scheme: light;
+
+  /* Reference palette: verified against the supplied HTML/CSS design bundle. */
+  --hb-color-ink: #111d13;
+  --hb-color-text-muted: #757575;
+  --hb-color-surface: #ffffff;
+  --hb-color-surface-muted: #f5f5f5;
+  --hb-color-border: #d9d9d9;
+  --hb-color-border-strong: #767676;
+  --hb-color-brand: #02542d;
+  --hb-color-brand-hover: #31572c;
+  --hb-color-brand-soft: #cff7d3;
+  --hb-color-danger: #c81e1e;
+  --hb-color-danger-soft: #fbebeb;
+  --hb-color-warning: #ffc107;
+  --hb-color-success: #31572c;
+  --hb-color-text-inverse: #f5f5f5;
+
+  /* Inter is the reference face. System fallbacks keep local builds offline. */
+  --hb-font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+  --hb-font-serif: Georgia, 'Times New Roman', serif;
+  --hb-font-size-xs: 0.75rem;
+  --hb-font-size-sm: 0.875rem;
+  --hb-font-size-base: 1rem;
+  --hb-font-size-lg: 1.25rem;
+  --hb-font-size-xl: 1.5rem;
+  --hb-font-size-display: clamp(3rem, 8vw, 6rem);
+  --hb-line-height-tight: 1.2;
+  --hb-line-height-normal: 1.4;
+  --hb-line-height-relaxed: 1.6;
+
+  --hb-space-1: 0.25rem;
+  --hb-space-2: 0.5rem;
+  --hb-space-3: 0.75rem;
+  --hb-space-4: 1rem;
+  --hb-space-6: 1.5rem;
+  --hb-space-8: 2rem;
+  --hb-space-12: 3rem;
+  --hb-space-16: 4rem;
+  --hb-space-24: 6rem;
+
+  --hb-radius-sm: 0.25rem;
+  --hb-radius-md: 0.5rem;
+  --hb-radius-lg: 1rem;
+  --hb-radius-round: 50%;
+  --hb-radius-pill: 9999px;
+  --hb-shadow-sm: 0 2px 5px rgb(12 12 13 / 5%);
+  --hb-shadow-md: 0 5px 15px rgb(12 12 13 / 10%);
+  --hb-focus-ring: 0 0 0 3px rgb(2 84 45 / 20%);
+  --hb-duration-fast: 150ms;
+  --hb-duration-normal: 200ms;
+
+  --hb-layout-canvas: 90rem;
+  --hb-layout-content: 82rem;
+  --hb-layout-reading: 42.5rem;
+  --hb-page-gutter: var(--hb-space-4);
+
+  /*
+   * Breakpoint contract. CSS custom properties document the values, while the
+   * literal media-query values below are required because custom properties
+   * cannot be used in media-query conditions.
+   */
+  --hb-breakpoint-compact: 30rem;
+  --hb-breakpoint-medium: 48rem;
+  --hb-breakpoint-wide: 64rem;
+  --hb-breakpoint-canvas: 90rem;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (min-width: 30rem) {
+  :root {
+    --hb-page-gutter: var(--hb-space-6);
+  }
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --hb-page-gutter: var(--hb-space-8);
+  }
+}
+
+@media (min-width: 64rem) {
+  :root {
+    --hb-page-gutter: var(--hb-space-16);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --hb-duration-fast: 0ms;
+    --hb-duration-normal: 0ms;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+}

@@ -15,7 +15,7 @@ COPY packages/typescript-config/package.json packages/typescript-config/package.
 RUN pnpm install --frozen-lockfile
 
 COPY . .
-RUN pnpm --filter @hop-and-barley/web build
+RUN pnpm --filter @hop-and-barley/api-client build && pnpm --filter @hop-and-barley/web build
 
 EXPOSE 3000
 

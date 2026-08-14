@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "reviewId": "d2-repeat-closure-2026-08-14",
+  "reviewerAgentRun": "https://app.notion.com/p/3bcd78850eab819b8710db5b5c1277ea?pvs=204",
+  "reviewedAt": "2026-08-14T18:28:00.000Z",
+  "overallOutcome": "failed-evidence-only",
+  "overallObservation": "The independent review failed only the fabricated evidence ledger. It explicitly passed the UI, browser, visual and dependency corrections listed below.",
+  "approvedObservations": [
+    {
+      "id": "manual-approved-all-visuals",
+      "status": "approved",
+      "observation": "The reviewer visually inspected and approved all eleven enforced PNG baselines, including the open menu, visible focus and API-unavailable composition.",
+      "states": [
+        "default",
+        "mobile-navigation-open",
+        "keyboard-navigation",
+        "api-unavailable"
+      ],
+      "checks": [
+        "responsive-layout",
+        "focus-visible",
+        "contrast",
+        "error-messaging",
+        "overflow-and-reflow"
+      ]
+    },
+    {
+      "id": "manual-approved-targets",
+      "status": "approved",
+      "observation": "The reviewer approved the real-Chromium 44 by 44 CSS pixel target evidence across all twelve Q1 viewport probes.",
+      "states": ["default"],
+      "checks": ["responsive-layout", "overflow-and-reflow"]
+    },
+    {
+      "id": "manual-approved-history",
+      "status": "approved",
+      "observation": "The reviewer approved the exact open home, navigate to cart, browser Back to home regression with the disclosure remaining closed.",
+      "states": ["keyboard-navigation"],
+      "checks": ["keyboard-navigation"]
+    },
+    {
+      "id": "manual-approved-banner",
+      "status": "approved",
+      "observation": "The reviewer approved the named storefront banner evidence in connected and unavailable API modes.",
+      "states": ["default", "api-unavailable"],
+      "checks": ["names-and-labels"]
+    },
+    {
+      "id": "manual-approved-axe",
+      "status": "approved",
+      "observation": "The reviewer approved the closed and open shell Axe results in the connected and unavailable browser runs.",
+      "states": ["default", "mobile-navigation-open", "api-unavailable"],
+      "checks": ["names-and-labels", "contrast"]
+    },
+    {
+      "id": "manual-approved-overflow",
+      "status": "approved",
+      "observation": "The reviewer approved the Q1 viewport overflow results from the connected and unavailable browser runs.",
+      "states": ["default", "api-unavailable"],
+      "checks": ["overflow-and-reflow"]
+    },
+    {
+      "id": "manual-approved-reduced-motion",
+      "status": "approved",
+      "observation": "The reviewer approved the reduced-motion browser result for automatic scrolling and zero-duration shell transitions.",
+      "states": ["default", "api-unavailable"],
+      "checks": ["reduced-motion"]
+    },
+    {
+      "id": "manual-approved-mismatch-enforcement",
+      "status": "approved",
+      "observation": "The reviewer independently proved that a temporary visual mismatch fails without updating tracked baselines.",
+      "states": ["default"],
+      "checks": ["responsive-layout"]
+    }
+  ],
+  "correctionAgentRun": "https://app.notion.com/p/3bcd78850eab818d9581f37cbae9deaa?pvs=204",
+  "correctionReviewedAt": "2026-08-14T18:50:33.952Z",
+  "correctionOutcome": "completed",
+  "correctionObservations": [
+    {
+      "id": "manual-correction-keyboard-sequence",
+      "status": "approved",
+      "observation": "At 360 by 800 in real Chromium, Tab reached the menu trigger, Enter opened it, Tab reached Products, and Escape closed it with focus returned to the trigger.",
+      "states": ["mobile-navigation-open", "keyboard-navigation"],
+      "checks": ["keyboard-navigation", "focus-visible", "names-and-labels"]
+    },
+    {
+      "id": "manual-correction-wide-resize",
+      "status": "approved",
+      "observation": "At 1023 by 900 the disclosure was visibly expanded; resizing to 1024 by 900 removed the trigger and exposed the desktop Storefront navigation without stale expanded state.",
+      "states": ["mobile-navigation-open"],
+      "checks": ["responsive-layout", "overflow-and-reflow"]
+    },
+    {
+      "id": "manual-correction-reflow-status",
+      "status": "approved",
+      "observation": "At the Q1 320 by 800 reflow viewport, the unavailable page remained readable without horizontal clipping and exposed the explicit text status API unavailable rather than relying on color alone.",
+      "states": ["api-unavailable"],
+      "checks": [
+        "responsive-layout",
+        "names-and-labels",
+        "error-messaging",
+        "contrast",
+        "overflow-and-reflow"
+      ]
+    }
+  ],
+  "remainingObservations": [
+    {
+      "id": "manual-pending-native-browser-zoom",
+      "status": "not-reviewed",
+      "observation": "The correction inspected the Q1 320 pixel reflow equivalent but did not separately operate the browser's native zoom control at 400 percent.",
+      "states": ["default"],
+      "checks": ["overflow-and-reflow"]
+    }
+  ]
+}

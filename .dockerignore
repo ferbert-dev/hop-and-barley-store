@@ -13,5 +13,7 @@ graphify-out
 **/.env
 **/.env.*
 !**/.env.example
+**/.DS_Store
 docs/07 Project M4-1.md
 docs/hop-and-barley-monorepo-plan.md
+/docs/Hop-and-Barley-main/

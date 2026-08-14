@@ -19,11 +19,12 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "prisma generate && jest --config ./test/jest-e2e.json --runInBand --watchman=false",
+    "test:catalog:postgres": "bash scripts/test-catalog-postgres.sh",
     "typecheck": "prisma generate && tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
-    "db:seed": "prisma db seed",
+    "db:seed": "prisma generate && prisma db seed",
     "generate:openapi": "prisma generate && node --import tsx scripts/generate-openapi.ts"
   },
   "dependencies": {

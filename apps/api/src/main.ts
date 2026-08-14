@@ -1,8 +1,8 @@
-import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { configureAppRouting } from './app-routing';
+import { configureAppValidation } from './app-validation';
 import { configureOpenApi } from './openapi';
 
 async function bootstrap() {
@@ -12,13 +12,7 @@ async function bootstrap() {
     origin: process.env.CORS_ORIGINS?.split(',').map((origin) => origin.trim()),
   });
   app.use(helmet());
-  app.useGlobalPipes(
-    new ValidationPipe({
-      forbidNonWhitelisted: true,
-      transform: true,
-      whitelist: true,
-    }),
-  );
+  configureAppValidation(app);
   app.enableShutdownHooks();
   configureOpenApi(app);
 

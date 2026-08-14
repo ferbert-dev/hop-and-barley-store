@@ -1,0 +1,296 @@
+.button {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--hb-radius-md);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 600;
+  justify-content: center;
+  min-block-size: 2.75rem;
+  min-inline-size: 2.75rem;
+  padding: var(--hb-space-2) var(--hb-space-4);
+  text-align: center;
+  text-decoration: none;
+  transition:
+    background-color var(--hb-duration-fast) ease,
+    border-color var(--hb-duration-fast) ease,
+    box-shadow var(--hb-duration-fast) ease;
+}
+
+.buttonPrimary {
+  background: var(--hb-color-brand);
+  border-color: var(--hb-color-brand);
+  color: var(--hb-color-text-inverse);
+}
+
+.buttonPrimary:hover:not(:disabled) {
+  background: var(--hb-color-brand-hover);
+  border-color: var(--hb-color-brand-hover);
+}
+
+.buttonSecondary {
+  background: var(--hb-color-surface);
+  border-color: var(--hb-color-border-strong);
+  color: var(--hb-color-ink);
+}
+
+.buttonSecondary:hover:not(:disabled) {
+  background: var(--hb-color-surface-muted);
+}
+
+.buttonDanger {
+  background: var(--hb-color-danger);
+  border-color: var(--hb-color-danger);
+  color: var(--hb-color-text-inverse);
+}
+
+.buttonDanger:hover:not(:disabled) {
+  box-shadow: var(--hb-shadow-md);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.button:focus-visible,
+.control:focus-visible,
+.productLink:focus-visible {
+  outline: 3px solid var(--hb-color-brand);
+  outline-offset: 2px;
+}
+
+.field {
+  display: grid;
+  gap: var(--hb-space-2);
+}
+
+.fieldLabel {
+  color: var(--hb-color-ink);
+  font-weight: 600;
+}
+
+.control {
+  background: var(--hb-color-surface);
+  border: 1px solid var(--hb-color-border-strong);
+  border-radius: var(--hb-radius-md);
+  color: var(--hb-color-ink);
+  font: inherit;
+  min-block-size: 2.75rem;
+  padding: var(--hb-space-2) var(--hb-space-3);
+  transition:
+    border-color var(--hb-duration-fast) ease,
+    box-shadow var(--hb-duration-fast) ease;
+  width: 100%;
+}
+
+.control[aria-invalid='true'] {
+  border-color: var(--hb-color-danger);
+}
+
+.select {
+  cursor: pointer;
+}
+
+.fieldDescription,
+.fieldError {
+  font-size: var(--hb-font-size-sm);
+  line-height: var(--hb-line-height-normal);
+  margin: 0;
+}
+
+.fieldDescription {
+  color: var(--hb-color-text-muted);
+}
+
+.fieldError {
+  color: var(--hb-color-danger);
+}
+
+.card {
+  background: var(--hb-color-surface);
+  border: 1px solid var(--hb-color-border);
+  border-radius: var(--hb-radius-md);
+  box-shadow: var(--hb-shadow-sm);
+  color: var(--hb-color-ink);
+  padding: var(--hb-space-4);
+}
+
+.productCard {
+  display: grid;
+  gap: var(--hb-space-4);
+}
+
+.productMedia {
+  aspect-ratio: 3 / 2;
+  background: var(--hb-color-surface-muted);
+  border-radius: var(--hb-radius-md);
+  overflow: hidden;
+}
+
+.productMedia > * {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.productContent {
+  display: grid;
+  gap: var(--hb-space-2);
+}
+
+.productName,
+.productDescription {
+  margin: 0;
+}
+
+.productName {
+  font-size: var(--hb-font-size-lg);
+  line-height: var(--hb-line-height-tight);
+}
+
+.productLink {
+  align-items: center;
+  color: var(--hb-color-ink);
+  display: inline-flex;
+  min-block-size: 2.75rem;
+  min-inline-size: 2.75rem;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.productPrice,
+.price {
+  font-weight: 700;
+}
+
+.productDescription {
+  color: var(--hb-color-text-muted);
+  font-size: var(--hb-font-size-sm);
+  line-height: var(--hb-line-height-relaxed);
+}
+
+.badge {
+  border: 1px solid transparent;
+  border-radius: var(--hb-radius-pill);
+  display: inline-flex;
+  font-size: var(--hb-font-size-xs);
+  font-weight: 700;
+  line-height: var(--hb-line-height-normal);
+  padding: var(--hb-space-1) var(--hb-space-2);
+}
+
+.badgeNeutral {
+  background: var(--hb-color-surface-muted);
+  border-color: var(--hb-color-border);
+  color: var(--hb-color-ink);
+}
+
+.badgeSuccess {
+  background: var(--hb-color-success);
+  color: var(--hb-color-text-inverse);
+}
+
+.badgeWarning {
+  background: var(--hb-color-warning);
+  color: var(--hb-color-ink);
+}
+
+.badgeDanger {
+  background: var(--hb-color-danger);
+  color: var(--hb-color-text-inverse);
+}
+
+.statusPanel {
+  background: var(--hb-color-surface-muted);
+  border: 1px solid var(--hb-color-border);
+  border-radius: var(--hb-radius-md);
+  color: var(--hb-color-ink);
+  padding: var(--hb-space-6);
+}
+
+.statusLoading {
+  border-style: dashed;
+}
+
+.statusError {
+  background: var(--hb-color-danger-soft);
+  border-color: var(--hb-color-danger);
+}
+
+.statusTitle,
+.statusBody {
+  margin: 0;
+}
+
+.statusTitle {
+  font-size: var(--hb-font-size-lg);
+  line-height: var(--hb-line-height-tight);
+}
+
+.statusBody,
+.statusAction {
+  margin-top: var(--hb-space-3);
+}
+
+.dialog {
+  background: var(--hb-color-surface);
+  border: 1px solid var(--hb-color-border);
+  border-radius: var(--hb-radius-lg);
+  box-shadow: var(--hb-shadow-md);
+  color: var(--hb-color-ink);
+  inline-size: min(
+    calc(100% - (2 * var(--hb-space-4))),
+    var(--hb-layout-reading)
+  );
+  max-block-size: calc(100dvh - (2 * var(--hb-space-4)));
+  overflow: auto;
+  padding: var(--hb-space-6);
+}
+
+.dialog::backdrop {
+  background: color-mix(in srgb, var(--hb-color-ink) 70%, transparent);
+}
+
+.dialogHeader {
+  align-items: start;
+  display: flex;
+  gap: var(--hb-space-4);
+  justify-content: space-between;
+}
+
+.dialogTitle,
+.dialogDescription {
+  margin-top: 0;
+}
+
+.dialogTitle {
+  font-size: var(--hb-font-size-xl);
+  line-height: var(--hb-line-height-tight);
+  margin-bottom: 0;
+}
+
+.dialogClose {
+  flex: 0 0 auto;
+  font-size: var(--hb-font-size-xl);
+  padding: 0;
+}
+
+.dialogDescription {
+  color: var(--hb-color-text-muted);
+  margin-bottom: var(--hb-space-4);
+  margin-right: var(--hb-space-12);
+}
+
+.dialogBody {
+  line-height: var(--hb-line-height-relaxed);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .control {
+    transition: none;
+  }
+}

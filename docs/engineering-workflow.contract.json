@@ -1,0 +1,226 @@
+{
+  "schemaVersion": 1,
+  "ticket": "R1",
+  "agentRun": "https://app.notion.com/p/3bcd78850eab8177b600d9abe52a2325?pvs=204",
+  "correctionAgentRun": "https://app.notion.com/p/3bcd78850eab812db3b4fe6f17b69544?pvs=204",
+  "policyDigest": "sha256:c3219ae537b9180a7541ec678f04a677ec266bb40379902cbb0d4a679d883db0",
+  "rules": [
+    {
+      "id": "independent-required-set",
+      "owner": "Independent reviewer",
+      "timing": "Before reading the builder evidence ledger",
+      "verification": "Derive requirementId/state/check/channel mappings from ticket and architecture, then require exact set equality.",
+      "rollback": "Return the ticket to In Progress with the missing, duplicate or unexpected mappings."
+    },
+    {
+      "id": "durable-fail-closed-evidence",
+      "owner": "Builder",
+      "timing": "Before requesting closure review",
+      "verification": "Resolve every pass to a durable JSON record and every N/A to a reviewer-approved reason; pending states never close.",
+      "rollback": "Preserve invalid runs as non-closing records and rerun only the affected proof."
+    },
+    {
+      "id": "isolated-next-build-server",
+      "owner": "Builder or integrator running browser evidence",
+      "timing": "Before starting any production Next.js server",
+      "verification": "Record build output, unique port, process identity, readiness and cleanup; enforce one server per build output.",
+      "rollback": "Stop the recorded process, discard only its isolated output and rerun serially."
+    },
+    {
+      "id": "disposable-postgres-review",
+      "owner": "Backend builder or reviewer",
+      "timing": "Before migration, seed, rollback or concurrency verification",
+      "verification": "Use a ticket/run-named disposable database resource and prove readiness, assertions and cleanup without shared Compose mutation.",
+      "rollback": "Remove only the disposable named resources; leave shared Compose and its volumes untouched."
+    },
+    {
+      "id": "direct-node24-clean-order",
+      "owner": "Integrator",
+      "timing": "After slice assembly and before combined review",
+      "verification": "Run the fixed-allowlist cleanup and declared Node 24/pnpm sequence with Turbo forced uncached.",
+      "rollback": "Reject the integration, restore the independently approved slice set and repeat from a fresh worktree."
+    },
+    {
+      "id": "generated-contract-drift",
+      "owner": "Integrator",
+      "timing": "Immediately after API generation in clean order",
+      "verification": "Snapshot the accepted client, generate twice, require both files and prove client baseline plus second-pass byte stability.",
+      "rollback": "Restore the pre-run client/OpenAPI state, return drift to the API-owning ticket and never hand-edit generated output."
+    },
+    {
+      "id": "reviewed-patch-binary-manifest",
+      "owner": "Integrator and independent reviewer",
+      "timing": "Before and during combined closure review",
+      "verification": "Recompute exact changed-path equality, dependency/lock deltas, binary hashes, dimensions and visual review records.",
+      "rollback": "Reject and rebuild the combined patch manifest without silently dropping another slice."
+    },
+    {
+      "id": "route-layout-ownership-before-auth-admin",
+      "owner": "Architect",
+      "timing": "Before the first auth or admin implementation ticket enters In Progress",
+      "verification": "Record the route-group tree and layout owner for every family, then test declared landmarks and inheritance.",
+      "rollback": "Remove new route-group wiring and return to the approved storefront-only layout."
+    },
+    {
+      "id": "cross-workspace-contract-second-consumer",
+      "owner": "Architect and owning builders",
+      "timing": "When a second independent workspace needs the same stable contract",
+      "verification": "Name both consumers, dependency direction, compatibility policy and contract tests before promotion.",
+      "rollback": "Keep or return the contract to its first consumer until two consumers exist."
+    },
+    {
+      "id": "c2-reuse-existing-contracts",
+      "owner": "C2 primary role and independent reviewer",
+      "timing": "Before C2 implementation and again before C2 closure",
+      "verification": "Audit imports for D3 ProductCard/Price/status primitives and the generated API client; reject duplicate card or raw-fetch contracts.",
+      "rollback": "Remove only the C2 adapter/UI slice and preserve accepted primitives and generated client."
+    }
+  ],
+  "evidence": {
+    "requiredSetOwner": "independent-reviewer",
+    "mappingFields": ["requirementId", "state", "check", "channel"],
+    "artifactReferencePattern": "<durable-json-path>#<record-id>",
+    "closureEligibleStatuses": ["pass", "not-applicable"],
+    "nonClosingStatuses": ["pending", "not-run", "blocked", "fail"],
+    "pass": {
+      "requires": [
+        "artifact",
+        "checkedAt",
+        "outcome",
+        "commandOrTestName",
+        "mode",
+        "environment"
+      ]
+    },
+    "notApplicable": {
+      "artifact": null,
+      "requires": ["reason", "reviewerAgreementTrace"]
+    }
+  },
+  "isolation": {
+    "next": {
+      "maxServersPerBuildOutput": 1,
+      "requiresUniquePorts": true,
+      "allowedStrategies": [
+        "serialized-build-start-test-stop",
+        "unique-build-output-per-server"
+      ]
+    },
+    "database": {
+      "disposable": true,
+      "requiresUniqueRunIdentity": true,
+      "sharedComposeMutationAllowed": false
+    }
+  },
+  "integration": {
+    "nodeMajor": 24,
+    "packageManager": "pnpm@11.21.0",
+    "turboForce": true,
+    "cleanOrder": [
+      "pnpm install --frozen-lockfile --ignore-scripts",
+      "pnpm clean",
+      "pnpm generated:verify",
+      "pnpm exec turbo run typecheck --force",
+      "pnpm format:check",
+      "pnpm exec turbo run lint test:unit build --force"
+    ],
+    "cleanupAllowlist": [
+      "apps/web/.next",
+      "apps/web/dist",
+      "apps/web/tsconfig.tsbuildinfo",
+      "apps/api/dist",
+      "apps/api/tsconfig.tsbuildinfo",
+      "apps/api/tsconfig.build.tsbuildinfo",
+      "apps/api/src/generated/prisma",
+      "apps/e2e/dist",
+      "apps/e2e/tsconfig.tsbuildinfo",
+      "packages/api-client/dist",
+      "packages/api-client/tsconfig.tsbuildinfo",
+      "packages/eslint-config/dist",
+      "packages/eslint-config/tsconfig.tsbuildinfo",
+      "packages/typescript-config/dist",
+      "packages/typescript-config/tsconfig.tsbuildinfo"
+    ],
+    "generatedFiles": [
+      "apps/api/openapi.json",
+      "packages/api-client/src/generated/schema.ts"
+    ],
+    "generatedStability": {
+      "passes": 2,
+      "clientBaseline": "pre-run-bytes",
+      "openApiBaseline": "first-generation-bytes",
+      "requires": [
+        "existing-client-before-first-generation",
+        "openapi-and-client-after-each-generation",
+        "first-client-equals-pre-run-client",
+        "second-openapi-equals-first-openapi",
+        "second-client-equals-first-client"
+      ]
+    },
+    "patchManifestRequiredFields": [
+      "baseObjectId",
+      "targetObjectId",
+      "changedPaths",
+      "textLineCounts",
+      "dependencyLockDelta",
+      "binarySha256",
+      "binaryDimensionsOrType",
+      "binaryProvenance",
+      "reviewMethod",
+      "runArtifacts",
+      "cleanupEvidence"
+    ],
+    "tooling": {
+      "cleaner": "scripts/clean-workspace-artifacts.mjs",
+      "generatedVerifier": "scripts/verify-generated-stability.mjs"
+    }
+  },
+  "ownership": {
+    "routeLayout": {
+      "decisionRequiredBefore": ["auth", "admin"],
+      "currentEvidencePath": "apps/web/src/app/layout.tsx",
+      "currentShellSymbol": "StorefrontShell",
+      "requiredDecisionOutputs": [
+        "routeGroupTree",
+        "layoutOwnerByFamily",
+        "authenticationBoundary",
+        "landmarkTests",
+        "rollback"
+      ]
+    },
+    "crossWorkspaceContract": {
+      "minimumIndependentConsumers": 2,
+      "firstConsumerOwnsLocally": true
+    }
+  },
+  "c2": {
+    "requiredWebExports": [
+      {
+        "path": "apps/web/src/components/ui/card.tsx",
+        "symbols": ["ProductCard"]
+      },
+      {
+        "path": "apps/web/src/components/ui/price.tsx",
+        "symbols": ["Price"]
+      },
+      {
+        "path": "apps/web/src/components/ui/status.tsx",
+        "symbols": ["LoadingState", "EmptyState", "ErrorState"]
+      }
+    ],
+    "generatedClientExports": [
+      {
+        "path": "packages/api-client/src/client.ts",
+        "symbols": ["createApiClient"]
+      },
+      {
+        "path": "packages/api-client/src/generated/schema.ts",
+        "symbols": ["paths"]
+      }
+    ],
+    "forbiddenOutcomes": [
+      "third-product-card-implementation",
+      "hand-written-raw-fetch-catalog-contract"
+    ]
+  }
+}
