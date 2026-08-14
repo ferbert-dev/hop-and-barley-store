@@ -1,0 +1,133 @@
+name: Pull request CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+
+jobs:
+  quality:
+    name: Quality and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: '11.21.0'
+          run_install: false
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24.5.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Remove allowlisted generated artifacts
+        run: pnpm clean
+      - name: Verify generated API contract stability
+        run: pnpm generated:verify
+      - name: Typecheck from a clean output tree
+        run: pnpm exec turbo run typecheck --force
+      - name: Check formatting
+        run: pnpm format:check
+      - name: Lint, test, and build without cache replay
+        run: pnpm exec turbo run lint test:unit build --force
+      - name: Reject high production dependency advisories
+        run: pnpm audit --prod --audit-level=high
+
+  postgresql:
+    name: PostgreSQL migration contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: '11.21.0'
+          run_install: false
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24.5.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Verify migrations, seed, PostgreSQL API, and rollback
+        run: pnpm test:catalog:postgres
+
+  browser:
+    name: Connected and unavailable browser flows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      COMPOSE_PROJECT_NAME: hb-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: '11.21.0'
+          run_install: false
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24.5.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install the pinned Chromium runtime
+        run: pnpm --filter @hop-and-barley/e2e exec playwright install --with-deps chromium
+      - name: Start the isolated full stack
+        run: docker compose up -d --build --wait
+      - name: Test the connected storefront
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: apps/e2e/playwright-report/connected
+          PLAYWRIGHT_OUTPUT_DIR: apps/e2e/test-results/connected
+        run: pnpm --filter @hop-and-barley/e2e test:e2e
+      - name: Stop only the API service
+        run: docker compose stop api
+      - name: Test the safe API-unavailable storefront
+        env:
+          E2E_EXPECT_API_STATUS: API unavailable
+          PLAYWRIGHT_HTML_OUTPUT_DIR: apps/e2e/playwright-report/unavailable
+          PLAYWRIGHT_OUTPUT_DIR: apps/e2e/test-results/unavailable
+        run: E2E_EXPECT_API_STATUS='API unavailable' pnpm --filter @hop-and-barley/e2e test:e2e
+      - name: Capture Compose diagnostics
+        if: always()
+        run: |
+          mkdir -p apps/e2e/test-results
+          docker compose ps -a > apps/e2e/test-results/compose-ps.txt
+          docker compose logs --no-color > apps/e2e/test-results/compose.log
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-evidence-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            apps/e2e/playwright-report
+            apps/e2e/test-results
+      - name: Stop isolated services
+        if: always()
+        run: docker compose down --remove-orphans

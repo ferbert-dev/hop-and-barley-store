@@ -24,7 +24,7 @@
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
-    "db:seed": "prisma db seed",
+    "db:seed": "prisma generate && prisma db seed",
     "generate:openapi": "prisma generate && node --import tsx scripts/generate-openapi.ts"
   },
   "dependencies": {

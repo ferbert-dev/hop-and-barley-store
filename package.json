@@ -22,7 +22,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "generated:verify": "node scripts/verify-generated-stability.mjs",
-    "workflow:check": "node --test scripts/engineering-workflow-contract.test.mjs",
+    "workflow:check": "node --test scripts/engineering-workflow-contract.test.mjs scripts/ci-workflow-contract.test.mjs",
     "test": "turbo run test:unit",
     "test:unit": "turbo run test:unit",
     "test:e2e": "turbo run test:e2e",

@@ -470,7 +470,7 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
 
   if (
     rootPackage.scripts?.['workflow:check'] !==
-    'node --test scripts/engineering-workflow-contract.test.mjs'
+    'node --test scripts/engineering-workflow-contract.test.mjs scripts/ci-workflow-contract.test.mjs'
   ) {
     errors.push('workflow:check script drifted');
   }

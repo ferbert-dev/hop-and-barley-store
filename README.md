@@ -1,6 +1,6 @@
 # Hop & Barley Store
 
-Hop & Barley is a full-stack ecommerce portfolio project built as a professional TypeScript monorepo. The repository contains an independently buildable storefront, REST API, PostgreSQL database, generated API client, and browser test suite.
+Hop & Barley is a full-stack ecommerce portfolio project built as a professional TypeScript monorepo. The repository contains a dependency-aware storefront workspace, REST API, PostgreSQL database, generated API client, and browser test suite.
 
 > **Current status:** the executable platform foundation and first catalog vertical slice are working locally. The complete shop described in the product brief is still being built; planned features are labelled explicitly below.
 
@@ -14,6 +14,7 @@ Hop & Barley is a full-stack ecommerce portfolio project built as a professional
 - Swagger UI and an OpenAPI document for the versioned public API endpoints;
 - an OpenAPI-generated TypeScript client package;
 - a web unit-test baseline, API unit/e2e tests, and a full-stack Playwright smoke test;
+- pull-request CI for clean generation, quality/build, PostgreSQL migrations and rollback, and connected/unavailable browser flows;
 - one Docker Compose command that starts PostgreSQL, migrations/seed, API, and storefront.
 
 ## Local Services
@@ -161,7 +162,7 @@ Planned product work:
 - order creation with backend-owned totals and inventory correctness;
 - authentication, account, and order history;
 - admin catalog/inventory/order flows;
-- CI and a production deployment pipeline.
+- a production deployment pipeline after a provider decision.
 
 The backend remains a modular monolith. Microservices, Kafka, and distributed transactions are intentionally out of scope until the product has evidence that they are needed.
 

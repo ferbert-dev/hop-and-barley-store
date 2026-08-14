@@ -1,6 +1,6 @@
 # `@hop-and-barley/web`
 
-The Hop & Barley storefront is a Next.js App Router application. It is independently buildable, but is designed to run with the NestJS API and PostgreSQL database from the repository root.
+The Hop & Barley storefront is a Next.js App Router application. Its workspace build is dependency-aware and builds the generated API client first. The running storefront is designed to use the NestJS API and PostgreSQL database from the repository root.
 
 > **Current slice:** the home page proves server-rendered frontend-to-API-to-database connectivity and displays the seeded catalog. Product details, cart, checkout, authentication, account, and admin flows are planned but are not implemented yet.
 
@@ -56,9 +56,9 @@ From the repository root:
 
 ```bash
 pnpm local:up
-pnpm --filter @hop-and-barley/web test:unit
-pnpm --filter @hop-and-barley/web typecheck
-pnpm --filter @hop-and-barley/web build
+pnpm exec turbo run test:unit --filter=@hop-and-barley/web
+pnpm exec turbo run typecheck --filter=@hop-and-barley/web
+pnpm exec turbo run build --filter=@hop-and-barley/web
 pnpm --filter @hop-and-barley/e2e test:e2e
 ```
 
