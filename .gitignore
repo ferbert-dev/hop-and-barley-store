@@ -1,0 +1,57 @@
+# macOS and editor state
+.DS_Store
+.idea/
+.vscode/*.log
+*.swp
+*.swo
+
+# User-requested local brief patterns. Both files are already tracked and must
+# stay tracked; never remove them from the index or delete the local originals.
+/docs/07 Project M4-1.md
+/docs/hop-and-barley-monorepo-plan.md
+
+# Dependencies and package-manager caches
+node_modules/
+.pnpm-store/
+.pnp.*
+
+# Build and framework output
+.next/
+dist/
+build/
+out/
+.turbo/
+*.tsbuildinfo
+
+# Test and browser artifacts
+coverage/
+playwright-report/
+test-results/
+blob-report/
+/output/playwright/
+.playwright-cli/
+graphify-out/
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.cache/
+.tmp/
+tmp/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Local database and container state
+postgres-data/
+docker-data/
+
+# Generated API artifacts
+/apps/api/openapi.json
+/apps/api/src/generated/prisma/

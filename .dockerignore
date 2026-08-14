@@ -1,0 +1,17 @@
+.git
+.github
+**/.next
+**/.playwright-cli
+**/.turbo
+**/coverage
+**/dist
+**/node_modules
+**/playwright-report
+**/test-results
+graphify-out
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+docs/07 Project M4-1.md
+docs/hop-and-barley-monorepo-plan.md

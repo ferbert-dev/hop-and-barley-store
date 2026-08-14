@@ -1,0 +1,14 @@
+{
+  "name": "@hop-and-barley/typescript-config",
+  "version": "0.1.0",
+  "private": true,
+  "files": [
+    "*.json"
+  ],
+  "exports": {
+    "./base.json": "./base.json",
+    "./nest.json": "./nest.json",
+    "./nextjs.json": "./nextjs.json",
+    "./node-library.json": "./node-library.json"
+  }
+}

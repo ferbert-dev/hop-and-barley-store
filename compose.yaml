@@ -1,0 +1,87 @@
+name: hop-and-barley
+
+x-api-environment: &api-environment
+  DATABASE_URL: postgresql://hopbarley:hopbarley@postgres:5432/hopbarley?schema=public
+  NODE_ENV: production
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: hopbarley
+      POSTGRES_PASSWORD: hopbarley
+      POSTGRES_USER: hopbarley
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U hopbarley -d hopbarley']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: >-
+      sh -c "pnpm --filter @hop-and-barley/api db:migrate:deploy &&
+      pnpm --filter @hop-and-barley/api db:seed"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: *api-environment
+    restart: 'no'
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *api-environment
+      CORS_ORIGINS: http://localhost:3000
+      PORT: 3001
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/api/v1/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - '3001:3001'
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_INTERNAL_URL: http://api:3001/api/v1
+      HOSTNAME: 0.0.0.0
+      NODE_ENV: production
+      PORT: 3000
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - '3000:3000'
+
+volumes:
+  postgres-data:

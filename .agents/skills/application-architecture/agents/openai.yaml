@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Application Architecture'
+  short_description: 'Review system design and architecture decisions'
+  default_prompt: 'Use $application-architecture to review or evolve the Hop & Barley architecture with evidence and explicit tradeoffs.'

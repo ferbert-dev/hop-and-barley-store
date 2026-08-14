@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Local Stack Operations'
+  short_description: 'Run and verify the local Docker, Prisma, and PostgreSQL stack'
+  default_prompt: 'Use $local-stack-operations to start, migrate, verify, or stop the local Hop & Barley stack safely.'

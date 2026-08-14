@@ -1,0 +1,249 @@
+@import 'tailwindcss';
+
+:root {
+  --ink: #172019;
+  --paper: #f3efe4;
+  --cream: #fffaf0;
+  --amber: #df8f2d;
+  --green: #1f5b42;
+  --line: rgba(23, 32, 25, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background:
+    radial-gradient(
+      circle at 20% 0%,
+      rgba(223, 143, 45, 0.2),
+      transparent 28rem
+    ),
+    var(--paper);
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+}
+
+main {
+  min-height: 100vh;
+}
+
+.site-header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 1.25rem 2rem;
+}
+
+.site-header p,
+footer {
+  font-size: 0.78rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.brand {
+  color: var(--ink);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.08em;
+  text-decoration: none;
+}
+
+.brand span {
+  color: var(--amber);
+}
+
+.hero {
+  align-items: end;
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: 1fr auto;
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: clamp(5rem, 12vw, 10rem) 2rem clamp(4rem, 9vw, 7rem);
+}
+
+.eyebrow {
+  color: var(--green);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  margin: 0 0 1rem;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1,
+h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  letter-spacing: -0.055em;
+}
+
+h1 {
+  font-size: clamp(4rem, 11vw, 9rem);
+  line-height: 0.83;
+  margin-bottom: 2rem;
+  max-width: 930px;
+}
+
+.lede {
+  font-size: clamp(1.05rem, 2vw, 1.35rem);
+  line-height: 1.6;
+  max-width: 680px;
+}
+
+.status {
+  align-items: center;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  display: flex;
+  font-size: 0.72rem;
+  font-weight: 800;
+  gap: 0.55rem;
+  letter-spacing: 0.08em;
+  padding: 0.72rem 1rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.status span {
+  background: currentColor;
+  border-radius: 50%;
+  height: 0.55rem;
+  width: 0.55rem;
+}
+
+.online {
+  color: var(--green);
+}
+
+.offline {
+  color: #a53e2f;
+}
+
+.catalog {
+  background: var(--ink);
+  color: var(--cream);
+  padding: clamp(4rem, 8vw, 7rem) max(2rem, calc((100vw - 1116px) / 2));
+}
+
+.catalog .eyebrow {
+  color: #e8a956;
+}
+
+.section-heading h2 {
+  font-size: clamp(2.8rem, 6vw, 5.5rem);
+  margin-bottom: 3rem;
+}
+
+.product-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.product-card {
+  align-items: center;
+  border: 1px solid rgba(255, 250, 240, 0.2);
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: 118px 1fr;
+  padding: 2rem;
+}
+
+.product-card h3 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.7rem;
+  margin-bottom: 0.75rem;
+}
+
+.product-card p {
+  color: rgba(255, 250, 240, 0.68);
+  line-height: 1.55;
+}
+
+.can {
+  align-items: center;
+  background: var(--amber);
+  border-radius: 0.45rem 0.45rem 1.2rem 1.2rem;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  height: 168px;
+  justify-content: space-between;
+  padding: 1.2rem 0.7rem;
+  width: 96px;
+}
+
+.can span {
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+}
+
+.can strong {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.65rem;
+}
+
+.price {
+  color: #e8a956;
+  display: inline-block;
+  margin-top: 0.8rem;
+}
+
+.empty-state {
+  border: 1px dashed rgba(255, 250, 240, 0.3);
+  padding: 2rem;
+}
+
+footer {
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 2.5rem 2rem;
+}
+
+@media (max-width: 760px) {
+  .site-header p {
+    display: none;
+  }
+
+  .hero {
+    align-items: start;
+    grid-template-columns: 1fr;
+  }
+
+  .status {
+    width: fit-content;
+  }
+
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-card {
+    grid-template-columns: 88px 1fr;
+    padding: 1.5rem;
+  }
+
+  .can {
+    height: 140px;
+    width: 76px;
+  }
+}
