@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const screenshotPathTemplate =
+  process.platform === 'darwin'
+    ? '{testDir}/__screenshots__/{testFilePath}/{arg}{ext}'
+    : '{testDir}/__screenshots__/{platform}/{testFilePath}/{arg}{ext}';
+
 export default defineConfig({
   testDir: './tests',
   expect: {
@@ -7,7 +12,7 @@ export default defineConfig({
       animations: 'disabled',
       caret: 'hide',
       maxDiffPixelRatio: 0.01,
-      pathTemplate: '{testDir}/__screenshots__/{testFilePath}/{arg}{ext}',
+      pathTemplate: screenshotPathTemplate,
       scale: 'css',
       stylePath: './tests/visual-stability.css',
       threshold: 0.2,

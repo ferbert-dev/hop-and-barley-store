@@ -14,6 +14,8 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
   const workflow = read('.github/workflows/ci.yml');
 
   assert.match(workflow, /pull_request:/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /update_visual_baselines:/);
   assert.doesNotMatch(workflow, /pull_request_target:/);
   assert.match(workflow, /permissions:\n\s+contents: read/);
   assert.match(workflow, /node-version: ['"]24\.5\.0['"]/);
@@ -43,7 +45,9 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
     'pnpm test:catalog:postgres',
     'docker compose up -d --build --wait',
     'pnpm --filter @hop-and-barley/e2e test:e2e',
+    'pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots',
     "E2E_EXPECT_API_STATUS='API unavailable'",
+    'apps/e2e/tests/__screenshots__/linux',
     'docker compose down --remove-orphans',
   ]) {
     assert.ok(workflow.includes(command), `${command} is required in CI`);
@@ -77,4 +81,20 @@ test('the security override and Docker context privacy guards remain exact', () 
 
   assert.match(workspace, /overrides:\n\s+'@nestjs\/swagger>js-yaml': 5\.2\.2/);
   assert.match(dockerIgnore, /^\*\*\/\.DS_Store$/m);
+});
+
+test('visual regression baselines are platform-specific without weaker gates', () => {
+  const config = read('apps/e2e/playwright.config.ts');
+
+  assert.match(config, /process\.platform === 'darwin'/);
+  assert.ok(
+    config.includes("'{testDir}/__screenshots__/{testFilePath}/{arg}{ext}'"),
+  );
+  assert.ok(
+    config.includes(
+      "'{testDir}/__screenshots__/{platform}/{testFilePath}/{arg}{ext}'",
+    ),
+  );
+  assert.match(config, /maxDiffPixelRatio: 0\.01/);
+  assert.match(config, /threshold: 0\.2/);
 });

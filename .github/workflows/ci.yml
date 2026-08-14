@@ -5,6 +5,13 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      update_visual_baselines:
+        description: Generate Ubuntu visual baselines as a downloadable artifact
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -19,6 +26,7 @@ env:
 jobs:
   quality:
     name: Quality and build
+    if: github.event_name != 'workflow_dispatch' || !inputs.update_visual_baselines
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -52,6 +60,7 @@ jobs:
 
   postgresql:
     name: PostgreSQL migration contract
+    if: github.event_name != 'workflow_dispatch' || !inputs.update_visual_baselines
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -99,14 +108,29 @@ jobs:
         run: pnpm --filter @hop-and-barley/e2e exec playwright install --with-deps chromium
       - name: Start the isolated full stack
         run: docker compose up -d --build --wait
+      - name: Generate connected Ubuntu visual baselines
+        if: github.event_name == 'workflow_dispatch' && inputs.update_visual_baselines
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: apps/e2e/playwright-report/connected
+          PLAYWRIGHT_OUTPUT_DIR: apps/e2e/test-results/connected
+        run: pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots
       - name: Test the connected storefront
+        if: github.event_name != 'workflow_dispatch' || !inputs.update_visual_baselines
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: apps/e2e/playwright-report/connected
           PLAYWRIGHT_OUTPUT_DIR: apps/e2e/test-results/connected
         run: pnpm --filter @hop-and-barley/e2e test:e2e
       - name: Stop only the API service
         run: docker compose stop api
+      - name: Generate API-unavailable Ubuntu visual baseline
+        if: github.event_name == 'workflow_dispatch' && inputs.update_visual_baselines
+        env:
+          E2E_EXPECT_API_STATUS: API unavailable
+          PLAYWRIGHT_HTML_OUTPUT_DIR: apps/e2e/playwright-report/unavailable
+          PLAYWRIGHT_OUTPUT_DIR: apps/e2e/test-results/unavailable
+        run: E2E_EXPECT_API_STATUS='API unavailable' pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots
       - name: Test the safe API-unavailable storefront
+        if: github.event_name != 'workflow_dispatch' || !inputs.update_visual_baselines
         env:
           E2E_EXPECT_API_STATUS: API unavailable
           PLAYWRIGHT_HTML_OUTPUT_DIR: apps/e2e/playwright-report/unavailable
@@ -128,6 +152,7 @@ jobs:
           path: |
             apps/e2e/playwright-report
             apps/e2e/test-results
+            apps/e2e/tests/__screenshots__/linux
       - name: Stop isolated services
         if: always()
         run: docker compose down --remove-orphans
