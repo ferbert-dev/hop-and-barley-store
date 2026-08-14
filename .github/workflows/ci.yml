@@ -128,7 +128,7 @@ jobs:
           E2E_EXPECT_API_STATUS: API unavailable
           PLAYWRIGHT_HTML_OUTPUT_DIR: apps/e2e/playwright-report/unavailable
           PLAYWRIGHT_OUTPUT_DIR: apps/e2e/test-results/unavailable
-        run: E2E_EXPECT_API_STATUS='API unavailable' pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots
+        run: E2E_EXPECT_API_STATUS='API unavailable' pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots --grep 'renders the configured API availability state'
       - name: Test the safe API-unavailable storefront
         if: github.event_name != 'workflow_dispatch' || !inputs.update_visual_baselines
         env:

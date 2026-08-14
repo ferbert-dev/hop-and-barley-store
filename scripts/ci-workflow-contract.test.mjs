@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
@@ -97,4 +97,26 @@ test('visual regression baselines are platform-specific without weaker gates', (
   );
   assert.match(config, /maxDiffPixelRatio: 0\.01/);
   assert.match(config, /threshold: 0\.2/);
+
+  const expectedBaselines = [
+    'api-unavailable-hero.png',
+    'canvas-at-shell-footer.png',
+    'canvas-at-shell-header.png',
+    'compact-mobile-360-shell-footer.png',
+    'compact-mobile-360-shell-header.png',
+    'desktop-1280-shell-footer.png',
+    'desktop-1280-shell-header.png',
+    'mobile-navigation-open.png',
+    'mobile-visible-focus.png',
+    'tablet-768-shell-footer.png',
+    'tablet-768-shell-header.png',
+  ];
+  const linuxBaselines = readdirSync(
+    join(
+      repositoryRoot,
+      'apps/e2e/tests/__screenshots__/linux/storefront-shell.spec.ts',
+    ),
+  ).sort();
+
+  assert.deepEqual(linuxBaselines, expectedBaselines);
 });
