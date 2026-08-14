@@ -5,6 +5,7 @@ import {
 } from '@hop-and-barley/api-client';
 
 const DEFAULT_API_URL = 'http://127.0.0.1:3001/api/v1';
+export const CATALOG_REQUEST_TIMEOUT_MS = 1_000;
 
 export type CatalogLoadResult =
   | { catalog: CatalogCompatibilityResult; connected: true }
@@ -43,7 +44,9 @@ export async function loadCatalog(
     const client = createApiClient(resolveApiOrigin(rawApiUrl), {
       cache: 'no-store',
     });
-    const { data, error, response } = await client.GET('/api/v1/products');
+    const { data, error, response } = await client.GET('/api/v1/products', {
+      signal: AbortSignal.timeout(CATALOG_REQUEST_TIMEOUT_MS),
+    });
     if (!response.ok || error !== undefined || data === undefined) {
       throw new Error(`Catalog request failed with ${response.status}`);
     }

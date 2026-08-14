@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { loadCatalog, resolveApiOrigin } from './catalog';
+import {
+  CATALOG_REQUEST_TIMEOUT_MS,
+  loadCatalog,
+  resolveApiOrigin,
+} from './catalog';
 
 const legacyItem = {
   currency: 'USD',
@@ -67,10 +71,15 @@ describe('resolveApiOrigin', () => {
 });
 
 describe('loadCatalog', () => {
+  it('bounds the internal API request so an unavailable service fails fast', () => {
+    expect(CATALOG_REQUEST_TIMEOUT_MS).toBe(1_000);
+  });
+
   it('uses the generated path once with no-store and normalizes the envelope', async () => {
     const fetch = vi.fn(async (request: Request) => {
       expect(request.url).toBe('http://api:3001/api/v1/products');
       expect(request.cache).toBe('no-store');
+      expect(request.signal).toBeInstanceOf(AbortSignal);
       return Response.json({ items: [pagedItem], meta });
     });
     vi.stubGlobal('fetch', fetch);
