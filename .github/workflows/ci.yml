@@ -120,8 +120,10 @@ jobs:
           PLAYWRIGHT_HTML_OUTPUT_DIR: apps/e2e/playwright-report/connected
           PLAYWRIGHT_OUTPUT_DIR: apps/e2e/test-results/connected
         run: pnpm --filter @hop-and-barley/e2e test:e2e
-      - name: Stop only the API service
-        run: docker compose stop api
+      - name: Remove only the isolated API service
+        run: |
+          docker compose stop api
+          docker compose rm --force api
       - name: Generate API-unavailable Ubuntu visual baseline
         if: github.event_name == 'workflow_dispatch' && inputs.update_visual_baselines
         env:

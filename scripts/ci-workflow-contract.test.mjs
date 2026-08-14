@@ -44,6 +44,7 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
     'pnpm audit --prod --audit-level=high',
     'pnpm test:catalog:postgres',
     'docker compose up -d --build --wait',
+    'docker compose rm --force api',
     'pnpm --filter @hop-and-barley/e2e test:e2e',
     'pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots',
     "E2E_EXPECT_API_STATUS='API unavailable'",
