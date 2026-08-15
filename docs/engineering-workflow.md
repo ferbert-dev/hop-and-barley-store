@@ -51,15 +51,16 @@ The machine-readable policy is
 missing, duplicated or weakened rule. It also recomputes the machine-policy
 digest so changing a nested value cannot bypass the explicit field assertions.
 
-Architecture state for this retrospective:
+Architecture state after the catalog retrospective:
 
-- **Implemented:** the accepted combined tree has the root `StorefrontShell`,
-  D3 web-local UI primitives and the generated OpenAPI client; source paths are
-  checked by `workflow:check` when that combined tree is present.
-- **Decided:** the evidence, isolation, integration and promotion rules in this
-  document apply before C2 review.
-- **Proposed:** none; R1 does not select a new service, package or deployment
-  provider.
+- **Implemented:** C1, C2 and C3 are merged. The catalog has deterministic
+  PostgreSQL fixtures, a bounded NestJS/OpenAPI contract, a generated client,
+  server-rendered URL state, query-specific public caching and responsive UI.
+- **Decided:** one ticket owns one branch and one pull request. Merge requires
+  green required CI plus an independent PASS for the exact head SHA; only then
+  may the ticket move to Done.
+- **Proposed:** P1, O0 and O1 trial conditional evidence tiers and generated
+  semantic browser evidence before R3 evaluates the result.
 - **Unknown/pending:** the exact auth/admin route-group and layout ownership is
   intentionally blocked on its dedicated architecture decision.
 
@@ -209,13 +210,13 @@ consumer.
 Rollback: keep or return the contract to the first consumer until two real
 consumers and a stable boundary are demonstrated.
 
-### C2 catalog integration gate
+### Accepted catalog integration boundary
 
-C2 may extend the NestJS/OpenAPI contract, but any C2 web surface must reuse the
-accepted D3 `ProductCard`, `Price`, `LoadingState`, `EmptyState` and `ErrorState`
-exports. It must call the generated `@hop-and-barley/api-client` client rather
-than define a raw-fetch DTO contract. A third product-card implementation or a
-second hand-written transport type fails review.
+The accepted catalog web surface reuses `ProductCard`, `Price`, `LoadingState`,
+`EmptyState` and `ErrorState`, and calls the generated
+`@hop-and-barley/api-client` client. Future product and cart work preserves this
+boundary: a third product-card implementation or a second hand-written catalog
+transport type fails review.
 
 Source-review paths are fixed in the contract:
 
@@ -225,9 +226,10 @@ Source-review paths are fixed in the contract:
 - `packages/api-client/src/client.ts#createApiClient`
 - `packages/api-client/src/generated/schema.ts#paths`
 
-The C2 owner checks these imports before implementation and the independent
-reviewer repeats the source audit. Rollback removes only the new C2 adapter/UI
-slice and preserves the accepted D3 primitives and generated client.
+The owning feature builder checks these imports before implementation and the
+independent reviewer repeats the source audit. Rollback removes only the new
+feature adapter/UI slice and preserves the accepted primitives and generated
+client.
 
 ## R1 measured retrospective
 
@@ -260,7 +262,7 @@ and dimension-checked baselines. The integrated review then reported web 80/80,
 API 18/18, PostgreSQL 11/11 and connected/unavailable Chromium 10/10 each, with
 zero generated client drift.
 
-For C2 and the next cluster, measure these gates before requesting review:
+R1 established these gates for C2 and the catalog cluster:
 
 - 100% exact equality between independently derived and submitted evidence
   mappings; zero duplicate, invented, missing or non-closing records;
@@ -277,3 +279,113 @@ The primary ticket owner collects the measurements, the integrator checks the
 combined tree and the independent reviewer recomputes them. A missed target does
 not get waived in prose: return the owning ticket to In Progress, preserve the
 failed evidence and apply the rollback stated above.
+
+## R2 measured catalog retrospective
+
+R2 was triggered after C1, C2 and C3 reached Done. Repository source, tests,
+migrations and Git history define the implemented baseline; linked Notion Agent
+Runs define review results and timestamps. The ignored HTML reference bundle is
+not reproducible from a clean clone, so its original 12-card, 12-detail and
+95-specification comparison remains accepted review evidence rather than a new
+claim.
+
+### Measured baseline
+
+| Slice | Implemented result                                                                                                    | Review feedback                                                                                                              | Final result                                                                    |
+| ----- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| C1    | 5 categories, 12 deterministic USD products, forward migration and seed                                               | First review found non-atomic structural rollback                                                                            | Corrected and independently reproduced from disposable PostgreSQL in 17 minutes |
+| C2    | Bounded query grammar, one `RepeatableRead` count/items/facets transaction, OpenAPI client and web bridge             | Closure exposed legacy discriminator, clean-dist startup, Docker-context and README drift                                    | Four bounded corrections, 7-minute integration and 5-minute combined review     |
+| C3    | Server-rendered URL state, five catalog states, 60-second public cache, responsive catalog and 48 cross-platform PNGs | Two green-CI heads still failed independent review: first for incomplete evidence, then for five unsupported semantic claims | Exact head `08d1547` passed with 113 PASS + 22 reviewed N/A mappings            |
+
+Both foundation PR #1 and catalog PR #2 needed six commits. PR #1 took 91
+minutes 44 seconds from open to merge; PR #2 took 2 hours 43 minutes 3 seconds.
+The useful failures were atomic rollback, clean prerequisites, Linux rendering,
+bounded unavailable behavior and exact assertion coverage. The expensive
+failure mode was discovering evidence and platform prerequisites only after a
+review-ready head had been published.
+
+### Keep
+
+- Keep disposable PostgreSQL fresh/upgrade/double-seed, concurrency and injected
+  rollback-failure proofs whenever schema, migration, seed or stored data change.
+- Keep NestJS DTO → OpenAPI → generated client as the only API/web catalog
+  transport, plus two-pass generated-byte stability and strict rollback
+  compatibility.
+- Keep query-specific public catalog caching at 60 seconds, the 1-second backend
+  request bound, failed-response non-caching and immediate recovery. Private
+  auth, cart and order responses remain `private, no-store`.
+- Keep platform-specific visual baselines at the existing 0.2 channel and 1%
+  pixel gates, isolated connected/unavailable runtime tests and explicit cleanup.
+- Keep independent exact-head review: it prevented two false C3 merges even when
+  CI was green.
+
+### Change
+
+One ticket now owns one `agent/<ticket>-<slug>` branch and one draft pull
+request based on `main`. The required order is Ready ticket → Running Agent Run
+→ branch → commit → draft PR → green required CI → exact-head independent
+review → ready PR → merge → Done. A new commit invalidates the prior PASS and
+requires a new review run.
+
+After a FAIL, preserve the failed Agent Run and use one bounded correction
+bundle by default. Rerun the affected local proof plus package checks, then let
+full exact-head CI remain the merge gate. Do not keep one reviewer run open
+across multiple heads and later relabel it Succeeded.
+
+During the P1/O0/O1 experiment, automated PASS records are generated from the
+test reporter and carry the head SHA, spec hash, stable test ID, assertion IDs,
+run URL, exit code and artifact hash. A test name or source path is navigation,
+not semantic proof. Browser evidence waits for observable application state;
+`networkidle` is forbidden. A newly cited browser evidence test must pass five
+repeats before it can support a closure mapping.
+
+Whenever catalog query grammar changes, one table-driven vector set must pass
+through the API and web parsers with identical valid, invalid, default and
+canonical classifications. This is a change-triggered test, not a reason to add
+a speculative shared runtime package now.
+
+### Conditional evidence tiers
+
+Every ticket records changed paths, relevant tests, CI, cleanup and exact head
+SHA. Add evidence only when the patch creates the corresponding risk:
+
+- PostgreSQL for schema, migration, seed or stored-data changes;
+- Playwright for user-flow or browser-state changes;
+- visual and manual review for changed visual bytes, layout or manual-only risk;
+- the full binary/dependency manifest for binary, lockfile, dependency or
+  multi-slice integration changes.
+
+Ticket-specific behavior such as cache isolation remains an explicit acceptance
+mapping; it is not hidden outside a generic quality matrix. Visual manifests
+are generated from files and reviewed, not hand-maintained as independent
+truth. A substantive finding always blocks merge regardless of which tier
+selected the proof.
+
+### Retire
+
+- Retire selective multi-slice integration when a dedicated ticket PR can own
+  the change directly.
+- Retire hand-written automated PASS rows and source-only artifact references.
+- Retire Cartesian state/check/channel rows that do not represent a distinct
+  acceptance risk; preserve exact required-set equality for the mappings that
+  do exist.
+- Retire routine full PostgreSQL, browser, visual or binary evidence for
+  documentation-only corrections while keeping full exact-head CI before merge.
+
+### P1, O0 and O1 experiment
+
+P1 and O0 may proceed in parallel only in separate branches and pull requests.
+O1 starts from merged O0 and also owns a dedicated PR. R3 measures the three
+deliveries against this catalog baseline:
+
+- 3/3 tickets have their own branch and PR; zero tickets reach Done before merge;
+- zero review requests have red required CI or mechanically incomplete evidence;
+- zero automated PASS mappings lack state-specific semantic assertions;
+- target no more than three CI runs and two exact-head reviews per ticket, while
+  every substantive finding still blocks merge;
+- zero generated drift, shared-Compose mutation or uncleaned isolated resource.
+
+The primary owner records timestamps and counts in the ticket and Agent Run.
+The independent reviewer verifies exact-head traceability and the selected
+evidence tiers. Rollback removes only the R2 policy delta, restores the prior
+ticket template and keeps all accepted catalog runtime/data behavior unchanged.
