@@ -45,6 +45,78 @@ test('renders the ready catalog and applies URL-owned filters', async ({
   ).toHaveAttribute('href', '/');
 });
 
+test('supports keyboard-only catalog filtering with Tab, Shift+Tab, and Enter', async ({
+  page,
+}) => {
+  test.skip(unavailable, 'requires the connected API');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+
+  const search = page.getByLabel('Search products');
+  const category = page.getByLabel('Category');
+  await expect(
+    page.getByRole('status').filter({ hasText: 'API connected' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('search', { name: 'Filter products' }),
+  ).toBeVisible();
+  await expect(search).toBeVisible();
+  await expect(category).toBeVisible();
+
+  await page.keyboard.press('Tab');
+  await expect(
+    page.getByRole('link', { name: 'Skip to main content' }),
+  ).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(
+    page.getByRole('link', { name: 'Hop and Barley home' }),
+  ).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Storefront' })
+      .getByRole('link', { name: 'Products', exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Storefront' })
+      .getByRole('link', { name: 'Shopping cart' }),
+  ).toBeFocused();
+
+  await page.keyboard.press('Tab');
+  await expect(search).toBeFocused();
+  await page.keyboard.type('Citra');
+
+  await page.keyboard.press('Tab');
+  await expect(category).toBeFocused();
+  await page.keyboard.press('h');
+  await expect(category).toHaveValue('hops');
+
+  await page.keyboard.press('Tab');
+  await expect(page.getByLabel('Minimum price')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByLabel('Maximum price')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByLabel('Sort by')).toBeFocused();
+  await page.keyboard.press('Tab');
+  const limit = page.getByLabel('Products per page');
+  await expect(limit).toBeFocused();
+  await page.keyboard.press('Tab');
+  const apply = page.getByRole('button', { name: 'Apply filters' });
+  await expect(apply).toBeFocused();
+
+  await page.keyboard.press('Shift+Tab');
+  await expect(limit).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(apply).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  await expect(page).toHaveURL(/\?search=Citra&category=hops$/);
+  await expect(page).toHaveTitle('Citra — Hop & Barley products');
+  await expect(page.getByRole('link', { name: 'Citra Hops' })).toBeVisible();
+});
+
 test('keeps stable pagination and restores URL state with browser history', async ({
   page,
 }) => {
@@ -102,6 +174,78 @@ test('renders invalid and empty URLs with safe recovery controls', async ({
   await expect(page.getByLabel('Category')).toContainText('Hops');
 });
 
+test('supports keyboard-only empty recovery with visible focus', async ({
+  page,
+}) => {
+  test.skip(unavailable, 'requires the connected API');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(stateUrls.empty);
+
+  const clear = page.getByRole('link', { name: 'Clear filters' });
+  await expect(
+    page.getByRole('status').filter({ hasText: 'API connected' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('search', { name: 'Filter products' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'No products match these filters' }),
+  ).toBeVisible();
+  await expect(clear).toBeVisible();
+
+  await pressTab(page, 12);
+  await expect(clear).toBeFocused();
+  await assertProjectFocusVisible(clear, 'empty recovery');
+
+  await page.keyboard.press('Shift+Tab');
+  await expect(
+    page.getByRole('button', { name: 'Apply filters' }),
+  ).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(clear).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveTitle('Shop brewing ingredients | Hop & Barley');
+  await expect(page.getByText('12 products found')).toBeVisible();
+});
+
+test('announces and titles ready, filtered, and empty catalog routes', async ({
+  page,
+}) => {
+  test.skip(unavailable, 'requires the connected API');
+
+  const states = [
+    {
+      announcement: '12 products found',
+      title: 'Shop brewing ingredients | Hop & Barley',
+      url: stateUrls.ready,
+    },
+    {
+      announcement: /\d+ products found/,
+      title: 'Hops — Hop & Barley products',
+      url: stateUrls.filtered,
+    },
+    {
+      announcement: 'No products match these filters',
+      title: 'Brewing Salts — Hop & Barley products',
+      url: stateUrls.empty,
+    },
+  ] as const;
+
+  for (const state of states) {
+    await page.goto(state.url);
+    await expect(page).toHaveTitle(state.title);
+    await expect(
+      page.getByRole('status').filter({ hasText: 'API connected' }),
+    ).toBeVisible();
+    const announcement = page
+      .locator('[aria-live="polite"]')
+      .filter({ hasText: state.announcement });
+    await expect(announcement).toBeVisible();
+  }
+});
+
 test('keeps ready, filtered, and empty states responsive at every Q1 probe', async ({
   page,
 }) => {
@@ -146,6 +290,70 @@ test('keeps unavailable and loading states responsive at every Q1 probe', async 
   }
 });
 
+test('announces and titles loading and error catalog routes', async ({
+  page,
+}) => {
+  test.skip(!unavailable, 'requires the unavailable API phase');
+  const search = 'Loading route announcement';
+  const targetHref = `/?search=${encodeURIComponent(search)}`;
+
+  await page.goto('/?page=201');
+  await expect(page).toHaveTitle('Invalid catalog URL | Hop & Barley');
+  await startLoadingNavigation(page, targetHref);
+  const loading = page
+    .getByRole('status')
+    .filter({ hasText: 'Loading products' });
+  await expect(loading).toHaveAttribute('aria-busy', 'true');
+  await expect(loading).toHaveAttribute('aria-live', 'polite');
+  await expect(page).toHaveTitle(`${search} — Hop & Barley products`);
+
+  const error = page
+    .getByRole('alert')
+    .filter({ hasText: 'Products unavailable' });
+  await expect(error).toBeVisible();
+  await expect(error).toHaveAttribute('aria-live', 'assertive');
+  await expect(page).toHaveTitle(`${search} — Hop & Barley products`);
+});
+
+test('supports keyboard-only error retry with visible focus', async ({
+  page,
+}) => {
+  test.skip(!unavailable, 'requires the unavailable API phase');
+  const retryHref = '/?search=keyboard-error-retry';
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(retryHref);
+
+  const retry = page.getByRole('link', { name: 'Try again' });
+  await expect(
+    page.getByRole('status').filter({ hasText: 'API unavailable' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'Products unavailable' }),
+  ).toBeVisible();
+  await expect(retry).toBeVisible();
+
+  await pressTab(page, 5);
+  await expect(retry).toBeFocused();
+  await assertProjectFocusVisible(retry, 'error retry');
+
+  await page.keyboard.press('Shift+Tab');
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Storefront' })
+      .getByRole('link', { name: 'Shopping cart' }),
+  ).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(retry).toBeFocused();
+
+  const navigation = page.waitForNavigation();
+  await page.keyboard.press('Enter');
+  await navigation;
+  await expect(page).toHaveURL(retryHref);
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'Products unavailable' }),
+  ).toBeVisible();
+});
+
 test('has no serious or critical catalog accessibility violations', async ({
   page,
 }) => {
@@ -156,13 +364,68 @@ test('has no serious or critical catalog accessibility violations', async ({
   for (const url of urls) {
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto(url);
-    const results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
-    expect(
-      results.violations.filter(
-        ({ impact }) => impact === 'critical' || impact === 'serious',
-      ),
-    ).toEqual([]);
+    await assertNoBlockingAxeViolations(page, url);
   }
+});
+
+test('has no serious or critical Axe violations in the loading state', async ({
+  page,
+}) => {
+  test.skip(!unavailable, 'requires the unavailable API phase');
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('/?page=201');
+  await startLoadingNavigation(page, '/?search=loading-axe-state');
+  await assertNoBlockingAxeViolations(page, 'loading');
+});
+
+test('honours reduced motion in every catalog availability phase', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(
+    unavailable ? '/?search=reduced-motion-unavailable' : stateUrls.ready,
+  );
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      ),
+    )
+    .toBe(true);
+  const action = unavailable
+    ? page.getByRole('link', { name: 'Try again' })
+    : page.getByRole('button', { name: 'Apply filters' });
+  await expect(action).toBeVisible();
+
+  const motion = await page.evaluate(() => {
+    const catalog = document.querySelector<HTMLElement>(
+      'section[aria-label="Catalog"], section[aria-labelledby="catalog-title"]',
+    );
+    const target = document.querySelector<HTMLElement>(
+      'main a[href], main button',
+    );
+    if (!catalog || !target)
+      throw new TypeError('Catalog motion probe missing');
+    const catalogStyle = getComputedStyle(catalog);
+    const targetStyle = getComputedStyle(target);
+
+    return {
+      animationDuration: catalogStyle.animationDuration,
+      animationIterationCount: catalogStyle.animationIterationCount,
+      animationName: catalogStyle.animationName,
+      scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
+      transitionDuration: targetStyle.transitionDuration,
+    };
+  });
+
+  expect(motion).toEqual({
+    animationDuration: '1e-05s',
+    animationIterationCount: '1',
+    animationName: 'none',
+    scrollBehavior: qualityGates.reducedMotion.scrollBehavior,
+    transitionDuration: '0s',
+  });
 });
 
 test('matches connected catalog state baselines', async ({ page }) => {
@@ -266,7 +529,40 @@ async function assertResponsiveCatalog(page: Page, label: string) {
     expect(box!.height, `${label} target height`).toBeGreaterThanOrEqual(
       qualityGates.pointerTarget.minimumHeightCssPx,
     );
+    expect(box!.width, `${label} target width`).toBeGreaterThanOrEqual(
+      qualityGates.pointerTarget.minimumWidthCssPx,
+    );
   }
+}
+
+async function assertNoBlockingAxeViolations(page: Page, label: string) {
+  const results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
+  expect(
+    results.violations.filter(
+      ({ impact }) => impact === 'critical' || impact === 'serious',
+    ),
+    `${label} Axe results`,
+  ).toEqual([]);
+}
+
+async function pressTab(page: Page, count: number) {
+  for (let index = 0; index < count; index += 1) {
+    await page.keyboard.press('Tab');
+  }
+}
+
+async function assertProjectFocusVisible(target: Locator, label: string) {
+  const outline = await target.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      style: style.outlineStyle,
+      widthCssPx: Number.parseFloat(style.outlineWidth),
+    };
+  });
+  expect(outline.style, `${label} outline style`).toBe('solid');
+  expect(outline.widthCssPx, `${label} outline width`).toBeGreaterThanOrEqual(
+    qualityGates.focus.minimumIndicatorThicknessCssPx,
+  );
 }
 
 async function assertGridColumns(articles: Locator, width: number) {

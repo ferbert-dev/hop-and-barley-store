@@ -1,158 +1,51 @@
 {
-  "schemaVersion": 1,
-  "baselineDirectory": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts",
+  "schemaVersion": 2,
+  "baselineDirectories": {
+    "darwin": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts",
+    "linux": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts"
+  },
   "review": {
-    "outcome": "pending",
-    "reviewerAgentRun": null,
-    "reviewedAt": null
+    "outcome": "approved",
+    "reviewerAgentRun": "https://app.notion.com/p/3bdd78850eab81dea404f9242a124efb",
+    "reviewedAt": "2026-08-15T02:30:32Z",
+    "observation": "The dedicated independent manual-evidence review visually approved all unchanged 24 macOS and 24 Ubuntu C3 catalog baselines. The later exact-head closure review remains a distinct process gate."
   },
   "baselines": [
     {
-      "id": "c3-core-loading-360",
+      "id": "c3-darwin-catalog-empty-1280",
+      "platform": "darwin",
       "kind": "core-state",
-      "state": "loading",
+      "state": "empty",
       "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-loading-360.png",
-      "width": 360,
-      "height": 239,
-      "sha256": "372cbcad39d571f232d046e51b3945c6744788b2c86bbf3d346fc65206577b8b",
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-empty-1280.png",
+      "width": 1280,
+      "height": 1196,
+      "sha256": "ef5ef46e99537dd6e209816cffe7f32ff17da2ea3b7315ef387e2dd647852ee2",
       "viewport": {
-        "id": "compact-mobile-360",
-        "width": 360,
-        "height": 800
+        "id": "desktop-1280",
+        "width": 1280,
+        "height": 900
       }
     },
     {
-      "id": "c3-core-loading-768",
+      "id": "c3-darwin-catalog-empty-1440",
+      "platform": "darwin",
       "kind": "core-state",
-      "state": "loading",
+      "state": "empty",
       "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-loading-768.png",
-      "width": 768,
-      "height": 239,
-      "sha256": "1b7021523ad3f1fc85ebfde20f1ac04bddd7e508bea7b92bf13b0e9bb7779695",
-      "viewport": { "id": "tablet-768", "width": 768, "height": 1024 }
-    },
-    {
-      "id": "c3-core-loading-1280",
-      "kind": "core-state",
-      "state": "loading",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-loading-1280.png",
-      "width": 1280,
-      "height": 316,
-      "sha256": "23700a413f67fb9daa4d5a1c11381d2240c69148f5fe4b68e01f89a90a0a3f73",
-      "viewport": { "id": "desktop-1280", "width": 1280, "height": 900 }
-    },
-    {
-      "id": "c3-core-loading-1440",
-      "kind": "core-state",
-      "state": "loading",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-loading-1440.png",
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-empty-1440.png",
       "width": 1440,
-      "height": 335,
-      "sha256": "e44704e4118fd49b17eb2cab38de284aa91c9fcd8f9384a9899186b425c83551",
-      "viewport": { "id": "canvas-at", "width": 1440, "height": 900 }
-    },
-    {
-      "id": "c3-core-ready-360",
-      "kind": "core-state",
-      "state": "ready",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-ready-360.png",
-      "width": 360,
-      "height": 6074,
-      "sha256": "735ba99f8665a612d780f269ad25c97c03ef17597c246fde1d28d7717eed1068",
+      "height": 1229,
+      "sha256": "ac6d3adc64f4d8cb6de9df88bea951880e637a7c547c3c9fcd032c4058a2a69b",
       "viewport": {
-        "id": "compact-mobile-360",
-        "width": 360,
-        "height": 800
+        "id": "canvas-at",
+        "width": 1440,
+        "height": 900
       }
     },
     {
-      "id": "c3-core-ready-768",
-      "kind": "core-state",
-      "state": "ready",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-ready-768.png",
-      "width": 768,
-      "height": 3347,
-      "sha256": "b96a7be5e85c42e1d1ffb4c2751d972869690cc76dad3148e5cb4f95035c1eb9",
-      "viewport": { "id": "tablet-768", "width": 768, "height": 1024 }
-    },
-    {
-      "id": "c3-core-ready-1280",
-      "kind": "core-state",
-      "state": "ready",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-ready-1280.png",
-      "width": 1280,
-      "height": 1928,
-      "sha256": "c392045eb22bf7d7fa7e1a58136050ad88c5b449d17ba600c15989a6b6138a4f",
-      "viewport": { "id": "desktop-1280", "width": 1280, "height": 900 }
-    },
-    {
-      "id": "c3-core-ready-1440",
-      "kind": "core-state",
-      "state": "ready",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-ready-1440.png",
-      "width": 1440,
-      "height": 2073,
-      "sha256": "a31952742f32ad1094ca2fa5a2af3473b3c637042f3b21ff3aafc563e6622b3d",
-      "viewport": { "id": "canvas-at", "width": 1440, "height": 900 }
-    },
-    {
-      "id": "c3-core-filtered-360",
-      "kind": "core-state",
-      "state": "filtered",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-filtered-360.png",
-      "width": 360,
-      "height": 1732,
-      "sha256": "9bc982ea6256a5ad0fdeb32cad1cba5f7454d880cdb8f0172102a564805dd31a",
-      "viewport": {
-        "id": "compact-mobile-360",
-        "width": 360,
-        "height": 800
-      }
-    },
-    {
-      "id": "c3-core-filtered-768",
-      "kind": "core-state",
-      "state": "filtered",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-filtered-768.png",
-      "width": 768,
-      "height": 1322,
-      "sha256": "5d0bc7757ec8911ffa452542bb59353ca38173f069f72bb6e4bfa6d2b44b8ae0",
-      "viewport": { "id": "tablet-768", "width": 768, "height": 1024 }
-    },
-    {
-      "id": "c3-core-filtered-1280",
-      "kind": "core-state",
-      "state": "filtered",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-filtered-1280.png",
-      "width": 1280,
-      "height": 1256,
-      "sha256": "5190536343a6e329c69978f59ea66956ff9f55ef281ee37b8ac9c63056ba2fd0",
-      "viewport": { "id": "desktop-1280", "width": 1280, "height": 900 }
-    },
-    {
-      "id": "c3-core-filtered-1440",
-      "kind": "core-state",
-      "state": "filtered",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-filtered-1440.png",
-      "width": 1440,
-      "height": 1289,
-      "sha256": "986cd9ca08fc7fb7d3530cfb04532d12431bfb51079738edae91e7de16c4389c",
-      "viewport": { "id": "canvas-at", "width": 1440, "height": 900 }
-    },
-    {
-      "id": "c3-core-empty-360",
+      "id": "c3-darwin-catalog-empty-360",
+      "platform": "darwin",
       "kind": "core-state",
       "state": "empty",
       "focusTarget": null,
@@ -167,7 +60,8 @@
       }
     },
     {
-      "id": "c3-core-empty-768",
+      "id": "c3-darwin-catalog-empty-768",
+      "platform": "darwin",
       "kind": "core-state",
       "state": "empty",
       "focusTarget": null,
@@ -175,106 +69,15 @@
       "width": 768,
       "height": 1016,
       "sha256": "acc04751a5d1c303be5d4e26e96863f7bd50897164285ccb075ea0355872678b",
-      "viewport": { "id": "tablet-768", "width": 768, "height": 1024 }
-    },
-    {
-      "id": "c3-core-empty-1280",
-      "kind": "core-state",
-      "state": "empty",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-empty-1280.png",
-      "width": 1280,
-      "height": 1196,
-      "sha256": "ef5ef46e99537dd6e209816cffe7f32ff17da2ea3b7315ef387e2dd647852ee2",
-      "viewport": { "id": "desktop-1280", "width": 1280, "height": 900 }
-    },
-    {
-      "id": "c3-core-empty-1440",
-      "kind": "core-state",
-      "state": "empty",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-empty-1440.png",
-      "width": 1440,
-      "height": 1229,
-      "sha256": "ac6d3adc64f4d8cb6de9df88bea951880e637a7c547c3c9fcd032c4058a2a69b",
-      "viewport": { "id": "canvas-at", "width": 1440, "height": 900 }
-    },
-    {
-      "id": "c3-core-error-360",
-      "kind": "core-state",
-      "state": "error",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-error-360.png",
-      "width": 360,
-      "height": 343,
-      "sha256": "fdf6f11efe12640a868e37ba3f642c6f840ed130f83635372ddd030dad4c3c06",
       "viewport": {
-        "id": "compact-mobile-360",
-        "width": 360,
-        "height": 800
+        "id": "tablet-768",
+        "width": 768,
+        "height": 1024
       }
     },
     {
-      "id": "c3-core-error-768",
-      "kind": "core-state",
-      "state": "error",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-error-768.png",
-      "width": 768,
-      "height": 295,
-      "sha256": "4d54317e7f05a720e63179a1e3136ba1fd8382437a780880e71ea7a5d0d41d45",
-      "viewport": { "id": "tablet-768", "width": 768, "height": 1024 }
-    },
-    {
-      "id": "c3-core-error-1280",
-      "kind": "core-state",
-      "state": "error",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-error-1280.png",
-      "width": 1280,
-      "height": 372,
-      "sha256": "3f1c44630387a4ed47cbaf4c04cfc7aad1de23c97951091dc189f8678d0892d5",
-      "viewport": { "id": "desktop-1280", "width": 1280, "height": 900 }
-    },
-    {
-      "id": "c3-core-error-1440",
-      "kind": "core-state",
-      "state": "error",
-      "focusTarget": null,
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-error-1440.png",
-      "width": 1440,
-      "height": 391,
-      "sha256": "e570ff290bea0e1ffe30c97873a9c228a3632d76e889feeebb6eeb6e21a7b4e1",
-      "viewport": { "id": "canvas-at", "width": 1440, "height": 900 }
-    },
-    {
-      "id": "c3-focus-ready-filter-360",
-      "kind": "focus",
-      "state": "ready",
-      "focusTarget": "filter",
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-ready-filter-focus-360.png",
-      "width": 328,
-      "height": 794,
-      "sha256": "a19621a556848abf09d961acadbe90c197897165acd06131e84fe5e3b28d2c20",
-      "viewport": {
-        "id": "compact-mobile-360",
-        "width": 360,
-        "height": 800
-      }
-    },
-    {
-      "id": "c3-focus-filtered-pagination-1280",
-      "kind": "focus",
-      "state": "filtered",
-      "focusTarget": "pagination",
-      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-filtered-pagination-focus-1280.png",
-      "width": 832,
-      "height": 45,
-      "sha256": "0891c4bbc10e543c101511f51526ca4b91c16b16bab93457379e007c38c74898",
-      "viewport": { "id": "desktop-1280", "width": 1280, "height": 900 }
-    },
-    {
-      "id": "c3-focus-empty-recovery-360",
+      "id": "c3-darwin-catalog-empty-recovery-focus-360",
+      "platform": "darwin",
       "kind": "focus",
       "state": "empty",
       "focusTarget": "recovery",
@@ -289,7 +92,72 @@
       }
     },
     {
-      "id": "c3-focus-error-retry-360",
+      "id": "c3-darwin-catalog-error-1280",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "error",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-error-1280.png",
+      "width": 1280,
+      "height": 372,
+      "sha256": "3f1c44630387a4ed47cbaf4c04cfc7aad1de23c97951091dc189f8678d0892d5",
+      "viewport": {
+        "id": "desktop-1280",
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-error-1440",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "error",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-error-1440.png",
+      "width": 1440,
+      "height": 391,
+      "sha256": "e570ff290bea0e1ffe30c97873a9c228a3632d76e889feeebb6eeb6e21a7b4e1",
+      "viewport": {
+        "id": "canvas-at",
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-error-360",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "error",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-error-360.png",
+      "width": 360,
+      "height": 343,
+      "sha256": "fdf6f11efe12640a868e37ba3f642c6f840ed130f83635372ddd030dad4c3c06",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-error-768",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "error",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-error-768.png",
+      "width": 768,
+      "height": 295,
+      "sha256": "4d54317e7f05a720e63179a1e3136ba1fd8382437a780880e71ea7a5d0d41d45",
+      "viewport": {
+        "id": "tablet-768",
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-error-retry-focus-360",
+      "platform": "darwin",
       "kind": "focus",
       "state": "error",
       "focusTarget": "retry",
@@ -302,6 +170,830 @@
         "width": 360,
         "height": 800
       }
+    },
+    {
+      "id": "c3-darwin-catalog-filtered-1280",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "filtered",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-filtered-1280.png",
+      "width": 1280,
+      "height": 1256,
+      "sha256": "5190536343a6e329c69978f59ea66956ff9f55ef281ee37b8ac9c63056ba2fd0",
+      "viewport": {
+        "id": "desktop-1280",
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-filtered-1440",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "filtered",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-filtered-1440.png",
+      "width": 1440,
+      "height": 1289,
+      "sha256": "986cd9ca08fc7fb7d3530cfb04532d12431bfb51079738edae91e7de16c4389c",
+      "viewport": {
+        "id": "canvas-at",
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-filtered-360",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "filtered",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-filtered-360.png",
+      "width": 360,
+      "height": 1732,
+      "sha256": "9bc982ea6256a5ad0fdeb32cad1cba5f7454d880cdb8f0172102a564805dd31a",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-filtered-768",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "filtered",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-filtered-768.png",
+      "width": 768,
+      "height": 1322,
+      "sha256": "5d0bc7757ec8911ffa452542bb59353ca38173f069f72bb6e4bfa6d2b44b8ae0",
+      "viewport": {
+        "id": "tablet-768",
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-filtered-pagination-focus-1280",
+      "platform": "darwin",
+      "kind": "focus",
+      "state": "filtered",
+      "focusTarget": "pagination",
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-filtered-pagination-focus-1280.png",
+      "width": 832,
+      "height": 45,
+      "sha256": "0891c4bbc10e543c101511f51526ca4b91c16b16bab93457379e007c38c74898",
+      "viewport": {
+        "id": "desktop-1280",
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-loading-1280",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "loading",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-loading-1280.png",
+      "width": 1280,
+      "height": 316,
+      "sha256": "23700a413f67fb9daa4d5a1c11381d2240c69148f5fe4b68e01f89a90a0a3f73",
+      "viewport": {
+        "id": "desktop-1280",
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-loading-1440",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "loading",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-loading-1440.png",
+      "width": 1440,
+      "height": 335,
+      "sha256": "e44704e4118fd49b17eb2cab38de284aa91c9fcd8f9384a9899186b425c83551",
+      "viewport": {
+        "id": "canvas-at",
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-loading-360",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "loading",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-loading-360.png",
+      "width": 360,
+      "height": 239,
+      "sha256": "372cbcad39d571f232d046e51b3945c6744788b2c86bbf3d346fc65206577b8b",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-loading-768",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "loading",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-loading-768.png",
+      "width": 768,
+      "height": 239,
+      "sha256": "1b7021523ad3f1fc85ebfde20f1ac04bddd7e508bea7b92bf13b0e9bb7779695",
+      "viewport": {
+        "id": "tablet-768",
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-ready-1280",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "ready",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-ready-1280.png",
+      "width": 1280,
+      "height": 1928,
+      "sha256": "c392045eb22bf7d7fa7e1a58136050ad88c5b449d17ba600c15989a6b6138a4f",
+      "viewport": {
+        "id": "desktop-1280",
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-ready-1440",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "ready",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-ready-1440.png",
+      "width": 1440,
+      "height": 2073,
+      "sha256": "a31952742f32ad1094ca2fa5a2af3473b3c637042f3b21ff3aafc563e6622b3d",
+      "viewport": {
+        "id": "canvas-at",
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-ready-360",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "ready",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-ready-360.png",
+      "width": 360,
+      "height": 6074,
+      "sha256": "735ba99f8665a612d780f269ad25c97c03ef17597c246fde1d28d7717eed1068",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-ready-768",
+      "platform": "darwin",
+      "kind": "core-state",
+      "state": "ready",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-ready-768.png",
+      "width": 768,
+      "height": 3347,
+      "sha256": "b96a7be5e85c42e1d1ffb4c2751d972869690cc76dad3148e5cb4f95035c1eb9",
+      "viewport": {
+        "id": "tablet-768",
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "id": "c3-darwin-catalog-ready-filter-focus-360",
+      "platform": "darwin",
+      "kind": "focus",
+      "state": "ready",
+      "focusTarget": "filter",
+      "path": "apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts/catalog-ready-filter-focus-360.png",
+      "width": 328,
+      "height": 794,
+      "sha256": "a19621a556848abf09d961acadbe90c197897165acd06131e84fe5e3b28d2c20",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "id": "c3-linux-catalog-empty-1280",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "empty",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-empty-1280.png",
+      "width": 1280,
+      "height": 1196,
+      "sha256": "d092fda7af762085ede7ede489d49e5b0adef03ab2dcd78ae6f8b2826a1f9415",
+      "viewport": {
+        "id": "desktop-1280",
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-linux-catalog-empty-1440",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "empty",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-empty-1440.png",
+      "width": 1440,
+      "height": 1229,
+      "sha256": "a5e4b0040de474ce863b788174b9486e53a76f2e7851844bdb4a783b71a9aba5",
+      "viewport": {
+        "id": "canvas-at",
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-linux-catalog-empty-360",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "empty",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-empty-360.png",
+      "width": 360,
+      "height": 1342,
+      "sha256": "8aad7b18bf2b4c0a70b0e6f8f66e5792d55c83957ee2b8f158603d2be17f8520",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "id": "c3-linux-catalog-empty-768",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "empty",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-empty-768.png",
+      "width": 768,
+      "height": 1016,
+      "sha256": "4ce07f59ae14557c7e02dcc79fcdde0b6f231e7fc999ce10284adddc487815f1",
+      "viewport": {
+        "id": "tablet-768",
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "id": "c3-linux-catalog-empty-recovery-focus-360",
+      "platform": "linux",
+      "kind": "focus",
+      "state": "empty",
+      "focusTarget": "recovery",
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-empty-recovery-focus-360.png",
+      "width": 328,
+      "height": 191,
+      "sha256": "e4b15a624868132846a9cb030064bf8cb99536a387444968a7612506efb35076",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "id": "c3-linux-catalog-error-1280",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "error",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-error-1280.png",
+      "width": 1280,
+      "height": 372,
+      "sha256": "936100573d459cf57450f2e15469537131cfa0b1014c0c785082be27382ee52b",
+      "viewport": {
+        "id": "desktop-1280",
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-linux-catalog-error-1440",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "error",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-error-1440.png",
+      "width": 1440,
+      "height": 391,
+      "sha256": "597abd7918f1a9f2044c0669a28f37e7f94f29e61edd07c0d9aaf89880495ec4",
+      "viewport": {
+        "id": "canvas-at",
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-linux-catalog-error-360",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "error",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-error-360.png",
+      "width": 360,
+      "height": 343,
+      "sha256": "b86bf5fc774fef0eb59cae9c41186ab92691732e55bb9a5a9dbee702b97e8e6f",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "id": "c3-linux-catalog-error-768",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "error",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-error-768.png",
+      "width": 768,
+      "height": 295,
+      "sha256": "625a9162cd64c2fbc9bd975843da027f00c02c75c9eda1c118a134dcc72f683d",
+      "viewport": {
+        "id": "tablet-768",
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "id": "c3-linux-catalog-error-retry-focus-360",
+      "platform": "linux",
+      "kind": "focus",
+      "state": "error",
+      "focusTarget": "retry",
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-error-retry-focus-360.png",
+      "width": 328,
+      "height": 215,
+      "sha256": "04f9526217984f80b6a43b4ca065f01bebce485d8d5117358b7efab65809ce75",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "id": "c3-linux-catalog-filtered-1280",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "filtered",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-filtered-1280.png",
+      "width": 1280,
+      "height": 1256,
+      "sha256": "7bcc8a09cb04e63e5d273bd763c94b677dd9b07dcd9fcc63d331cb9b453e07d7",
+      "viewport": {
+        "id": "desktop-1280",
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-linux-catalog-filtered-1440",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "filtered",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-filtered-1440.png",
+      "width": 1440,
+      "height": 1289,
+      "sha256": "d6fe67ffa3a23a0e4eea8bb5ba17d2466e3fbf1ceefc192b876d5789b6850337",
+      "viewport": {
+        "id": "canvas-at",
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-linux-catalog-filtered-360",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "filtered",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-filtered-360.png",
+      "width": 360,
+      "height": 1731,
+      "sha256": "b887bc1dd18a233bbef756b6fc53e127ad61de14e1250588d90d0cf702ea211d",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "id": "c3-linux-catalog-filtered-768",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "filtered",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-filtered-768.png",
+      "width": 768,
+      "height": 1321,
+      "sha256": "3d383d398f4a3536745d4927b661cbc5b04e17e43c06fbb0b9847b0d62cd72d5",
+      "viewport": {
+        "id": "tablet-768",
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "id": "c3-linux-catalog-filtered-pagination-focus-1280",
+      "platform": "linux",
+      "kind": "focus",
+      "state": "filtered",
+      "focusTarget": "pagination",
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-filtered-pagination-focus-1280.png",
+      "width": 832,
+      "height": 45,
+      "sha256": "3a1a8a3b2f00146230117dd07123e8d4f4f2b335eb7798326f9152353c1f29b6",
+      "viewport": {
+        "id": "desktop-1280",
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-linux-catalog-loading-1280",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "loading",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-loading-1280.png",
+      "width": 1280,
+      "height": 316,
+      "sha256": "778e7dd19931a57d8e1d66fd9960aa98ead1c4e0c29c6b747317bfed5c7d115e",
+      "viewport": {
+        "id": "desktop-1280",
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-linux-catalog-loading-1440",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "loading",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-loading-1440.png",
+      "width": 1440,
+      "height": 335,
+      "sha256": "96f92590c0f9511fd97b3379ceffe3127e9577c693b669b0899f1b1d63397d9b",
+      "viewport": {
+        "id": "canvas-at",
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-linux-catalog-loading-360",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "loading",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-loading-360.png",
+      "width": 360,
+      "height": 263,
+      "sha256": "72763f33039f6d1378d8f7f7700c0cda584cc72722c833795c60131bfc30ca6e",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "id": "c3-linux-catalog-loading-768",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "loading",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-loading-768.png",
+      "width": 768,
+      "height": 239,
+      "sha256": "37b4cff600746ebc1bff57fb56fc357e76fd464f49ea53a07507c6728e207d37",
+      "viewport": {
+        "id": "tablet-768",
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "id": "c3-linux-catalog-ready-1280",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "ready",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-ready-1280.png",
+      "width": 1280,
+      "height": 1947,
+      "sha256": "514cb0ae483e992a1df4b4b8c4f04288bb1b3fe01c3fbdb78752aba7e81d570d",
+      "viewport": {
+        "id": "desktop-1280",
+        "width": 1280,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-linux-catalog-ready-1440",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "ready",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-ready-1440.png",
+      "width": 1440,
+      "height": 2073,
+      "sha256": "db64dd835a3d270bacb579e4cea6e2af3475d280747000751bddd042f8cb6b5a",
+      "viewport": {
+        "id": "canvas-at",
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "id": "c3-linux-catalog-ready-360",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "ready",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-ready-360.png",
+      "width": 360,
+      "height": 6062,
+      "sha256": "09e160ff7238984991fc3645cb75dd21e1b9de70bee44c1fb8256ffe4b539fa7",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      }
+    },
+    {
+      "id": "c3-linux-catalog-ready-768",
+      "platform": "linux",
+      "kind": "core-state",
+      "state": "ready",
+      "focusTarget": null,
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-ready-768.png",
+      "width": 768,
+      "height": 3341,
+      "sha256": "d6310ff43d6093a6a876fa5db1748f550d654dc89069ff14368def777e3820e5",
+      "viewport": {
+        "id": "tablet-768",
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "id": "c3-linux-catalog-ready-filter-focus-360",
+      "platform": "linux",
+      "kind": "focus",
+      "state": "ready",
+      "focusTarget": "filter",
+      "path": "apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts/catalog-ready-filter-focus-360.png",
+      "width": 328,
+      "height": 794,
+      "sha256": "097f04320b3e16513caf685ab9db36f9f93298ddc2faa9f1464b32d909b107c2",
+      "viewport": {
+        "id": "compact-mobile-360",
+        "width": 360,
+        "height": 800
+      }
+    }
+  ],
+  "evidenceSets": [
+    {
+      "id": "c3-visual-loading-responsive-layout",
+      "requirementId": "c3-catalog-discovery",
+      "state": "loading",
+      "check": "responsive-layout",
+      "channel": "visual",
+      "baselineIds": [
+        "c3-darwin-catalog-loading-1280",
+        "c3-darwin-catalog-loading-1440",
+        "c3-darwin-catalog-loading-360",
+        "c3-darwin-catalog-loading-768",
+        "c3-linux-catalog-loading-1280",
+        "c3-linux-catalog-loading-1440",
+        "c3-linux-catalog-loading-360",
+        "c3-linux-catalog-loading-768"
+      ]
+    },
+    {
+      "id": "c3-visual-loading-overflow-and-reflow",
+      "requirementId": "c3-catalog-discovery",
+      "state": "loading",
+      "check": "overflow-and-reflow",
+      "channel": "visual",
+      "baselineIds": [
+        "c3-darwin-catalog-loading-1280",
+        "c3-darwin-catalog-loading-1440",
+        "c3-darwin-catalog-loading-360",
+        "c3-darwin-catalog-loading-768",
+        "c3-linux-catalog-loading-1280",
+        "c3-linux-catalog-loading-1440",
+        "c3-linux-catalog-loading-360",
+        "c3-linux-catalog-loading-768"
+      ]
+    },
+    {
+      "id": "c3-visual-ready-responsive-layout",
+      "requirementId": "c3-catalog-discovery",
+      "state": "ready",
+      "check": "responsive-layout",
+      "channel": "visual",
+      "baselineIds": [
+        "c3-darwin-catalog-ready-1280",
+        "c3-darwin-catalog-ready-1440",
+        "c3-darwin-catalog-ready-360",
+        "c3-darwin-catalog-ready-768",
+        "c3-linux-catalog-ready-1280",
+        "c3-linux-catalog-ready-1440",
+        "c3-linux-catalog-ready-360",
+        "c3-linux-catalog-ready-768"
+      ]
+    },
+    {
+      "id": "c3-visual-ready-overflow-and-reflow",
+      "requirementId": "c3-catalog-discovery",
+      "state": "ready",
+      "check": "overflow-and-reflow",
+      "channel": "visual",
+      "baselineIds": [
+        "c3-darwin-catalog-ready-1280",
+        "c3-darwin-catalog-ready-1440",
+        "c3-darwin-catalog-ready-360",
+        "c3-darwin-catalog-ready-768",
+        "c3-linux-catalog-ready-1280",
+        "c3-linux-catalog-ready-1440",
+        "c3-linux-catalog-ready-360",
+        "c3-linux-catalog-ready-768"
+      ]
+    },
+    {
+      "id": "c3-visual-filtered-responsive-layout",
+      "requirementId": "c3-catalog-discovery",
+      "state": "filtered",
+      "check": "responsive-layout",
+      "channel": "visual",
+      "baselineIds": [
+        "c3-darwin-catalog-filtered-1280",
+        "c3-darwin-catalog-filtered-1440",
+        "c3-darwin-catalog-filtered-360",
+        "c3-darwin-catalog-filtered-768",
+        "c3-linux-catalog-filtered-1280",
+        "c3-linux-catalog-filtered-1440",
+        "c3-linux-catalog-filtered-360",
+        "c3-linux-catalog-filtered-768"
+      ]
+    },
+    {
+      "id": "c3-visual-filtered-overflow-and-reflow",
+      "requirementId": "c3-catalog-discovery",
+      "state": "filtered",
+      "check": "overflow-and-reflow",
+      "channel": "visual",
+      "baselineIds": [
+        "c3-darwin-catalog-filtered-1280",
+        "c3-darwin-catalog-filtered-1440",
+        "c3-darwin-catalog-filtered-360",
+        "c3-darwin-catalog-filtered-768",
+        "c3-linux-catalog-filtered-1280",
+        "c3-linux-catalog-filtered-1440",
+        "c3-linux-catalog-filtered-360",
+        "c3-linux-catalog-filtered-768"
+      ]
+    },
+    {
+      "id": "c3-visual-empty-responsive-layout",
+      "requirementId": "c3-catalog-discovery",
+      "state": "empty",
+      "check": "responsive-layout",
+      "channel": "visual",
+      "baselineIds": [
+        "c3-darwin-catalog-empty-1280",
+        "c3-darwin-catalog-empty-1440",
+        "c3-darwin-catalog-empty-360",
+        "c3-darwin-catalog-empty-768",
+        "c3-linux-catalog-empty-1280",
+        "c3-linux-catalog-empty-1440",
+        "c3-linux-catalog-empty-360",
+        "c3-linux-catalog-empty-768"
+      ]
+    },
+    {
+      "id": "c3-visual-empty-overflow-and-reflow",
+      "requirementId": "c3-catalog-discovery",
+      "state": "empty",
+      "check": "overflow-and-reflow",
+      "channel": "visual",
+      "baselineIds": [
+        "c3-darwin-catalog-empty-1280",
+        "c3-darwin-catalog-empty-1440",
+        "c3-darwin-catalog-empty-360",
+        "c3-darwin-catalog-empty-768",
+        "c3-linux-catalog-empty-1280",
+        "c3-linux-catalog-empty-1440",
+        "c3-linux-catalog-empty-360",
+        "c3-linux-catalog-empty-768"
+      ]
+    },
+    {
+      "id": "c3-visual-error-responsive-layout",
+      "requirementId": "c3-catalog-discovery",
+      "state": "error",
+      "check": "responsive-layout",
+      "channel": "visual",
+      "baselineIds": [
+        "c3-darwin-catalog-error-1280",
+        "c3-darwin-catalog-error-1440",
+        "c3-darwin-catalog-error-360",
+        "c3-darwin-catalog-error-768",
+        "c3-linux-catalog-error-1280",
+        "c3-linux-catalog-error-1440",
+        "c3-linux-catalog-error-360",
+        "c3-linux-catalog-error-768"
+      ]
+    },
+    {
+      "id": "c3-visual-error-overflow-and-reflow",
+      "requirementId": "c3-catalog-discovery",
+      "state": "error",
+      "check": "overflow-and-reflow",
+      "channel": "visual",
+      "baselineIds": [
+        "c3-darwin-catalog-error-1280",
+        "c3-darwin-catalog-error-1440",
+        "c3-darwin-catalog-error-360",
+        "c3-darwin-catalog-error-768",
+        "c3-linux-catalog-error-1280",
+        "c3-linux-catalog-error-1440",
+        "c3-linux-catalog-error-360",
+        "c3-linux-catalog-error-768"
+      ]
+    },
+    {
+      "id": "c3-visual-ready-focus-visible",
+      "requirementId": "c3-catalog-discovery",
+      "state": "ready",
+      "check": "focus-visible",
+      "channel": "visual",
+      "baselineIds": [
+        "c3-darwin-catalog-ready-filter-focus-360",
+        "c3-linux-catalog-ready-filter-focus-360"
+      ]
+    },
+    {
+      "id": "c3-visual-filtered-focus-visible",
+      "requirementId": "c3-catalog-discovery",
+      "state": "filtered",
+      "check": "focus-visible",
+      "channel": "visual",
+      "baselineIds": [
+        "c3-darwin-catalog-filtered-pagination-focus-1280",
+        "c3-linux-catalog-filtered-pagination-focus-1280"
+      ]
+    },
+    {
+      "id": "c3-visual-empty-focus-visible",
+      "requirementId": "c3-catalog-discovery",
+      "state": "empty",
+      "check": "focus-visible",
+      "channel": "visual",
+      "baselineIds": [
+        "c3-darwin-catalog-empty-recovery-focus-360",
+        "c3-linux-catalog-empty-recovery-focus-360"
+      ]
+    },
+    {
+      "id": "c3-visual-error-focus-visible",
+      "requirementId": "c3-catalog-discovery",
+      "state": "error",
+      "check": "focus-visible",
+      "channel": "visual",
+      "baselineIds": [
+        "c3-darwin-catalog-error-retry-focus-360",
+        "c3-linux-catalog-error-retry-focus-360"
+      ]
     }
   ]
 }

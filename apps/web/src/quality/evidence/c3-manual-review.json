@@ -1,7 +1,417 @@
 {
-  "schemaVersion": 1,
-  "outcome": "pending",
-  "reviewerAgentRun": null,
-  "reviewedAt": null,
-  "note": "Independent C3 closure review has not run. Manual and not-applicable mappings remain non-closing until a reviewer records a durable Agent Run URL and decision."
+  "schemaVersion": 2,
+  "reviews": [
+    {
+      "id": "c3-failed-review-visual-and-na",
+      "outcome": "approved-partial",
+      "reviewerAgentRun": "https://app.notion.com/p/3bdd78850eab811fa693c08c1e93246b?pvs=204",
+      "reviewedAt": "2026-08-15T01:55:00.000Z",
+      "approvedScopes": ["visual-baselines", "not-applicable-classification"],
+      "observation": "The failed independent review explicitly approved the unchanged 48 visual baselines and the 22-row not-applicable classification. It did not approve the remaining manual mappings or close the exact-head process gate."
+    },
+    {
+      "id": "c3-correction-manual-evidence-review",
+      "outcome": "approved",
+      "reviewerAgentRun": "https://app.notion.com/p/3bdd78850eab81dea404f9242a124efb",
+      "reviewedAt": "2026-08-15T02:30:32Z",
+      "approvedScopes": [
+        "manual-mappings",
+        "not-applicable-classification",
+        "visual-baselines"
+      ],
+      "observation": "PASS on corrected catalog spec SHA d8bbd8695604e91fac806c99fb903bf8fec8d8841acfa24cacee30286b9d2943: the independent reviewer approved all 39 applicable manual mappings, confirmed the exact 22 N/A semantics, and visually approved all unchanged 24 macOS plus 24 Ubuntu baselines. The review explicitly covered real Tab, Shift+Tab and Enter recovery, focus at or above 3 pixels, 44 by 44 targets, labels, contrast, reduced motion, reflow, safe error messaging and route announcements. Final exact-head closure remains separate."
+    }
+  ],
+  "observations": [
+    {
+      "id": "c3-manual-loading-responsive-layout",
+      "requirementId": "c3-catalog-discovery",
+      "state": "loading",
+      "check": "responsive-layout",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved responsive behavior and the 44 by 44 target-size requirement for the loading catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-loading-names-and-labels",
+      "requirementId": "c3-catalog-discovery",
+      "state": "loading",
+      "check": "names-and-labels",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved accessible names and labels for the loading catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-loading-contrast",
+      "requirementId": "c3-catalog-discovery",
+      "state": "loading",
+      "check": "contrast",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved readable contrast for the loading catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-loading-reduced-motion",
+      "requirementId": "c3-catalog-discovery",
+      "state": "loading",
+      "check": "reduced-motion",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved reduced-motion behavior for the loading catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-loading-overflow-and-reflow",
+      "requirementId": "c3-catalog-discovery",
+      "state": "loading",
+      "check": "overflow-and-reflow",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved reflow without harmful overflow for the loading catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-loading-route-announcement",
+      "requirementId": "c3-catalog-discovery",
+      "state": "loading",
+      "check": "route-announcement",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved route titles and announcements for the loading catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-ready-responsive-layout",
+      "requirementId": "c3-catalog-discovery",
+      "state": "ready",
+      "check": "responsive-layout",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved responsive behavior and the 44 by 44 target-size requirement for the ready catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-ready-keyboard-navigation",
+      "requirementId": "c3-catalog-discovery",
+      "state": "ready",
+      "check": "keyboard-navigation",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved real Tab, Shift+Tab, and Enter keyboard operation for the ready catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-ready-focus-visible",
+      "requirementId": "c3-catalog-discovery",
+      "state": "ready",
+      "check": "focus-visible",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved the visible focus treatment at or above 3 pixels for the ready catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-ready-names-and-labels",
+      "requirementId": "c3-catalog-discovery",
+      "state": "ready",
+      "check": "names-and-labels",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved accessible names and labels for the ready catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-ready-contrast",
+      "requirementId": "c3-catalog-discovery",
+      "state": "ready",
+      "check": "contrast",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved readable contrast for the ready catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-ready-reduced-motion",
+      "requirementId": "c3-catalog-discovery",
+      "state": "ready",
+      "check": "reduced-motion",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved reduced-motion behavior for the ready catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-ready-overflow-and-reflow",
+      "requirementId": "c3-catalog-discovery",
+      "state": "ready",
+      "check": "overflow-and-reflow",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved reflow without harmful overflow for the ready catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-ready-route-announcement",
+      "requirementId": "c3-catalog-discovery",
+      "state": "ready",
+      "check": "route-announcement",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved route titles and announcements for the ready catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-filtered-responsive-layout",
+      "requirementId": "c3-catalog-discovery",
+      "state": "filtered",
+      "check": "responsive-layout",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved responsive behavior and the 44 by 44 target-size requirement for the filtered catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-filtered-keyboard-navigation",
+      "requirementId": "c3-catalog-discovery",
+      "state": "filtered",
+      "check": "keyboard-navigation",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved real Tab, Shift+Tab, and Enter keyboard operation for the filtered catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-filtered-focus-visible",
+      "requirementId": "c3-catalog-discovery",
+      "state": "filtered",
+      "check": "focus-visible",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved the visible focus treatment at or above 3 pixels for the filtered catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-filtered-names-and-labels",
+      "requirementId": "c3-catalog-discovery",
+      "state": "filtered",
+      "check": "names-and-labels",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved accessible names and labels for the filtered catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-filtered-contrast",
+      "requirementId": "c3-catalog-discovery",
+      "state": "filtered",
+      "check": "contrast",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved readable contrast for the filtered catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-filtered-reduced-motion",
+      "requirementId": "c3-catalog-discovery",
+      "state": "filtered",
+      "check": "reduced-motion",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved reduced-motion behavior for the filtered catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-filtered-overflow-and-reflow",
+      "requirementId": "c3-catalog-discovery",
+      "state": "filtered",
+      "check": "overflow-and-reflow",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved reflow without harmful overflow for the filtered catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-filtered-route-announcement",
+      "requirementId": "c3-catalog-discovery",
+      "state": "filtered",
+      "check": "route-announcement",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved route titles and announcements for the filtered catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-empty-responsive-layout",
+      "requirementId": "c3-catalog-discovery",
+      "state": "empty",
+      "check": "responsive-layout",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved responsive behavior and the 44 by 44 target-size requirement for the empty catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-empty-keyboard-navigation",
+      "requirementId": "c3-catalog-discovery",
+      "state": "empty",
+      "check": "keyboard-navigation",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved real Tab, Shift+Tab, and Enter keyboard operation for the empty catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-empty-focus-visible",
+      "requirementId": "c3-catalog-discovery",
+      "state": "empty",
+      "check": "focus-visible",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved the visible focus treatment at or above 3 pixels for the empty catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-empty-names-and-labels",
+      "requirementId": "c3-catalog-discovery",
+      "state": "empty",
+      "check": "names-and-labels",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved accessible names and labels for the empty catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-empty-contrast",
+      "requirementId": "c3-catalog-discovery",
+      "state": "empty",
+      "check": "contrast",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved readable contrast for the empty catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-empty-reduced-motion",
+      "requirementId": "c3-catalog-discovery",
+      "state": "empty",
+      "check": "reduced-motion",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved reduced-motion behavior for the empty catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-empty-overflow-and-reflow",
+      "requirementId": "c3-catalog-discovery",
+      "state": "empty",
+      "check": "overflow-and-reflow",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved reflow without harmful overflow for the empty catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-empty-route-announcement",
+      "requirementId": "c3-catalog-discovery",
+      "state": "empty",
+      "check": "route-announcement",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved route titles and announcements for the empty catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-error-responsive-layout",
+      "requirementId": "c3-catalog-discovery",
+      "state": "error",
+      "check": "responsive-layout",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved responsive behavior and the 44 by 44 target-size requirement for the error catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-error-keyboard-navigation",
+      "requirementId": "c3-catalog-discovery",
+      "state": "error",
+      "check": "keyboard-navigation",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved real Tab, Shift+Tab, and Enter keyboard operation for the error catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-error-focus-visible",
+      "requirementId": "c3-catalog-discovery",
+      "state": "error",
+      "check": "focus-visible",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved the visible focus treatment at or above 3 pixels for the error catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-error-names-and-labels",
+      "requirementId": "c3-catalog-discovery",
+      "state": "error",
+      "check": "names-and-labels",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved accessible names and labels for the error catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-error-contrast",
+      "requirementId": "c3-catalog-discovery",
+      "state": "error",
+      "check": "contrast",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved readable contrast for the error catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-error-error-messaging",
+      "requirementId": "c3-catalog-discovery",
+      "state": "error",
+      "check": "error-messaging",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved safe, actionable error messaging for the error catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-error-reduced-motion",
+      "requirementId": "c3-catalog-discovery",
+      "state": "error",
+      "check": "reduced-motion",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved reduced-motion behavior for the error catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-error-overflow-and-reflow",
+      "requirementId": "c3-catalog-discovery",
+      "state": "error",
+      "check": "overflow-and-reflow",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved reflow without harmful overflow for the error catalog state under the explicit 39-row approval."
+    },
+    {
+      "id": "c3-manual-error-route-announcement",
+      "requirementId": "c3-catalog-discovery",
+      "state": "error",
+      "check": "route-announcement",
+      "channel": "manual",
+      "status": "approved",
+      "reviewId": "c3-correction-manual-evidence-review",
+      "observation": "Independent reviewer approved route titles and announcements for the error catalog state under the explicit 39-row approval."
+    }
+  ]
 }

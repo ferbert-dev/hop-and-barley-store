@@ -76,12 +76,14 @@ pixels plus focused filter, pagination, empty-recovery, and error-retry regions.
 Baselines are platform-specific in CI and use the repository-wide 0.2 channel
 threshold and 1 percent pixel-difference gate.
 
-The machine-readable C3 evidence scaffold validates the exact 135 Q1
-state/check/channel mappings and recomputes all 24 PNG hashes and dimensions.
-The current run and manual-review records deliberately remain `pending`: the
-presence of local screenshots or test source does not close a mapping. Closure
-requires durable passing run records plus an independent reviewer Agent Run URL
-and visual/manual decision.
+The machine-readable C3 bundle independently derives the exact 135 Q1
+state/check/channel mappings and closes only at exactly 113 durable passes plus
+22 reviewed not-applicable rows. It recomputes hashes and dimensions for all 48
+macOS and Linux PNGs and requires exact platform filename parity. The failed
+independent review is used only for the facts it explicitly approved: the
+unchanged visual set and the N/A classification. Applicable manual rows require
+a separate independent manual-evidence review; the later exact-head closure
+review remains a distinct process gate.
 
 ## Verification and rollback
 
