@@ -86,6 +86,7 @@ test('supports keyboard-only catalog filtering with Tab, Shift+Tab, and Enter', 
 
   await page.keyboard.press('Tab');
   await expect(search).toBeFocused();
+  await assertProjectFocusVisible(search, 'ready');
   await page.keyboard.type('Citra');
 
   await page.keyboard.press('Tab');
@@ -115,6 +116,13 @@ test('supports keyboard-only catalog filtering with Tab, Shift+Tab, and Enter', 
   await expect(page).toHaveURL(/\?search=Citra&category=hops$/);
   await expect(page).toHaveTitle('Citra — Hop & Barley products');
   await expect(page.getByRole('link', { name: 'Citra Hops' })).toBeVisible();
+
+  const filteredFocus = page.getByRole('link', {
+    name: 'Skip to main content',
+  });
+  await page.keyboard.press('Tab');
+  await expect(filteredFocus).toBeFocused();
+  await assertProjectFocusVisible(filteredFocus, 'filtered');
 });
 
 test('keeps stable pagination and restores URL state with browser history', async ({
@@ -378,54 +386,70 @@ test('has no serious or critical Axe violations in the loading state', async ({
   await assertNoBlockingAxeViolations(page, 'loading');
 });
 
-test('honours reduced motion in every catalog availability phase', async ({
+test('honours reduced motion in ready, filtered, empty, loading, and error states', async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(
-    unavailable ? '/?search=reduced-motion-unavailable' : stateUrls.ready,
-  );
 
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-      ),
-    )
-    .toBe(true);
-  const action = unavailable
-    ? page.getByRole('link', { name: 'Try again' })
-    : page.getByRole('button', { name: 'Apply filters' });
-  await expect(action).toBeVisible();
-
-  const motion = await page.evaluate(() => {
-    const catalog = document.querySelector<HTMLElement>(
-      'section[aria-label="Catalog"], section[aria-labelledby="catalog-title"]',
+  if (unavailable) {
+    const loadingSearch = 'reduced-motion-loading';
+    await page.goto('/?page=201');
+    await startLoadingNavigation(
+      page,
+      `/?search=${encodeURIComponent(loadingSearch)}`,
     );
-    const target = document.querySelector<HTMLElement>(
-      'main a[href], main button',
-    );
-    if (!catalog || !target)
-      throw new TypeError('Catalog motion probe missing');
-    const catalogStyle = getComputedStyle(catalog);
-    const targetStyle = getComputedStyle(target);
+    const loading = page
+      .getByRole('status')
+      .filter({ hasText: 'Loading products' });
+    await expect(loading).toHaveAttribute('aria-busy', 'true');
+    await expect(loading).toHaveAttribute('aria-live', 'polite');
+    await expect(page).toHaveTitle(`${loadingSearch} — Hop & Barley products`);
+    await assertReducedMotionState(page, 'loading');
 
-    return {
-      animationDuration: catalogStyle.animationDuration,
-      animationIterationCount: catalogStyle.animationIterationCount,
-      animationName: catalogStyle.animationName,
-      scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
-      transitionDuration: targetStyle.transitionDuration,
-    };
-  });
+    const errorSearch = 'reduced-motion-error';
+    await page.goto(`/?search=${encodeURIComponent(errorSearch)}`);
+    await expect(
+      page.getByRole('status').filter({ hasText: 'API unavailable' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'Products unavailable' }),
+    ).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Try again' })).toBeVisible();
+    await expect(page).toHaveTitle(`${errorSearch} — Hop & Barley products`);
+    await assertReducedMotionState(page, 'error');
+    return;
+  }
 
-  expect(motion).toEqual({
-    animationDuration: '1e-05s',
-    animationIterationCount: '1',
-    animationName: 'none',
-    scrollBehavior: qualityGates.reducedMotion.scrollBehavior,
-    transitionDuration: '0s',
-  });
+  await page.goto(stateUrls.ready);
+  await expect(
+    page.getByRole('status').filter({ hasText: 'API connected' }),
+  ).toBeVisible();
+  await expect(page.getByText('12 products found')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Apply filters' }),
+  ).toBeVisible();
+  await expect(page).toHaveTitle('Shop brewing ingredients | Hop & Barley');
+  await assertReducedMotionState(page, 'ready');
+
+  await page.goto(stateUrls.filtered);
+  await expect(
+    page.getByRole('status').filter({ hasText: 'API connected' }),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Mosaic Hops' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Next' })).toBeVisible();
+  await expect(page).toHaveTitle('Hops — Hop & Barley products');
+  await assertReducedMotionState(page, 'filtered');
+
+  await page.goto(stateUrls.empty);
+  await expect(
+    page.getByRole('status').filter({ hasText: 'API connected' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'No products match these filters' }),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Clear filters' })).toBeVisible();
+  await expect(page).toHaveTitle('Brewing Salts — Hop & Barley products');
+  await assertReducedMotionState(page, 'empty');
 });
 
 test('matches connected catalog state baselines', async ({ page }) => {
@@ -563,6 +587,41 @@ async function assertProjectFocusVisible(target: Locator, label: string) {
   expect(outline.widthCssPx, `${label} outline width`).toBeGreaterThanOrEqual(
     qualityGates.focus.minimumIndicatorThicknessCssPx,
   );
+}
+
+async function assertReducedMotionState(page: Page, label: string) {
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      ),
+    )
+    .toBe(true);
+
+  const catalog = page
+    .locator(
+      'section[aria-label="Catalog"], section[aria-labelledby="catalog-title"]',
+    )
+    .first();
+  await expect(catalog, `${label} catalog`).toBeVisible();
+  const motion = await catalog.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      animationDuration: style.animationDuration,
+      animationIterationCount: style.animationIterationCount,
+      animationName: style.animationName,
+      scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
+      transitionDuration: style.transitionDuration,
+    };
+  });
+
+  expect(motion, `${label} reduced motion`).toEqual({
+    animationDuration: '1e-05s',
+    animationIterationCount: '1',
+    animationName: 'none',
+    scrollBehavior: qualityGates.reducedMotion.scrollBehavior,
+    transitionDuration: '0s',
+  });
 }
 
 async function assertGridColumns(articles: Locator, width: number) {

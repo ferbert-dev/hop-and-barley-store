@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -179,6 +179,8 @@ describe('C3 catalog closure evidence', () => {
     expect(runManifest.runs.map(({ mode }) => mode).sort()).toEqual([
       'api-connected',
       'api-connected',
+      'api-connected',
+      'api-unavailable',
       'api-unavailable',
       'unit',
     ]);
@@ -192,6 +194,30 @@ describe('C3 catalog closure evidence', () => {
       }, {}),
     ).toEqual({ 'api-connected': 27, 'api-unavailable': 18, unit: 15 });
     expect(runManifest.runs.flatMap(({ records }) => records)).toHaveLength(60);
+
+    const catalogSpec = readFileSync(
+      join(repositoryRoot, 'apps/e2e/tests/catalog-discovery.spec.ts'),
+      'utf8',
+    );
+    const explicitFocusStates = [
+      ...catalogSpec.matchAll(
+        /assertProjectFocusVisible\([^\n]+, '(ready|filtered)'\);/g,
+      ),
+    ].map((match) => match[1]);
+    const explicitReducedMotionStates = [
+      ...catalogSpec.matchAll(
+        /assertReducedMotionState\(page, '(ready|filtered|empty|loading|error)'\);/g,
+      ),
+    ].map((match) => match[1]);
+
+    expect(explicitFocusStates.sort()).toEqual(['filtered', 'ready']);
+    expect(explicitReducedMotionStates.sort()).toEqual([
+      'empty',
+      'error',
+      'filtered',
+      'loading',
+      'ready',
+    ]);
   });
 
   it('requires an independent approved record for every applicable manual row', () => {

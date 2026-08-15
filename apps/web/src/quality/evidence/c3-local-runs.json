@@ -176,28 +176,10 @@
           "testName": "supports keyboard-only catalog filtering with Tab, Shift+Tab, and Enter"
         },
         {
-          "id": "c3-run-ready-focus-visible-playwright",
-          "requirementId": "c3-catalog-discovery",
-          "state": "ready",
-          "check": "focus-visible",
-          "channel": "playwright",
-          "outcome": "pass",
-          "testName": "supports keyboard-only catalog filtering with Tab, Shift+Tab, and Enter"
-        },
-        {
           "id": "c3-run-filtered-keyboard-navigation-playwright",
           "requirementId": "c3-catalog-discovery",
           "state": "filtered",
           "check": "keyboard-navigation",
-          "channel": "playwright",
-          "outcome": "pass",
-          "testName": "supports keyboard-only catalog filtering with Tab, Shift+Tab, and Enter"
-        },
-        {
-          "id": "c3-run-filtered-focus-visible-playwright",
-          "requirementId": "c3-catalog-discovery",
-          "state": "filtered",
-          "check": "focus-visible",
           "channel": "playwright",
           "outcome": "pass",
           "testName": "supports keyboard-only catalog filtering with Tab, Shift+Tab, and Enter"
@@ -319,15 +301,6 @@
           "testName": "has no serious or critical catalog accessibility violations"
         },
         {
-          "id": "c3-run-filtered-reduced-motion-playwright",
-          "requirementId": "c3-catalog-discovery",
-          "state": "filtered",
-          "check": "reduced-motion",
-          "channel": "playwright",
-          "outcome": "pass",
-          "testName": "honours reduced motion in every catalog availability phase"
-        },
-        {
           "id": "c3-run-filtered-overflow-and-reflow-playwright",
           "requirementId": "c3-catalog-discovery",
           "state": "filtered",
@@ -400,15 +373,6 @@
           "testName": "has no serious or critical catalog accessibility violations"
         },
         {
-          "id": "c3-run-empty-reduced-motion-playwright",
-          "requirementId": "c3-catalog-discovery",
-          "state": "empty",
-          "check": "reduced-motion",
-          "channel": "playwright",
-          "outcome": "pass",
-          "testName": "honours reduced motion in every catalog availability phase"
-        },
-        {
           "id": "c3-run-empty-overflow-and-reflow-playwright",
           "requirementId": "c3-catalog-discovery",
           "state": "empty",
@@ -428,6 +392,59 @@
         }
       ],
       "note": "Full corrected-head connected nonvisual run completed with 10 passed and 4 skipped tests. A separate 1 of 1 connected visual comparison passed without snapshot updates immediately afterward."
+    },
+    {
+      "id": "c3-playwright-correction2-connected-focus-reduced-motion",
+      "mode": "api-connected",
+      "outcome": "pass",
+      "command": "'/opt/homebrew/opt/node@24/bin/node' '/opt/homebrew/Cellar/node/24.5.0/lib/node_modules/corepack/dist/pnpm.js' --filter @hop-and-barley/e2e exec playwright test tests/catalog-discovery.spec.ts --project=chromium --workers=1 --grep 'supports keyboard-only catalog filtering|honours reduced motion in ready, filtered, empty, loading, and error states'",
+      "startedAt": "2026-08-15T03:18:12Z",
+      "finishedAt": "2026-08-15T03:18:16Z",
+      "environment": {
+        "node": "v24.5.0",
+        "pnpm": "11.21.0",
+        "platform": "darwin-arm64",
+        "playwrightProject": "chromium"
+      },
+      "records": [
+        {
+          "id": "c3-run-ready-focus-visible-playwright",
+          "requirementId": "c3-catalog-discovery",
+          "state": "ready",
+          "check": "focus-visible",
+          "channel": "playwright",
+          "outcome": "pass",
+          "testName": "supports keyboard-only catalog filtering with Tab, Shift+Tab, and Enter"
+        },
+        {
+          "id": "c3-run-filtered-focus-visible-playwright",
+          "requirementId": "c3-catalog-discovery",
+          "state": "filtered",
+          "check": "focus-visible",
+          "channel": "playwright",
+          "outcome": "pass",
+          "testName": "supports keyboard-only catalog filtering with Tab, Shift+Tab, and Enter"
+        },
+        {
+          "id": "c3-run-filtered-reduced-motion-playwright",
+          "requirementId": "c3-catalog-discovery",
+          "state": "filtered",
+          "check": "reduced-motion",
+          "channel": "playwright",
+          "outcome": "pass",
+          "testName": "honours reduced motion in ready, filtered, empty, loading, and error states"
+        },
+        {
+          "id": "c3-run-empty-reduced-motion-playwright",
+          "requirementId": "c3-catalog-discovery",
+          "state": "empty",
+          "check": "reduced-motion",
+          "channel": "playwright",
+          "outcome": "pass",
+          "testName": "honours reduced motion in ready, filtered, empty, loading, and error states"
+        }
+      ],
+      "note": "Correction 2 connected run completed 2 of 2 tests at exit 0. It adds explicit solid focus outlines at or above 3 pixels for ready and filtered keyboard focus and state-specific reduced-motion assertions for filtered and empty; the same reduced-motion test also rechecked ready."
     },
     {
       "id": "c3-playwright-unavailable-main-exact-rerun",
@@ -478,15 +495,6 @@
           "channel": "axe",
           "outcome": "pass",
           "testName": "has no serious or critical Axe violations in the loading state"
-        },
-        {
-          "id": "c3-run-loading-reduced-motion-playwright",
-          "requirementId": "c3-catalog-discovery",
-          "state": "loading",
-          "check": "reduced-motion",
-          "channel": "playwright",
-          "outcome": "pass",
-          "testName": "honours reduced motion in every catalog availability phase"
         },
         {
           "id": "c3-run-loading-overflow-and-reflow-playwright",
@@ -607,6 +615,32 @@
         }
       ],
       "note": "Exact isolated unavailable rerun completed with 15 discovered, 6 passed and 9 skipped tests at exit 0. Cleanup removed the disposable stub and web containers plus their network, leaving zero residual containers and networks."
+    },
+    {
+      "id": "c3-playwright-correction2-unavailable-loading-reduced-motion",
+      "mode": "api-unavailable",
+      "outcome": "pass",
+      "command": "E2E_BASE_URL='http://127.0.0.1:61476' E2E_EXPECT_API_STATUS='API unavailable' '/opt/homebrew/opt/node@24/bin/node' '/opt/homebrew/Cellar/node/24.5.0/lib/node_modules/corepack/dist/pnpm.js' --filter @hop-and-barley/e2e exec playwright test tests/catalog-discovery.spec.ts --project=chromium --workers=1 --grep 'supports keyboard-only error retry with visible focus|honours reduced motion in ready, filtered, empty, loading, and error states'",
+      "startedAt": "2026-08-15T03:18:53Z",
+      "finishedAt": "2026-08-15T03:19:00Z",
+      "environment": {
+        "node": "v24.5.0",
+        "pnpm": "11.21.0",
+        "platform": "darwin-arm64",
+        "playwrightProject": "chromium"
+      },
+      "records": [
+        {
+          "id": "c3-run-loading-reduced-motion-playwright",
+          "requirementId": "c3-catalog-discovery",
+          "state": "loading",
+          "check": "reduced-motion",
+          "channel": "playwright",
+          "outcome": "pass",
+          "testName": "honours reduced motion in ready, filtered, empty, loading, and error states"
+        }
+      ],
+      "note": "Correction 2 unavailable run completed 2 of 2 tests at exit 0 against the literal disposable URL. It adds the state-specific loading reduced-motion assertion and rechecked error focus and reduced motion. Cleanup removed the two disposable containers and network with zero residual resources."
     }
   ]
 }
