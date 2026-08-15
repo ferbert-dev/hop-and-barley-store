@@ -3,9 +3,11 @@
 D2 moves the shared storefront frame into the root App Router layout without
 changing cart behaviour or backend ownership. C2 now routes catalog reads
 through the generated `@hop-and-barley/api-client` path and the shared
-compatibility normalizer with the client-level `cache: 'no-store'` option. The
-page remains `force-dynamic` and renders either `API connected` or
-`API unavailable` in a status region; it contains no raw fetch DTO or cast.
+compatibility normalizer. C3 owns the public catalog route and supplies typed
+query parameters with a 60-second Next revalidation hint. It renders either
+`API connected`, `API unavailable`, or `API not contacted` in a status region;
+it contains no raw fetch DTO or cast. Authenticated/private requests remain
+outside this public caching contract and must use `private, no-store`.
 
 ## Component boundary
 
@@ -64,8 +66,11 @@ animations, hidden carets and CSS-pixel scale. Baselines live at
 
 The four shell pairs hide only `main` during capture. This isolates the shared
 D2 shell from future catalog content and makes the same baseline valid for both
-connected and unavailable API runs. `visual-stability.css` changes only scroll
-behaviour during screenshot capture. It does not alter rendered appearance.
+connected and unavailable API runs. The unavailable regression reuses the
+desktop header/footer pair; `api-unavailable-hero.png` is retained as the
+historical D2 route-content reference, while C3 owns the current loading and
+error catalog baselines. `visual-stability.css` changes only scroll behaviour
+during screenshot capture. It does not alter rendered appearance.
 
 The machine-readable evidence contract is deliberately not a cartesian
 state/check/channel pass generator. Its 108 explicit evidence records match an

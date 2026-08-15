@@ -22,7 +22,7 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     Browser->>Web: GET /
-    Web->>API: generated GET /api/v1/products (no-store)
+    Web->>API: generated GET /api/v1/products (revalidate 60s)
     API->>DB: Prisma query
     DB-->>API: Product rows
     API-->>Web: {items, meta} catalog envelope
@@ -69,11 +69,17 @@ Open [http://localhost:3000](http://localhost:3000). A healthy full-stack render
 `@hop-and-barley/api-client` is the runtime and type boundary for the catalog.
 `src/lib/catalog.ts` resolves either an origin or the existing terminal
 `/api/v1` environment value to one origin, preventing duplicated path prefixes.
-It calls the generated `/api/v1/products` path with `cache: 'no-store'` and
-passes the response through the shared list compatibility normalizer. The
-normalizer returns a discriminated paged or legacy branch, permits additive
-future fields, rejects malformed required structure, and never invents facets,
-pagination, availability, or category facts for the legacy branch.
+It calls the generated `/api/v1/products` path with typed query parameters and
+`requestInitExt.next.revalidate = 60`, then passes the response through the
+shared list compatibility normalizer. The normalizer returns a discriminated
+paged or legacy branch, permits additive future fields, rejects malformed
+required structure, and never invents facets, pagination, availability, or
+category facts for the legacy branch.
+
+The public `/` route treats the URL as the only discovery state. It validates
+and canonicalizes `search`, `category`, price, sort, page, and limit before the
+API call. See [Catalog discovery](docs/catalog-discovery.md) for the exact
+rendering, responsive, cache, accessibility, and rollback contract.
 
 ## Design Foundation
 
@@ -96,10 +102,19 @@ from stable local paths under `public/assets`.
 ```text
 src/
 ├── app/
+│   ├── (catalog)/
+│   │   ├── error.tsx
+│   │   ├── loading.tsx
+│   │   └── page.tsx
 │   ├── globals.css
 │   ├── icon.svg
-│   ├── layout.tsx
-│   └── page.tsx
+│   └── layout.tsx
+├── features/
+│   └── catalog/
+│       ├── catalog-controls.tsx
+│       ├── catalog-pagination.tsx
+│       ├── catalog-query.ts
+│       └── catalog-screen.tsx
 ├── design-system/
 │   ├── assets.ts
 │   ├── assets.sha256.json
@@ -117,7 +132,10 @@ src/
     └── design-tokens.css
 ```
 
-Feature-first folders should be added only with real functionality. The planned direction is `features/catalog`, `features/cart`, `features/checkout`, `features/auth`, and `features/orders`, while route files remain thin.
+Feature-first folders are added only with real functionality. Catalog discovery
+now lives in `features/catalog`; the planned direction remains `features/cart`,
+`features/checkout`, `features/auth`, and `features/orders`, while route files
+stay thin.
 
 ## Deployment Boundary
 

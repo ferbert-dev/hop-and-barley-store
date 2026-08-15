@@ -242,8 +242,12 @@ test('renders the configured API availability state without changing the shell',
   await expect(page.locator('main')).toHaveCount(1);
 
   if (process.env.E2E_EXPECT_API_STATUS === 'API unavailable') {
-    await expect(page.locator('.hero')).toHaveScreenshot(
-      'api-unavailable-hero.png',
+    await waitForShellAssets(page);
+    await expect(page.locator('.site-header')).toHaveScreenshot(
+      'desktop-1280-shell-header.png',
+    );
+    await expect(page.locator('.site-footer__content')).toHaveScreenshot(
+      'desktop-1280-shell-footer.png',
     );
   }
 });

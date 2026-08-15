@@ -45,10 +45,17 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
     'pnpm test:catalog:postgres',
     'docker compose up -d --build --wait',
     'docker compose rm --force api',
+    '--network-alias api',
+    'Recreate a cold storefront for the unavailable phase',
+    'docker compose rm --stop --force web',
+    'setTimeout(()=>{response.statusCode=503;response.end("delayed unavailable")},2000)',
     'pnpm --filter @hop-and-barley/e2e test:e2e',
     'pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots',
+    'matches connected catalog state baselines',
+    'matches unavailable and loading catalog state baselines',
     "E2E_EXPECT_API_STATUS='API unavailable'",
     'apps/e2e/tests/__screenshots__/linux',
+    'docker rm --force "${COMPOSE_PROJECT_NAME}-delayed-api"',
     'docker compose down --remove-orphans',
   ]) {
     assert.ok(workflow.includes(command), `${command} is required in CI`);
@@ -57,11 +64,16 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
 
 test('clean public database and web verification commands own their prerequisites', () => {
   const apiPackage = JSON.parse(read('apps/api/package.json'));
+  const e2ePackage = JSON.parse(read('apps/e2e/package.json'));
   const webReadme = read('apps/web/README.md');
 
   assert.equal(
     apiPackage.scripts['db:seed'],
     'prisma generate && prisma db seed',
+  );
+  assert.equal(
+    e2ePackage.scripts['test:e2e'],
+    'pnpm --filter @hop-and-barley/api-client build && playwright test',
   );
   assert.doesNotMatch(
     webReadme,
