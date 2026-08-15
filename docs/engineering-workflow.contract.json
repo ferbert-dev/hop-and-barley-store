@@ -3,7 +3,7 @@
   "ticket": "R2",
   "agentRun": "https://app.notion.com/p/3bdd78850eab81d69677f7d24401fbcc",
   "correctionAgentRun": null,
-  "policyDigest": "sha256:968dd30e4d225e4bc0221ac940619926afc439ba7e8974c9bde7b37bea3c0fd6",
+  "policyDigest": "sha256:350da2a9be59ee39437c77364ce515edd8ed43ebd64de88ed471a1a2af61699c",
   "rules": [
     {
       "id": "independent-required-set",
@@ -143,21 +143,6 @@
       "playwright": "user-flow-or-browser-state-touch",
       "visualManual": "visual-bytes-layout-or-manual-risk",
       "fullBinaryManifest": "binary-dependency-lock-or-multi-slice-integration"
-    },
-    "automatedSemanticProof": {
-      "status": "experiment",
-      "appliesTo": ["P1", "O0", "O1"],
-      "generatedFromReporter": true,
-      "sourceNameAloneSufficient": false,
-      "requires": [
-        "headSha",
-        "specSha256",
-        "testId",
-        "assertionIds",
-        "runUrl",
-        "exitCode",
-        "artifactHash"
-      ]
     }
   },
   "isolation": {
@@ -375,6 +360,18 @@
       "unsupportedAutomatedEvidenceMappings": 0,
       "maximumCiRunsPerTicket": 3,
       "maximumExactHeadReviewAttemptsPerTicket": 2
+    },
+    "semanticReporterProposal": {
+      "status": "proposed-non-closing",
+      "activationRequires": [
+        "dedicated-tooling-ticket",
+        "executable-reporter-command",
+        "versioned-artifact-schema",
+        "ticket-template-slot",
+        "ci-contract",
+        "independent-review"
+      ],
+      "blocksTickets": []
     }
   }
 }

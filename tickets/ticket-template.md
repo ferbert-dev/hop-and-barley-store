@@ -9,6 +9,8 @@
 - Risks and rollback:
 - Verification:
 - Required authority:
+- Ticket URL:
+- Implementation Agent Run:
 - Branch: `agent/<ticket>-<slug>`
 - Pull request:
 - Head SHA:

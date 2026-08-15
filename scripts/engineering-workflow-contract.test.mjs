@@ -76,7 +76,7 @@ const expectedCleanOrder = [
 ];
 
 const expectedPolicyDigest =
-  'sha256:968dd30e4d225e4bc0221ac940619926afc439ba7e8974c9bde7b37bea3c0fd6';
+  'sha256:350da2a9be59ee39437c77364ce515edd8ed43ebd64de88ed471a1a2af61699c';
 const expectedArtifactReferencePattern = '<durable-json-path>#<record-id>';
 const expectedNextStrategies = [
   'serialized-build-start-test-stop',
@@ -170,15 +170,18 @@ const expectedAlwaysEvidence = [
   'cleanup',
   'exactHeadSha',
 ];
-const expectedSemanticProofFields = [
-  'headSha',
-  'specSha256',
-  'testId',
-  'assertionIds',
-  'runUrl',
-  'exitCode',
-  'artifactHash',
-];
+const expectedSemanticReporterProposal = {
+  status: 'proposed-non-closing',
+  activationRequires: [
+    'dedicated-tooling-ticket',
+    'executable-reporter-command',
+    'versioned-artifact-schema',
+    'ticket-template-slot',
+    'ci-contract',
+    'independent-review',
+  ],
+  blocksTickets: [],
+};
 const expectedTraceability = [
   'ticketUrl',
   'agentRunUrl',
@@ -418,18 +421,8 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
   ) {
     errors.push('conditional evidence tiers drifted');
   }
-  if (
-    candidate.evidence?.automatedSemanticProof?.status !== 'experiment' ||
-    JSON.stringify(candidate.evidence?.automatedSemanticProof?.appliesTo) !==
-      JSON.stringify(['P1', 'O0', 'O1']) ||
-    candidate.evidence?.automatedSemanticProof?.generatedFromReporter !==
-      true ||
-    candidate.evidence?.automatedSemanticProof?.sourceNameAloneSufficient !==
-      false ||
-    JSON.stringify(candidate.evidence?.automatedSemanticProof?.requires) !==
-      JSON.stringify(expectedSemanticProofFields)
-  ) {
-    errors.push('automated semantic proof requirements drifted');
+  if (Object.hasOwn(candidate.evidence ?? {}, 'automatedSemanticProof')) {
+    errors.push('unimplemented semantic reporter must not be a closing gate');
   }
 
   if (candidate.isolation?.next?.maxServersPerBuildOutput !== 1) {
@@ -638,6 +631,7 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
         maximumCiRunsPerTicket: 3,
         maximumExactHeadReviewAttemptsPerTicket: 2,
       },
+      semanticReporterProposal: expectedSemanticReporterProposal,
     })
   ) {
     errors.push('P1/O0/O1 experiment drifted');
@@ -746,19 +740,28 @@ test('root README reports the accepted catalog seed and remaining detail scope',
   assert.doesNotMatch(readme, /product details and categories/u);
 });
 
-test('ticket template captures exact-head pull-request closure and tiered evidence', () => {
-  for (const literal of [
-    '- Branch: `agent/<ticket>-<slug>`',
-    '- Pull request:',
-    '- Head SHA:',
-    '- Required checks / check-suite URL:',
-    '- Independent review Agent Run:',
-    '- Review verdict: `PASS | FAIL | BLOCKED`',
-    '- Merge SHA:',
-    '- Merged at:',
-    '- Evidence tiers:',
-    '- Delivery metrics:',
-  ]) {
+test('ticket template captures every traceability field and tiered evidence', () => {
+  const traceabilityLabels = {
+    ticketUrl: '- Ticket URL:',
+    agentRunUrl: '- Implementation Agent Run:',
+    branch: '- Branch: `agent/<ticket>-<slug>`',
+    pullRequestUrl: '- Pull request:',
+    headSha: '- Head SHA:',
+    checkSuiteUrl: '- Required checks / check-suite URL:',
+    reviewRunUrl: '- Independent review Agent Run:',
+    verdict: '- Review verdict: `PASS | FAIL | BLOCKED`',
+    mergeSha: '- Merge SHA:',
+    mergedAt: '- Merged at:',
+  };
+
+  assert.deepEqual(
+    Object.keys(traceabilityLabels),
+    contract.delivery.traceabilityRequired,
+  );
+  for (const literal of Object.values(traceabilityLabels)) {
+    assert.ok(ticketTemplate.includes(literal), literal);
+  }
+  for (const literal of ['- Evidence tiers:', '- Delivery metrics:']) {
     assert.ok(ticketTemplate.includes(literal), literal);
   }
 });
@@ -780,6 +783,34 @@ test('R2 catalog baseline remains grounded in executable source contracts', () =
     join(repositoryRoot, 'apps/e2e/tests/catalog-discovery.spec.ts'),
     'utf8',
   );
+  const evidenceSource = readFileSync(
+    join(repositoryRoot, 'apps/web/src/quality/c3-catalog-evidence.ts'),
+    'utf8',
+  );
+  const localRuns = JSON.parse(
+    readFileSync(
+      join(repositoryRoot, 'apps/web/src/quality/evidence/c3-local-runs.json'),
+      'utf8',
+    ),
+  );
+  const manualReview = JSON.parse(
+    readFileSync(
+      join(
+        repositoryRoot,
+        'apps/web/src/quality/evidence/c3-manual-review.json',
+      ),
+      'utf8',
+    ),
+  );
+  const visualBaselines = JSON.parse(
+    readFileSync(
+      join(
+        repositoryRoot,
+        'apps/web/src/quality/evidence/c3-visual-baselines.json',
+      ),
+      'utf8',
+    ),
+  );
 
   assert.match(fixtureTest, /five normalized categories/u);
   assert.match(fixtureTest, /catalogProducts\)\.toHaveLength\(12\)/u);
@@ -794,6 +825,96 @@ test('R2 catalog baseline remains grounded in executable source contracts', () =
   assert.match(transport, /CATALOG_REQUEST_TIMEOUT_MS = 1_000/u);
   assert.match(transport, /next: \{ revalidate: 60 \}/u);
   assert.doesNotMatch(browserSpec, /networkidle/u);
+
+  const catalogStatesBlock = evidenceSource.match(
+    /export const c3CatalogStates = \[([\s\S]*?)\] as const;/u,
+  )?.[1];
+  assert.ok(catalogStatesBlock, 'C3 catalog states export must exist');
+  const catalogStates = [...catalogStatesBlock.matchAll(/'([^']+)'/gu)].map(
+    ([, state]) => state,
+  );
+
+  const channelMapBlock = evidenceSource.match(
+    /export const c3RequiredChannelsByCheck = \{([\s\S]*?)\} as const satisfies/u,
+  )?.[1];
+  assert.ok(channelMapBlock, 'C3 required-channel map must exist');
+  const channelsByCheck = Object.fromEntries(
+    [...channelMapBlock.matchAll(/('?[^':]+'?): \[([^\]]+)\]/gu)].map(
+      ([, rawCheck, rawChannels]) => [
+        rawCheck.replaceAll("'", ''),
+        [...rawChannels.matchAll(/'([^']+)'/gu)].map(([, channel]) => channel),
+      ],
+    ),
+  );
+  const channelsPerState = Object.values(channelsByCheck).reduce(
+    (total, channels) => total + channels.length,
+    0,
+  );
+
+  const loadingNotApplicableChecks = [
+    ...(evidenceSource
+      .match(
+        /mapping\.state === 'loading'[\s\S]*?\[([^\]]+)\]\.includes\(\s*mapping\.check/u,
+      )?.[1]
+      .matchAll(/'([^']+)'/gu) ?? []),
+  ].map(([, check]) => check);
+  const successfulStates = [
+    ...(evidenceSource
+      .match(/return \(\s*\[([^\]]+)\]\.includes\(mapping\.state\)/u)?.[1]
+      .matchAll(/'([^']+)'/gu) ?? []),
+  ].map(([, state]) => state);
+  const notApplicableCount =
+    loadingNotApplicableChecks.reduce(
+      (total, check) => total + channelsByCheck[check].length,
+      0,
+    ) +
+    successfulStates.length * channelsByCheck['error-messaging'].length;
+
+  const publicCurrencies = [
+    ...new Set(
+      [...service.matchAll(/currency: '([A-Z]{3})'/gu)].map(
+        ([, currency]) => currency,
+      ),
+    ),
+  ];
+  const automatedPassCount = localRuns.runs.reduce((total, run) => {
+    assert.equal(run.outcome, 'pass', run.id);
+    assert.equal(
+      run.records.every((record) => record.outcome === 'pass'),
+      true,
+      run.id,
+    );
+    return total + run.records.length;
+  }, 0);
+  assert.equal(
+    manualReview.observations.every(
+      (observation) => observation.status === 'approved',
+    ),
+    true,
+  );
+  assert.equal(visualBaselines.review.outcome, 'approved');
+
+  assert.deepEqual(publicCurrencies, [
+    contract.catalogBoundary.baseline.currency,
+  ]);
+  assert.equal(
+    catalogStates.length,
+    contract.catalogBoundary.baseline.catalogStates,
+  );
+  assert.equal(
+    catalogStates.length * channelsPerState,
+    contract.catalogBoundary.baseline.qualityMappings,
+  );
+  assert.equal(
+    automatedPassCount +
+      manualReview.observations.length +
+      visualBaselines.evidenceSets.length,
+    contract.catalogBoundary.baseline.qualityPass,
+  );
+  assert.equal(
+    notApplicableCount,
+    contract.catalogBoundary.baseline.qualityNotApplicable,
+  );
 
   for (const relativeDirectory of [
     'apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts',

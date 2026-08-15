@@ -59,8 +59,10 @@ Architecture state after the catalog retrospective:
 - **Decided:** one ticket owns one branch and one pull request. Merge requires
   green required CI plus an independent PASS for the exact head SHA; only then
   may the ticket move to Done.
-- **Proposed:** P1, O0 and O1 trial conditional evidence tiers and generated
-  semantic browser evidence before R3 evaluates the result.
+- **Proposed:** P1, O0 and O1 trial conditional evidence tiers before R3
+  evaluates the result. A generated semantic-evidence reporter is a separate,
+  non-closing tooling proposal until its prerequisite ticket is implemented and
+  independently reviewed.
 - **Unknown/pending:** the exact auth/admin route-group and layout ownership is
   intentionally blocked on its dedicated architecture decision.
 
@@ -332,12 +334,17 @@ bundle by default. Rerun the affected local proof plus package checks, then let
 full exact-head CI remain the merge gate. Do not keep one reviewer run open
 across multiple heads and later relabel it Succeeded.
 
-During the P1/O0/O1 experiment, automated PASS records are generated from the
-test reporter and carry the head SHA, spec hash, stable test ID, assertion IDs,
-run URL, exit code and artifact hash. A test name or source path is navigation,
-not semantic proof. Browser evidence waits for observable application state;
-`networkidle` is forbidden. A newly cited browser evidence test must pass five
-repeats before it can support a closure mapping.
+During the P1/O0/O1 experiment, current durable run records, state-specific
+assertions and independent exact-head review remain authoritative. A test name
+or source path is navigation, not semantic proof. Browser evidence waits for
+observable application state; `networkidle` is forbidden. A newly cited browser
+evidence test must pass five repeats before it can support a closure mapping.
+
+The generated semantic-evidence reporter is not a merge or ticket prerequisite
+today. Activating it requires a dedicated tooling ticket that supplies an
+executable command, versioned artifact schema, ticket-template slot, CI
+contract and independent review. Until all six exist, the proposal blocks no
+feature or order ticket and cannot create closing evidence.
 
 Whenever catalog query grammar changes, one table-driven vector set must pass
 through the API and web parsers with identical valid, invalid, default and
@@ -389,3 +396,7 @@ The primary owner records timestamps and counts in the ticket and Agent Run.
 The independent reviewer verifies exact-head traceability and the selected
 evidence tiers. Rollback removes only the R2 policy delta, restores the prior
 ticket template and keeps all accepted catalog runtime/data behavior unchanged.
+
+R3 also decides whether the non-closing semantic-reporter proposal has enough
+value to justify its own tooling ticket; P1, O0 and O1 do not invent reporter
+formats independently.
