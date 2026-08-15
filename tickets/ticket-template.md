@@ -9,4 +9,31 @@
 - Risks and rollback:
 - Verification:
 - Required authority:
-- Evidence:
+- Ticket URL:
+- Implementation Agent Run:
+- Branch: `agent/<ticket>-<slug>`
+- Pull request:
+- Head SHA:
+- Required checks / check-suite URL:
+- Independent review Agent Run:
+- Review verdict: `PASS | FAIL | BLOCKED`
+- Merge SHA:
+- Merged at:
+- Evidence tiers:
+  - Always: changed paths, relevant tests, CI, cleanup, exact head SHA
+  - Database (when schema, migration, seed or stored data changes):
+  - Browser (when user flow or browser state changes):
+  - Visual/manual (when visual bytes, layout or manual-only risk changes):
+  - Full binary/dependency manifest (when binaries, dependencies, lockfile or
+    multi-slice integration change):
+- Delivery metrics:
+  - Ready at:
+  - First commit at:
+  - PR opened at:
+  - First green at:
+  - Review started at:
+  - PASS at:
+  - Merged at:
+  - Commit / CI run / CI failure counts:
+  - Review attempt / correction cycle counts:
+  - Changed path / binary byte counts:

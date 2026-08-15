@@ -1,9 +1,9 @@
 {
-  "schemaVersion": 1,
-  "ticket": "R1",
-  "agentRun": "https://app.notion.com/p/3bcd78850eab8177b600d9abe52a2325?pvs=204",
-  "correctionAgentRun": "https://app.notion.com/p/3bcd78850eab812db3b4fe6f17b69544?pvs=204",
-  "policyDigest": "sha256:c3219ae537b9180a7541ec678f04a677ec266bb40379902cbb0d4a679d883db0",
+  "schemaVersion": 2,
+  "ticket": "R2",
+  "agentRun": "https://app.notion.com/p/3bdd78850eab81d69677f7d24401fbcc",
+  "correctionAgentRun": null,
+  "policyDigest": "sha256:350da2a9be59ee39437c77364ce515edd8ed43ebd64de88ed471a1a2af61699c",
   "rules": [
     {
       "id": "independent-required-set",
@@ -69,11 +69,46 @@
       "rollback": "Keep or return the contract to its first consumer until two consumers exist."
     },
     {
-      "id": "c2-reuse-existing-contracts",
-      "owner": "C2 primary role and independent reviewer",
-      "timing": "Before C2 implementation and again before C2 closure",
-      "verification": "Audit imports for D3 ProductCard/Price/status primitives and the generated API client; reject duplicate card or raw-fetch contracts.",
-      "rollback": "Remove only the C2 adapter/UI slice and preserve accepted primitives and generated client."
+      "id": "one-ticket-branch-pr",
+      "owner": "Primary ticket owner",
+      "timing": "Before the first state-changing commit",
+      "verification": "Use one ticket-scoped branch and one dedicated pull request based on main; record the ticket, branch and pull request links.",
+      "rollback": "Close the mixed-scope pull request without merging and split the work into ticket-owned branches."
+    },
+    {
+      "id": "exact-head-green-review",
+      "owner": "Independent reviewer",
+      "timing": "After required CI is green and before merge",
+      "verification": "Record PASS, FAIL or BLOCKED against the exact pull-request head SHA and required check-suite URLs.",
+      "rollback": "Treat a new head or red required check as non-closing and start a new independent review run."
+    },
+    {
+      "id": "immutable-correction-review",
+      "owner": "Correction owner and independent reviewer",
+      "timing": "After a failed exact-head review",
+      "verification": "Preserve the failed review, apply one bounded correction bundle, rerun exact-head CI and create a new review run.",
+      "rollback": "Revert only the correction bundle or keep the ticket In Progress; never rewrite the failed result as PASS."
+    },
+    {
+      "id": "catalog-query-parity",
+      "owner": "API and web owners",
+      "timing": "Whenever catalog query grammar changes",
+      "verification": "Run one table-driven vector set through API and web parsers and require equal valid, invalid, default and canonical classifications.",
+      "rollback": "Revert the grammar change or restore the last generated client and URL contract; do not add a second runtime contract package for a hypothetical change."
+    },
+    {
+      "id": "public-private-cache-separation",
+      "owner": "Feature owner and security reviewer",
+      "timing": "Whenever cached catalog data or private user data is introduced or changed",
+      "verification": "Keep public catalog cache keys query-specific and failure-free; require private auth, cart and order responses to stay private and no-store.",
+      "rollback": "Disable the affected cache path, preserve the authoritative backend result and rerun connected, unavailable and privacy checks."
+    },
+    {
+      "id": "catalog-source-evidence-provenance",
+      "owner": "Catalog data or asset owner and independent reviewer",
+      "timing": "Whenever catalog seed content, slugs, image paths or production asset bytes change",
+      "verification": "Require deterministic fixture identity plus exact slug, local path, checksum and reviewer-owned provenance coverage.",
+      "rollback": "Restore the last accepted fixture and asset manifest together; keep the ignored reference bundle local and outside Git and Docker contexts."
     }
   ],
   "evidence": {
@@ -95,6 +130,19 @@
     "notApplicable": {
       "artifact": null,
       "requires": ["reason", "reviewerAgreementTrace"]
+    },
+    "always": [
+      "changedPaths",
+      "relevantTests",
+      "ci",
+      "cleanup",
+      "exactHeadSha"
+    ],
+    "conditional": {
+      "database": "schema-migration-seed-or-data-touch",
+      "playwright": "user-flow-or-browser-state-touch",
+      "visualManual": "visual-bytes-layout-or-manual-risk",
+      "fullBinaryManifest": "binary-dependency-lock-or-multi-slice-integration"
     }
   },
   "isolation": {
@@ -193,7 +241,73 @@
       "firstConsumerOwnsLocally": true
     }
   },
-  "c2": {
+  "delivery": {
+    "branch": {
+      "base": "main",
+      "pattern": "^agent/[a-z0-9]+-[a-z0-9-]+$",
+      "ticketsPerPullRequest": 1,
+      "draftBeforeReview": true
+    },
+    "traceabilityRequired": [
+      "ticketUrl",
+      "agentRunUrl",
+      "branch",
+      "pullRequestUrl",
+      "headSha",
+      "checkSuiteUrl",
+      "reviewRunUrl",
+      "verdict",
+      "mergeSha",
+      "mergedAt"
+    ],
+    "review": {
+      "independent": true,
+      "verdicts": ["PASS", "FAIL", "BLOCKED"],
+      "exactHeadRequired": true,
+      "greenRequiredChecksBeforePass": true,
+      "newHeadRequiresNewRun": true,
+      "failedAttemptsImmutable": true
+    },
+    "closureOrder": [
+      "ready-ticket",
+      "running-agent-run",
+      "ticket-branch",
+      "commit",
+      "draft-pull-request",
+      "green-required-ci",
+      "exact-head-independent-review",
+      "ready-pull-request",
+      "merge",
+      "ticket-done"
+    ],
+    "correction": {
+      "defaultBundlesPerFail": 1,
+      "requires": ["newCommit", "newHead", "greenRequiredCi", "newReviewRun"],
+      "preservesFailedRun": true
+    },
+    "browserReadiness": {
+      "forbiddenLifecycleWait": "networkidle",
+      "requiredWait": "observable-application-state",
+      "newlyCitedEvidenceRepeatPasses": 5
+    },
+    "metricsRequired": [
+      "readyAt",
+      "firstCommitAt",
+      "pullRequestOpenedAt",
+      "firstGreenAt",
+      "reviewStartedAt",
+      "passAt",
+      "mergedAt",
+      "commitCount",
+      "ciRunCount",
+      "ciFailureCount",
+      "reviewAttemptCount",
+      "correctionCycleCount",
+      "changedPathCount",
+      "binaryBytes"
+    ]
+  },
+  "catalogBoundary": {
     "requiredWebExports": [
       {
         "path": "apps/web/src/components/ui/card.tsx",
@@ -221,6 +335,43 @@
     "forbiddenOutcomes": [
       "third-product-card-implementation",
       "hand-written-raw-fetch-catalog-contract"
-    ]
+    ],
+    "baseline": {
+      "categories": 5,
+      "products": 12,
+      "currency": "USD",
+      "transactionIsolation": "RepeatableRead",
+      "publicRevalidateSeconds": 60,
+      "requestTimeoutMilliseconds": 1000,
+      "catalogStates": 5,
+      "qualityMappings": 135,
+      "qualityPass": 113,
+      "qualityNotApplicable": 22,
+      "visualBaselinesPerPlatform": 24
+    }
+  },
+  "nextExperiment": {
+    "tickets": ["P1", "O0", "O1"],
+    "retrospective": "R3",
+    "targets": {
+      "dedicatedBranchAndPullRequest": "3/3",
+      "ticketsDoneBeforeMerge": 0,
+      "reviewRequestsWithIncompleteEvidenceOrRedCi": 0,
+      "unsupportedAutomatedEvidenceMappings": 0,
+      "maximumCiRunsPerTicket": 3,
+      "maximumExactHeadReviewAttemptsPerTicket": 2
+    },
+    "semanticReporterProposal": {
+      "status": "proposed-non-closing",
+      "activationRequires": [
+        "dedicated-tooling-ticket",
+        "executable-reporter-command",
+        "versioned-artifact-schema",
+        "ticket-template-slot",
+        "ci-contract",
+        "independent-review"
+      ],
+      "blocksTickets": []
+    }
   }
 }

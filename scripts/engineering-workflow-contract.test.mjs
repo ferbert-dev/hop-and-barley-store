@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -35,6 +36,7 @@ const packagePath = join(repositoryRoot, 'package.json');
 const dockerIgnorePath = join(repositoryRoot, '.dockerignore');
 const gitIgnorePath = join(repositoryRoot, '.gitignore');
 const readmePath = join(repositoryRoot, 'README.md');
+const ticketTemplatePath = join(repositoryRoot, 'tickets/ticket-template.md');
 
 const workflow = readFileSync(workflowPath, 'utf8');
 const contract = JSON.parse(readFileSync(contractPath, 'utf8'));
@@ -42,18 +44,24 @@ const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
 const dockerIgnore = readFileSync(dockerIgnorePath, 'utf8');
 const gitIgnore = readFileSync(gitIgnorePath, 'utf8');
 const readme = readFileSync(readmePath, 'utf8');
+const ticketTemplate = readFileSync(ticketTemplatePath, 'utf8');
 
 const referenceBundleIgnore = '/docs/Hop-and-Barley-main/';
 
 const expectedRuleIds = [
-  'c2-reuse-existing-contracts',
+  'catalog-query-parity',
+  'catalog-source-evidence-provenance',
   'cross-workspace-contract-second-consumer',
   'direct-node24-clean-order',
   'disposable-postgres-review',
   'durable-fail-closed-evidence',
+  'exact-head-green-review',
   'generated-contract-drift',
+  'immutable-correction-review',
   'independent-required-set',
   'isolated-next-build-server',
+  'one-ticket-branch-pr',
+  'public-private-cache-separation',
   'reviewed-patch-binary-manifest',
   'route-layout-ownership-before-auth-admin',
 ];
@@ -68,7 +76,7 @@ const expectedCleanOrder = [
 ];
 
 const expectedPolicyDigest =
-  'sha256:c3219ae537b9180a7541ec678f04a677ec266bb40379902cbb0d4a679d883db0';
+  'sha256:350da2a9be59ee39437c77364ce515edd8ed43ebd64de88ed471a1a2af61699c';
 const expectedArtifactReferencePattern = '<durable-json-path>#<record-id>';
 const expectedNextStrategies = [
   'serialized-build-start-test-stop',
@@ -155,6 +163,65 @@ const expectedTooling = {
   cleaner: 'scripts/clean-workspace-artifacts.mjs',
   generatedVerifier: 'scripts/verify-generated-stability.mjs',
 };
+const expectedAlwaysEvidence = [
+  'changedPaths',
+  'relevantTests',
+  'ci',
+  'cleanup',
+  'exactHeadSha',
+];
+const expectedSemanticReporterProposal = {
+  status: 'proposed-non-closing',
+  activationRequires: [
+    'dedicated-tooling-ticket',
+    'executable-reporter-command',
+    'versioned-artifact-schema',
+    'ticket-template-slot',
+    'ci-contract',
+    'independent-review',
+  ],
+  blocksTickets: [],
+};
+const expectedTraceability = [
+  'ticketUrl',
+  'agentRunUrl',
+  'branch',
+  'pullRequestUrl',
+  'headSha',
+  'checkSuiteUrl',
+  'reviewRunUrl',
+  'verdict',
+  'mergeSha',
+  'mergedAt',
+];
+const expectedClosureOrder = [
+  'ready-ticket',
+  'running-agent-run',
+  'ticket-branch',
+  'commit',
+  'draft-pull-request',
+  'green-required-ci',
+  'exact-head-independent-review',
+  'ready-pull-request',
+  'merge',
+  'ticket-done',
+];
+const expectedDeliveryMetrics = [
+  'readyAt',
+  'firstCommitAt',
+  'pullRequestOpenedAt',
+  'firstGreenAt',
+  'reviewStartedAt',
+  'passAt',
+  'mergedAt',
+  'commitCount',
+  'ciRunCount',
+  'ciFailureCount',
+  'reviewAttemptCount',
+  'correctionCycleCount',
+  'changedPathCount',
+  'binaryBytes',
+];
 
 const expectedWorkflowHeadings = [
   '## Evidence boundary',
@@ -166,8 +233,12 @@ const expectedWorkflowHeadings = [
   '## Ownership gates for upcoming slices',
   '### Route and layout ownership before auth or admin',
   '### Promote a cross-workspace contract on the second consumer',
-  '### C2 catalog integration gate',
+  '### Accepted catalog integration boundary',
   '## R1 measured retrospective',
+  '## R2 measured catalog retrospective',
+  '### Measured baseline',
+  '### Conditional evidence tiers',
+  '### P1, O0 and O1 experiment',
 ];
 
 function isNonEmptyString(value) {
@@ -252,16 +323,16 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
   const rules = Array.isArray(candidate.rules) ? candidate.rules : [];
   const ruleIds = rules.map((rule) => rule?.id).filter(isNonEmptyString);
 
-  if (candidate.schemaVersion !== 1) errors.push('schemaVersion must be 1');
-  if (candidate.ticket !== 'R1') errors.push('ticket must be R1');
-  if (!isNonEmptyString(candidate.agentRun)) {
-    errors.push('agentRun must be durable');
-  }
+  if (candidate.schemaVersion !== 2) errors.push('schemaVersion must be 2');
+  if (candidate.ticket !== 'R2') errors.push('ticket must be R2');
   if (
-    candidate.correctionAgentRun !==
-    'https://app.notion.com/p/3bcd78850eab812db3b4fe6f17b69544?pvs=204'
+    candidate.agentRun !==
+    'https://app.notion.com/p/3bdd78850eab81d69677f7d24401fbcc'
   ) {
-    errors.push('correctionAgentRun drifted');
+    errors.push('R2 agentRun must be durable and exact');
+  }
+  if (candidate.correctionAgentRun !== null) {
+    errors.push('correctionAgentRun must stay null until a real correction');
   }
   if (
     candidate.policyDigest !== expectedPolicyDigest ||
@@ -273,7 +344,7 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
     errors.push('rule IDs must be unique');
   }
   if (JSON.stringify([...ruleIds].sort()) !== JSON.stringify(expectedRuleIds)) {
-    errors.push('rules must equal the independent R1 expected set');
+    errors.push('rules must equal the independent R2 expected set');
   }
 
   for (const rule of rules) {
@@ -332,6 +403,26 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
     JSON.stringify(['reason', 'reviewerAgreementTrace'])
   ) {
     errors.push('not-applicable review requirements drifted');
+  }
+  if (
+    JSON.stringify(candidate.evidence?.always) !==
+    JSON.stringify(expectedAlwaysEvidence)
+  ) {
+    errors.push('always-required evidence drifted');
+  }
+  if (
+    JSON.stringify(candidate.evidence?.conditional) !==
+    JSON.stringify({
+      database: 'schema-migration-seed-or-data-touch',
+      playwright: 'user-flow-or-browser-state-touch',
+      visualManual: 'visual-bytes-layout-or-manual-risk',
+      fullBinaryManifest: 'binary-dependency-lock-or-multi-slice-integration',
+    })
+  ) {
+    errors.push('conditional evidence tiers drifted');
+  }
+  if (Object.hasOwn(candidate.evidence ?? {}, 'automatedSemanticProof')) {
+    errors.push('unimplemented semantic reporter must not be a closing gate');
   }
 
   if (candidate.isolation?.next?.maxServersPerBuildOutput !== 1) {
@@ -433,21 +524,117 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
   }
 
   if (
-    JSON.stringify(candidate.c2?.requiredWebExports) !==
-      JSON.stringify(expectedWebExports) ||
-    JSON.stringify(candidate.c2?.generatedClientExports) !==
-      JSON.stringify(expectedGeneratedClientExports)
+    candidate.delivery?.branch?.base !== 'main' ||
+    candidate.delivery?.branch?.pattern !== '^agent/[a-z0-9]+-[a-z0-9-]+$' ||
+    candidate.delivery?.branch?.ticketsPerPullRequest !== 1 ||
+    candidate.delivery?.branch?.draftBeforeReview !== true
   ) {
-    errors.push('C2 reuse paths or symbols drifted');
+    errors.push('one-ticket branch and pull-request policy drifted');
   }
   if (
-    JSON.stringify(candidate.c2?.forbiddenOutcomes) !==
+    JSON.stringify(candidate.delivery?.traceabilityRequired) !==
+    JSON.stringify(expectedTraceability)
+  ) {
+    errors.push('delivery traceability fields drifted');
+  }
+  if (
+    candidate.delivery?.review?.independent !== true ||
+    JSON.stringify(candidate.delivery?.review?.verdicts) !==
+      JSON.stringify(['PASS', 'FAIL', 'BLOCKED']) ||
+    candidate.delivery?.review?.exactHeadRequired !== true ||
+    candidate.delivery?.review?.greenRequiredChecksBeforePass !== true ||
+    candidate.delivery?.review?.newHeadRequiresNewRun !== true ||
+    candidate.delivery?.review?.failedAttemptsImmutable !== true
+  ) {
+    errors.push('exact-head independent review policy drifted');
+  }
+  if (
+    JSON.stringify(candidate.delivery?.closureOrder) !==
+    JSON.stringify(expectedClosureOrder)
+  ) {
+    errors.push('ticket closure order drifted');
+  }
+  if (
+    candidate.delivery?.correction?.defaultBundlesPerFail !== 1 ||
+    JSON.stringify(candidate.delivery?.correction?.requires) !==
+      JSON.stringify([
+        'newCommit',
+        'newHead',
+        'greenRequiredCi',
+        'newReviewRun',
+      ]) ||
+    candidate.delivery?.correction?.preservesFailedRun !== true
+  ) {
+    errors.push('immutable correction lifecycle drifted');
+  }
+  if (
+    candidate.delivery?.browserReadiness?.forbiddenLifecycleWait !==
+      'networkidle' ||
+    candidate.delivery?.browserReadiness?.requiredWait !==
+      'observable-application-state' ||
+    candidate.delivery?.browserReadiness?.newlyCitedEvidenceRepeatPasses !== 5
+  ) {
+    errors.push('browser evidence readiness policy drifted');
+  }
+  if (
+    JSON.stringify(candidate.delivery?.metricsRequired) !==
+    JSON.stringify(expectedDeliveryMetrics)
+  ) {
+    errors.push('delivery metrics drifted');
+  }
+
+  if (
+    JSON.stringify(candidate.catalogBoundary?.requiredWebExports) !==
+      JSON.stringify(expectedWebExports) ||
+    JSON.stringify(candidate.catalogBoundary?.generatedClientExports) !==
+      JSON.stringify(expectedGeneratedClientExports)
+  ) {
+    errors.push('catalog reuse paths or symbols drifted');
+  }
+  if (
+    JSON.stringify(candidate.catalogBoundary?.forbiddenOutcomes) !==
     JSON.stringify([
       'third-product-card-implementation',
       'hand-written-raw-fetch-catalog-contract',
     ])
   ) {
-    errors.push('C2 duplicate-contract rejection drifted');
+    errors.push('catalog duplicate-contract rejection drifted');
+  }
+  if (
+    JSON.stringify(candidate.catalogBoundary?.baseline) !==
+    JSON.stringify({
+      categories: 5,
+      products: 12,
+      currency: 'USD',
+      transactionIsolation: 'RepeatableRead',
+      publicRevalidateSeconds: 60,
+      requestTimeoutMilliseconds: 1000,
+      catalogStates: 5,
+      qualityMappings: 135,
+      qualityPass: 113,
+      qualityNotApplicable: 22,
+      visualBaselinesPerPlatform: 24,
+    })
+  ) {
+    errors.push('accepted catalog baseline drifted');
+  }
+  if (
+    JSON.stringify(candidate.nextExperiment) !==
+    JSON.stringify({
+      tickets: ['P1', 'O0', 'O1'],
+      retrospective: 'R3',
+      targets: {
+        dedicatedBranchAndPullRequest: '3/3',
+        ticketsDoneBeforeMerge: 0,
+        reviewRequestsWithIncompleteEvidenceOrRedCi: 0,
+        unsupportedAutomatedEvidenceMappings: 0,
+        maximumCiRunsPerTicket: 3,
+        maximumExactHeadReviewAttemptsPerTicket: 2,
+      },
+      semanticReporterProposal: expectedSemanticReporterProposal,
+    })
+  ) {
+    errors.push('P1/O0/O1 experiment drifted');
   }
 
   for (const heading of expectedWorkflowHeadings) {
@@ -462,6 +649,10 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
     'pnpm exec turbo run typecheck --force',
     '62 backed passes plus 46 precise reviewer-approved N/A records',
     'zero third product cards',
+    'one `agent/<ticket>-<slug>` branch and one draft pull request',
+    'A test name or source path is navigation, not semantic proof.',
+    '`networkidle` is forbidden',
+    'P1 and O0 may proceed in parallel only in separate branches and pull requests',
   ]) {
     if (!normalizedMarkdown.includes(literal)) {
       errors.push(`workflow is missing invariant text: ${literal}`);
@@ -519,7 +710,7 @@ function assertExports(sourceRoot, entries) {
   }
 }
 
-test('R1 contract matches an independent required rule set', () => {
+test('R2 contract matches an independent required rule set', () => {
   assert.deepEqual(
     validateWorkflowContract(contract, workflow, packageJson),
     [],
@@ -549,6 +740,195 @@ test('root README reports the accepted catalog seed and remaining detail scope',
   assert.doesNotMatch(readme, /product details and categories/u);
 });
 
+test('ticket template captures every traceability field and tiered evidence', () => {
+  const traceabilityLabels = {
+    ticketUrl: '- Ticket URL:',
+    agentRunUrl: '- Implementation Agent Run:',
+    branch: '- Branch: `agent/<ticket>-<slug>`',
+    pullRequestUrl: '- Pull request:',
+    headSha: '- Head SHA:',
+    checkSuiteUrl: '- Required checks / check-suite URL:',
+    reviewRunUrl: '- Independent review Agent Run:',
+    verdict: '- Review verdict: `PASS | FAIL | BLOCKED`',
+    mergeSha: '- Merge SHA:',
+    mergedAt: '- Merged at:',
+  };
+
+  assert.deepEqual(
+    Object.keys(traceabilityLabels),
+    contract.delivery.traceabilityRequired,
+  );
+  for (const literal of Object.values(traceabilityLabels)) {
+    assert.ok(ticketTemplate.includes(literal), literal);
+  }
+  for (const literal of ['- Evidence tiers:', '- Delivery metrics:']) {
+    assert.ok(ticketTemplate.includes(literal), literal);
+  }
+});
+
+test('R2 catalog baseline remains grounded in executable source contracts', () => {
+  const fixtureTest = readFileSync(
+    join(repositoryRoot, 'apps/api/src/catalog/catalog-fixtures.spec.ts'),
+    'utf8',
+  );
+  const service = readFileSync(
+    join(repositoryRoot, 'apps/api/src/catalog/catalog.service.ts'),
+    'utf8',
+  );
+  const transport = readFileSync(
+    join(repositoryRoot, 'apps/web/src/lib/catalog.ts'),
+    'utf8',
+  );
+  const browserSpec = readFileSync(
+    join(repositoryRoot, 'apps/e2e/tests/catalog-discovery.spec.ts'),
+    'utf8',
+  );
+  const evidenceSource = readFileSync(
+    join(repositoryRoot, 'apps/web/src/quality/c3-catalog-evidence.ts'),
+    'utf8',
+  );
+  const localRuns = JSON.parse(
+    readFileSync(
+      join(repositoryRoot, 'apps/web/src/quality/evidence/c3-local-runs.json'),
+      'utf8',
+    ),
+  );
+  const manualReview = JSON.parse(
+    readFileSync(
+      join(
+        repositoryRoot,
+        'apps/web/src/quality/evidence/c3-manual-review.json',
+      ),
+      'utf8',
+    ),
+  );
+  const visualBaselines = JSON.parse(
+    readFileSync(
+      join(
+        repositoryRoot,
+        'apps/web/src/quality/evidence/c3-visual-baselines.json',
+      ),
+      'utf8',
+    ),
+  );
+
+  assert.match(fixtureTest, /five normalized categories/u);
+  assert.match(fixtureTest, /catalogProducts\)\.toHaveLength\(12\)/u);
+  for (const sourceContract of [
+    'transaction.product.count({ where })',
+    'transaction.product.findMany({',
+    'transaction.category.findMany(facetQuery)',
+    "{ isolationLevel: 'RepeatableRead' }",
+  ]) {
+    assert.ok(service.includes(sourceContract), sourceContract);
+  }
+  assert.match(transport, /CATALOG_REQUEST_TIMEOUT_MS = 1_000/u);
+  assert.match(transport, /next: \{ revalidate: 60 \}/u);
+  assert.doesNotMatch(browserSpec, /networkidle/u);
+
+  const catalogStatesBlock = evidenceSource.match(
+    /export const c3CatalogStates = \[([\s\S]*?)\] as const;/u,
+  )?.[1];
+  assert.ok(catalogStatesBlock, 'C3 catalog states export must exist');
+  const catalogStates = [...catalogStatesBlock.matchAll(/'([^']+)'/gu)].map(
+    ([, state]) => state,
+  );
+
+  const channelMapBlock = evidenceSource.match(
+    /export const c3RequiredChannelsByCheck = \{([\s\S]*?)\} as const satisfies/u,
+  )?.[1];
+  assert.ok(channelMapBlock, 'C3 required-channel map must exist');
+  const channelsByCheck = Object.fromEntries(
+    [...channelMapBlock.matchAll(/('?[^':]+'?): \[([^\]]+)\]/gu)].map(
+      ([, rawCheck, rawChannels]) => [
+        rawCheck.replaceAll("'", ''),
+        [...rawChannels.matchAll(/'([^']+)'/gu)].map(([, channel]) => channel),
+      ],
+    ),
+  );
+  const channelsPerState = Object.values(channelsByCheck).reduce(
+    (total, channels) => total + channels.length,
+    0,
+  );
+
+  const loadingNotApplicableChecks = [
+    ...(evidenceSource
+      .match(
+        /mapping\.state === 'loading'[\s\S]*?\[([^\]]+)\]\.includes\(\s*mapping\.check/u,
+      )?.[1]
+      .matchAll(/'([^']+)'/gu) ?? []),
+  ].map(([, check]) => check);
+  const successfulStates = [
+    ...(evidenceSource
+      .match(/return \(\s*\[([^\]]+)\]\.includes\(mapping\.state\)/u)?.[1]
+      .matchAll(/'([^']+)'/gu) ?? []),
+  ].map(([, state]) => state);
+  const notApplicableCount =
+    loadingNotApplicableChecks.reduce(
+      (total, check) => total + channelsByCheck[check].length,
+      0,
+    ) +
+    successfulStates.length * channelsByCheck['error-messaging'].length;
+
+  const publicCurrencies = [
+    ...new Set(
+      [...service.matchAll(/currency: '([A-Z]{3})'/gu)].map(
+        ([, currency]) => currency,
+      ),
+    ),
+  ];
+  const automatedPassCount = localRuns.runs.reduce((total, run) => {
+    assert.equal(run.outcome, 'pass', run.id);
+    assert.equal(
+      run.records.every((record) => record.outcome === 'pass'),
+      true,
+      run.id,
+    );
+    return total + run.records.length;
+  }, 0);
+  assert.equal(
+    manualReview.observations.every(
+      (observation) => observation.status === 'approved',
+    ),
+    true,
+  );
+  assert.equal(visualBaselines.review.outcome, 'approved');
+
+  assert.deepEqual(publicCurrencies, [
+    contract.catalogBoundary.baseline.currency,
+  ]);
+  assert.equal(
+    catalogStates.length,
+    contract.catalogBoundary.baseline.catalogStates,
+  );
+  assert.equal(
+    catalogStates.length * channelsPerState,
+    contract.catalogBoundary.baseline.qualityMappings,
+  );
+  assert.equal(
+    automatedPassCount +
+      manualReview.observations.length +
+      visualBaselines.evidenceSets.length,
+    contract.catalogBoundary.baseline.qualityPass,
+  );
+  assert.equal(
+    notApplicableCount,
+    contract.catalogBoundary.baseline.qualityNotApplicable,
+  );
+
+  for (const relativeDirectory of [
+    'apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts',
+    'apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts',
+  ]) {
+    assert.equal(
+      readdirSync(join(repositoryRoot, relativeDirectory)).filter((path) =>
+        path.endsWith('.png'),
+      ).length,
+      contract.catalogBoundary.baseline.visualBaselinesPerPlatform,
+    );
+  }
+});
+
 test('every workflow rule has an owner, timing, verification and rollback', () => {
   for (const rule of contract.rules) {
     assert.equal(isNonEmptyString(rule.owner), true, rule.id);
@@ -564,7 +944,7 @@ test('contract rejects a submitted rule set with a missing mapping', () => {
 
   assert.match(
     validateWorkflowContract(candidate, workflow, packageJson).join('\n'),
-    /independent R1 expected set/,
+    /independent R2 expected set/,
   );
 });
 
@@ -614,10 +994,10 @@ test('contract rejects cached, reordered or incomplete integration closure', () 
   assert.match(errors, /patch manifest/);
 });
 
-test('contract rejects premature sharing and C2 duplicate contracts', () => {
+test('contract rejects premature sharing and duplicate catalog contracts', () => {
   const candidate = clone(contract);
   candidate.ownership.crossWorkspaceContract.minimumIndependentConsumers = 1;
-  candidate.c2.requiredWebExports = [];
+  candidate.catalogBoundary.requiredWebExports = [];
 
   const errors = validateWorkflowContract(
     candidate,
@@ -625,7 +1005,7 @@ test('contract rejects premature sharing and C2 duplicate contracts', () => {
     packageJson,
   ).join('\n');
   assert.match(errors, /second-consumer/);
-  assert.match(errors, /C2 reuse paths or symbols/);
+  assert.match(errors, /catalog reuse paths or symbols/);
 });
 
 test('every machine-policy leaf is protected by the independent exact digest', () => {
@@ -793,8 +1173,10 @@ test('generated verifier rejects second-pass nondeterminism and restores pre-run
 });
 
 test('accepted integration exposes the route owner, D3 primitives and generated client', (context) => {
-  const integratedCardPath = contract.c2.requiredWebExports[0].path;
+  const integratedCardPath =
+    contract.catalogBoundary.requiredWebExports[0].path;
   const integrationSourceRoot =
+    process.env.WORKFLOW_INTEGRATION_SOURCE_ROOT ??
     process.env.R1_INTEGRATION_SOURCE_ROOT ??
     (existsSync(join(repositoryRoot, integratedCardPath))
       ? repositoryRoot
@@ -802,14 +1184,14 @@ test('accepted integration exposes the route owner, D3 primitives and generated 
 
   if (!integrationSourceRoot) {
     context.skip(
-      'Set R1_INTEGRATION_SOURCE_ROOT to the accepted combined tree for the integration source audit.',
+      'Set WORKFLOW_INTEGRATION_SOURCE_ROOT to the accepted combined tree for the integration source audit.',
     );
     return;
   }
 
   assertExports(integrationSourceRoot, [
-    ...contract.c2.requiredWebExports,
-    ...contract.c2.generatedClientExports,
+    ...contract.catalogBoundary.requiredWebExports,
+    ...contract.catalogBoundary.generatedClientExports,
   ]);
 
   const layout = readFileSync(
