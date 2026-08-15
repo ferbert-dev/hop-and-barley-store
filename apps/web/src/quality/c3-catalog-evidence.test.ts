@@ -159,6 +159,23 @@ describe('C3 catalog evidence scaffold', () => {
     );
   });
 
+  it('pins an exact Ubuntu counterpart for every C3 visual baseline', () => {
+    const { visualManifest } = loadC3EvidenceArtifacts(repositoryRoot);
+    const expectedNames = visualManifest.baselines
+      .map(({ path }) => path.split('/').at(-1))
+      .sort();
+    const ubuntuNames = readdirSync(
+      join(
+        repositoryRoot,
+        'apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts',
+      ),
+    )
+      .filter((filename) => filename.endsWith('.png'))
+      .sort();
+
+    expect(ubuntuNames).toEqual(expectedNames);
+  });
+
   it('rejects missing, duplicate, unexpected, hash-drifted, and dimension-drifted PNGs', () => {
     const { visualManifest } = loadC3EvidenceArtifacts(repositoryRoot);
 
