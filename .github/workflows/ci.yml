@@ -113,7 +113,7 @@ jobs:
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: apps/e2e/playwright-report/connected
           PLAYWRIGHT_OUTPUT_DIR: apps/e2e/test-results/connected
-        run: pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots
+        run: pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots=all --grep 'matches approved shell visual baselines|matches mobile open-menu and visible-focus baselines|matches connected catalog state baselines'
       - name: Test the connected storefront
         if: github.event_name != 'workflow_dispatch' || !inputs.update_visual_baselines
         env:

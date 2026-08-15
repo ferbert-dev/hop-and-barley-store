@@ -51,6 +51,7 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
     'setTimeout(()=>{response.statusCode=503;response.end("delayed unavailable")},2000)',
     'pnpm --filter @hop-and-barley/e2e test:e2e',
     'pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots',
+    'matches connected catalog state baselines',
     'matches unavailable and loading catalog state baselines',
     "E2E_EXPECT_API_STATUS='API unavailable'",
     'apps/e2e/tests/__screenshots__/linux',
@@ -63,11 +64,16 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
 
 test('clean public database and web verification commands own their prerequisites', () => {
   const apiPackage = JSON.parse(read('apps/api/package.json'));
+  const e2ePackage = JSON.parse(read('apps/e2e/package.json'));
   const webReadme = read('apps/web/README.md');
 
   assert.equal(
     apiPackage.scripts['db:seed'],
     'prisma generate && prisma db seed',
+  );
+  assert.equal(
+    e2ePackage.scripts['test:e2e'],
+    'pnpm --filter @hop-and-barley/api-client build && playwright test',
   );
   assert.doesNotMatch(
     webReadme,
