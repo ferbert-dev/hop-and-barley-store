@@ -4,6 +4,11 @@ import {
   type CatalogCompatibilityResult,
 } from '@hop-and-barley/api-client';
 
+import {
+  DEFAULT_CATALOG_QUERY,
+  type CatalogQuery,
+} from '../features/catalog/catalog-query';
+
 const DEFAULT_API_URL = 'http://127.0.0.1:3001/api/v1';
 export const CATALOG_REQUEST_TIMEOUT_MS = 1_000;
 
@@ -38,13 +43,15 @@ export function resolveApiOrigin(rawUrl: string): string {
 }
 
 export async function loadCatalog(
+  query: CatalogQuery = DEFAULT_CATALOG_QUERY,
   rawApiUrl = process.env.API_INTERNAL_URL ?? DEFAULT_API_URL,
 ): Promise<CatalogLoadResult> {
   try {
     const client = createApiClient(resolveApiOrigin(rawApiUrl), {
-      cache: 'no-store',
+      requestInitExt: { next: { revalidate: 60 } } satisfies RequestInit,
     });
     const { data, error, response } = await client.GET('/api/v1/products', {
+      params: { query },
       signal: AbortSignal.timeout(CATALOG_REQUEST_TIMEOUT_MS),
     });
     if (!response.ok || error !== undefined || data === undefined) {

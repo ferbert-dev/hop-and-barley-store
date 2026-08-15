@@ -36,7 +36,10 @@ describe('storefront shell architecture', () => {
   });
 
   it('keeps the route page free of duplicate shell landmarks', () => {
-    const page = readFileSync(join(process.cwd(), 'src/app/page.tsx'), 'utf8');
+    const page = readFileSync(
+      join(process.cwd(), 'src/app/(catalog)/page.tsx'),
+      'utf8',
+    );
     const transport = readFileSync(
       join(process.cwd(), 'src/lib/catalog.ts'),
       'utf8',
@@ -45,11 +48,14 @@ describe('storefront shell architecture', () => {
     expect(page).not.toMatch(/<(?:main|header|footer)\b/);
     expect(page).not.toContain('fetch(');
     expect(page).toContain('loadCatalog');
-    expect(page).toContain("export const dynamic = 'force-dynamic'");
+    expect(page).not.toContain("export const dynamic = 'force-dynamic'");
     expect(transport).toContain("from '@hop-and-barley/api-client'");
-    expect(transport).toContain("cache: 'no-store'");
+    expect(transport).toContain('requestInitExt');
+    expect(transport).toContain('revalidate: 60');
+    expect(transport).toContain('AbortSignal.timeout');
+    expect(transport).not.toContain("cache: 'no-store'");
     expect(transport).not.toContain(' as Product');
-    expect(page).toContain('API unavailable');
+    expect(page).toContain('CatalogScreen');
   });
 
   it('keeps clean-order and Docker builds independent from warm dist output', () => {

@@ -5,6 +5,7 @@ import {
   loadCatalog,
   resolveApiOrigin,
 } from './catalog';
+import { DEFAULT_CATALOG_QUERY } from '../features/catalog/catalog-query';
 
 const legacyItem = {
   currency: 'USD',
@@ -75,20 +76,32 @@ describe('loadCatalog', () => {
     expect(CATALOG_REQUEST_TIMEOUT_MS).toBe(1_000);
   });
 
-  it('uses the generated path once with no-store and normalizes the envelope', async () => {
-    const fetch = vi.fn(async (request: Request) => {
-      expect(request.url).toBe('http://api:3001/api/v1/products');
-      expect(request.cache).toBe('no-store');
-      expect(request.signal).toBeInstanceOf(AbortSignal);
-      return Response.json({ items: [pagedItem], meta });
-    });
+  it('uses the typed query once with 60-second revalidation and a bounded request', async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({ items: [pagedItem], meta }),
+    );
     vi.stubGlobal('fetch', fetch);
 
-    await expect(loadCatalog('http://api:3001/api/v1')).resolves.toMatchObject({
+    await expect(
+      loadCatalog(
+        { category: 'hops', limit: 12, page: 1, sort: 'name-asc' },
+        'http://api:3001/api/v1',
+      ),
+    ).resolves.toMatchObject({
       catalog: { items: [pagedItem], kind: 'paged', meta },
       connected: true,
     });
     expect(fetch).toHaveBeenCalledOnce();
+    const [request, init] = fetch.mock.calls[0] as unknown as [
+      Request,
+      RequestInit,
+    ];
+    expect(request.url).toBe(
+      'http://api:3001/api/v1/products?category=hops&limit=12&page=1&sort=name-asc',
+    );
+    expect(request.cache).toBe('default');
+    expect(request.signal).toBeInstanceOf(AbortSignal);
+    expect(init).toEqual({ next: { revalidate: 60 } });
   });
 
   it('keeps the exact legacy array rollback branch', async () => {
@@ -97,7 +110,9 @@ describe('loadCatalog', () => {
       vi.fn(async () => Response.json([legacyItem])),
     );
 
-    await expect(loadCatalog('http://127.0.0.1:3001')).resolves.toEqual({
+    await expect(
+      loadCatalog(DEFAULT_CATALOG_QUERY, 'http://127.0.0.1:3001'),
+    ).resolves.toEqual({
       catalog: {
         capabilities: { facets: 'unavailable', pagination: 'unavailable' },
         items: [legacyItem],

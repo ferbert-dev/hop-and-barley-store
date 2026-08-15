@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "runs": [
+    {
+      "id": "c3-unit",
+      "mode": "unit",
+      "outcome": "pending",
+      "command": null,
+      "startedAt": null,
+      "finishedAt": null,
+      "environment": null,
+      "records": [],
+      "note": "No durable post-C3 unit run report has been recorded in this bundle yet. Terminal output alone is not closure evidence."
+    },
+    {
+      "id": "c3-playwright-connected",
+      "mode": "api-connected",
+      "outcome": "pending",
+      "command": null,
+      "startedAt": null,
+      "finishedAt": null,
+      "environment": null,
+      "records": [],
+      "note": "Connected catalog screenshots exist, but no durable complete connected run report has been recorded in this bundle yet."
+    },
+    {
+      "id": "c3-playwright-unavailable",
+      "mode": "api-unavailable",
+      "outcome": "pending",
+      "command": null,
+      "startedAt": null,
+      "finishedAt": null,
+      "environment": null,
+      "records": [],
+      "note": "Unavailable and loading screenshots exist, but no durable complete unavailable run report has been recorded in this bundle yet."
+    }
+  ]
+}

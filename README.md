@@ -7,7 +7,8 @@ Hop & Barley is a full-stack ecommerce portfolio project built as a professional
 ## What Works Today
 
 - one pnpm workspace orchestrated by Turborepo;
-- a Next.js storefront that renders products returned by the backend;
+- a Next.js storefront with URL-owned catalog search, category/price filters,
+  sorting, pagination, and responsive product cards;
 - a NestJS modular-monolith API with validation, CORS, Helmet, health checks, and graceful shutdown;
 - PostgreSQL managed through Prisma schema, committed migration, and deterministic seed data;
 - a backend service console at `http://localhost:3001`;
@@ -34,7 +35,7 @@ After `pnpm local:up` completes:
 ```mermaid
 flowchart LR
     Browser["Browser"] -->|"HTTP :3000"| Web["apps/web<br/>Next.js 16 + React 19"]
-    Web -->|"generated client<br/>server-side no-store"| API["apps/api<br/>NestJS 11 REST API<br/>/api/v1"]
+    Web -->|"generated client<br/>60-second public revalidation"| API["apps/api<br/>NestJS 11 REST API<br/>/api/v1"]
     API -->|"Prisma 7"| DB[("PostgreSQL 17.6")]
     API --- Docs["Swagger UI<br/>/api/docs"]
     E2E["apps/e2e<br/>Playwright"] --> Browser
@@ -56,10 +57,12 @@ flowchart LR
 ```
 
 The contract pipeline is operational end to end. The storefront calls the
-generated path through `@hop-and-barley/api-client`, keeps the current catalog
-request dynamic and `no-store`, and validates either the paged C2 envelope or
-the exact legacy six-field rollback array before rendering. Malformed payloads
-fail closed as `API unavailable` rather than appearing as an empty catalog.
+generated path through `@hop-and-barley/api-client`, revalidates each canonical
+public catalog query for 60 seconds, and validates either the paged C2 envelope
+or the exact legacy six-field rollback array before rendering. Malformed
+payloads fail closed as `API unavailable` rather than appearing as an empty
+catalog. Future authenticated/private requests remain uncached by a separate
+security contract.
 
 ## Technology Stack
 
@@ -153,6 +156,8 @@ Implemented now:
 - `GET /api/v1/products`;
 - liveness/readiness endpoints;
 - database-backed storefront status and catalog rendering;
+- canonical URL-backed discovery with search, filters, sorting, pagination,
+  loading, empty, invalid, and API-unavailable states;
 - developer console, Swagger UI, generated client, and baseline tests.
 
 Planned product work:

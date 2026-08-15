@@ -124,13 +124,34 @@ jobs:
         run: |
           docker compose stop api
           docker compose rm --force api
-      - name: Generate API-unavailable Ubuntu visual baseline
+      - name: Start a delayed unavailable API stub
+        run: |
+          docker run --detach --rm \
+            --name "${COMPOSE_PROJECT_NAME}-delayed-api" \
+            --network "${COMPOSE_PROJECT_NAME}_default" \
+            --network-alias api \
+            node:24.5.0-alpine \
+            node -e 'require("http").createServer((_request,response)=>setTimeout(()=>{response.statusCode=503;response.end("delayed unavailable")},2000)).listen(3001,"0.0.0.0")'
+      - name: Recreate a cold storefront for the unavailable phase
+        run: |
+          docker compose rm --stop --force web
+          docker compose up -d --no-deps web
+          for attempt in {1..30}; do
+            hb_web_health=$(docker inspect --format '{{.State.Health.Status}}' "${COMPOSE_PROJECT_NAME}-web-1" 2>/dev/null || true)
+            if [ "$hb_web_health" = healthy ]; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker compose ps -a
+          exit 1
+      - name: Generate API-unavailable Ubuntu visual baselines
         if: github.event_name == 'workflow_dispatch' && inputs.update_visual_baselines
         env:
           E2E_EXPECT_API_STATUS: API unavailable
           PLAYWRIGHT_HTML_OUTPUT_DIR: apps/e2e/playwright-report/unavailable
           PLAYWRIGHT_OUTPUT_DIR: apps/e2e/test-results/unavailable
-        run: E2E_EXPECT_API_STATUS='API unavailable' pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots --grep 'renders the configured API availability state'
+        run: E2E_EXPECT_API_STATUS='API unavailable' pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots=all --grep 'renders the configured API availability state|matches unavailable and loading catalog state baselines'
       - name: Test the safe API-unavailable storefront
         if: github.event_name != 'workflow_dispatch' || !inputs.update_visual_baselines
         env:
@@ -155,6 +176,9 @@ jobs:
             apps/e2e/playwright-report
             apps/e2e/test-results
             apps/e2e/tests/__screenshots__/linux
+      - name: Stop the delayed unavailable API stub
+        if: always()
+        run: docker rm --force "${COMPOSE_PROJECT_NAME}-delayed-api" 2>/dev/null || true
       - name: Stop isolated services
         if: always()
         run: docker compose down --remove-orphans

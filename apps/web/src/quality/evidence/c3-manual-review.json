@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "outcome": "pending",
+  "reviewerAgentRun": null,
+  "reviewedAt": null,
+  "note": "Independent C3 closure review has not run. Manual and not-applicable mappings remain non-closing until a reviewer records a durable Agent Run URL and decision."
+}
