@@ -212,6 +212,9 @@ test('matches unavailable and loading catalog state baselines', async ({
   for (const probe of coreViewports) {
     await page.setViewportSize({ width: probe.width, height: probe.height });
     await page.goto(`/?search=offline-error-${probe.width}`);
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'Products unavailable' }),
+    ).toBeVisible();
     await captureCatalogViewport(page, `catalog-error-${probe.width}.png`);
 
     await page.goto('/?page=201');
