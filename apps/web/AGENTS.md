@@ -10,9 +10,14 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Hop & Barley Web
 
-- Read the repository-root `AGENTS.md` before state-changing work.
-- This app uses Next.js 16 App Router, React 19, and Tailwind CSS 4. Read relevant version-matched guidance in `node_modules/next/dist/docs/` and use Context7 for current external documentation.
-- Use `vercel-react-best-practices` for React and Next.js performance review only; it does not imply Vercel hosting.
-- The browser never connects to PostgreSQL directly. Server-rendered code reaches the API through `API_INTERNAL_URL`; inside Docker that address is `http://api:3001/api/v1`.
-- Keep graceful API-unavailable states, but verify successful changes against the live local stack with Playwright.
-- Production hosting is undecided. Do not add provider-specific deployment files without an explicit decision and ticket.
+- Follow the root `AGENTS.md`, relevant ticket and architecture. Web tickets inherit its one-branch/PR, model-routing and agent-lifecycle rules.
+- Stack: Next.js 16 App Router, React 19 and Tailwind CSS 4. Read version-matched bundled Next docs and use Context7 for current external documentation.
+- Use `vercel-react-best-practices` only as a React/Next performance checklist; it does not select Vercel hosting.
+- Prefer Server Components. Add a client boundary only for browser-only state, events or APIs, and keep it as narrow as possible.
+- Browser code never accesses PostgreSQL or imports API source. Server-rendered code uses the generated `@hop-and-barley/api-client`; Docker API base is `http://api:3001/api/v1`.
+- Reuse established UI primitives, design tokens and local production assets. Do not create duplicate product-card, price or status implementations.
+- Preserve accessible names, keyboard order, visible focus, reduced motion, responsive reflow and explicit loading/empty/error states.
+- Public catalog caching stays query-specific; private identity/cart/order data must remain private and no-store.
+- Verify UI behavior in a real browser against the live or isolated ticket-approved stack. Static rendering/unit tests alone do not prove a flow.
+- Keep Playwright screenshots, traces, reports, coverage and generated evidence outside Git. Record only concise checks, cleanup and exact head SHA.
+- Production hosting remains provider-neutral; do not add provider-specific deployment files without an approved decision and ticket.

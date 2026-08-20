@@ -9,6 +9,10 @@
 - Risks and rollback:
 - Verification:
 - Required authority:
+- Delegation plan:
+  - Model / reasoning effort:
+  - Cost/correctness rationale:
+  - Worker cleanup:
 - Ticket URL:
 - Implementation Agent Run:
 - Branch: `codex/<ticket>-<slug>`

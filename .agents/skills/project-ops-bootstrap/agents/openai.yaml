@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Project Ops Bootstrap'
+  short_description: 'Create an auditable Notion project workspace'
+  default_prompt: 'Use $project-ops-bootstrap to set up project operations for this repository.'

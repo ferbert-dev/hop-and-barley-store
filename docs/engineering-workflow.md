@@ -37,6 +37,31 @@ The machine-readable policy is
 missing, duplicated or weakened rule. It also recomputes the machine-policy
 digest so changing a nested value cannot bypass the explicit field assertions.
 
+## Cost-aware multi-model orchestration
+
+One root orchestrator owns one vertical scope, its integration, pull request and
+final status. Work may be delegated to at most two disjoint workers; there is no
+standing agent pool. A worker is stopped or reused immediately after handoff,
+and a second vertical scope waits until the current PR is merged or explicitly
+Blocked.
+
+Model selection is explicit on every delegation:
+
+| Model           | Default work                                                                                  | Escalation boundary                                                          |
+| --------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `gpt-5.6-sol`   | architecture, security-sensitive changes, risky cross-cutting work, exact-head closure review | authoritative fallback whenever correctness, trust, data or scope is unclear |
+| `gpt-5.6-terra` | routine feature implementation, medium-complexity fixes and integration                       | escalate to Sol when the task crosses an uncertain boundary                  |
+| `gpt-5.6-luna`  | bounded mechanical edits, fixtures, repetitive tests, inventories and documentation           | escalate when judgment or architecture becomes material                      |
+
+The delegating Agent Run records model, reasoning effort and one sentence
+explaining the cost/correctness choice. A worker may return uncertainty instead
+of stretching its scope. That uncertainty routes upward; it is never silently
+reassigned downward to save cost.
+
+Only one independent reviewer runs, using Sol, after required CI is green. The
+review is exact-head and read-only. A changed head or failed check invalidates
+the verdict and requires a fresh review after correction.
+
 Architecture state after the catalog retrospective:
 
 - **Implemented:** C1, C2 and C3 are merged. The catalog has deterministic
