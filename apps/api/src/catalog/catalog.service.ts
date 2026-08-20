@@ -1,8 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import type { CatalogQueryDto, CatalogSort } from './dto/catalog-query.dto';
 import type { CatalogResponseDto } from './dto/catalog-response.dto';
+import type {
+  ProductDetailDto,
+  ProductSpecificationDto,
+} from './dto/product-detail.dto';
 
 const productSelect = {
   category: { select: { name: true, slug: true } },
@@ -16,6 +20,11 @@ const productSelect = {
   slug: true,
   stockQuantity: true,
   teaser: true,
+} satisfies Prisma.ProductSelect;
+
+const productDetailSelect = {
+  ...productSelect,
+  specifications: true,
 } satisfies Prisma.ProductSelect;
 
 const facetQuery = {
@@ -37,6 +46,24 @@ const sortOrder: Record<CatalogSort, Prisma.ProductOrderByWithRelationInput[]> =
 @Injectable()
 export class CatalogService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async getProduct(slug: string): Promise<ProductDetailDto> {
+    const product = await this.prisma.product.findFirst({
+      select: productDetailSelect,
+      where: { currency: 'USD', isActive: true, slug },
+    });
+
+    if (!product) throw new NotFoundException('Product not found');
+
+    const { specifications, stockQuantity, ...publicProduct } = product;
+
+    return {
+      ...publicProduct,
+      availability: stockQuantity > 0 ? 'in-stock' : 'out-of-stock',
+      currency: 'USD',
+      specifications: parseProductSpecifications(specifications),
+    };
+  }
 
   async listProducts(query: CatalogQueryDto): Promise<CatalogResponseDto> {
     const where = buildProductWhere(query);
@@ -86,6 +113,57 @@ export class CatalogService {
       },
     };
   }
+}
+
+function parseProductSpecifications(
+  value: Prisma.JsonValue,
+): ProductSpecificationDto[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new TypeError('Stored product specifications are invalid');
+  }
+
+  return value.map((specification) => {
+    if (!isProductSpecification(specification)) {
+      throw new TypeError('Stored product specifications are invalid');
+    }
+
+    return {
+      label: specification.label,
+      value: Array.isArray(specification.value)
+        ? [...specification.value]
+        : specification.value,
+    };
+  });
+}
+
+type StoredProductSpecification = {
+  label: string;
+  value: string | string[];
+};
+
+function isProductSpecification(
+  value: unknown,
+): value is StoredProductSpecification {
+  if (value === null || Array.isArray(value) || typeof value !== 'object') {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  const label = record.label;
+  const specificationValue = record.value;
+
+  return (
+    typeof label === 'string' &&
+    label.trim().length > 0 &&
+    (isNonEmptyString(specificationValue) ||
+      (Array.isArray(specificationValue) &&
+        specificationValue.length > 0 &&
+        specificationValue.every(isNonEmptyString)))
+  );
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function buildProductWhere(query: CatalogQueryDto): Prisma.ProductWhereInput {

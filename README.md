@@ -2,13 +2,14 @@
 
 Hop & Barley is a full-stack ecommerce portfolio project built as a professional TypeScript monorepo. The repository contains a dependency-aware storefront workspace, REST API, PostgreSQL database, generated API client, and browser test suite.
 
-> **Current status:** the executable platform foundation and first catalog vertical slice are working locally. The complete shop described in the product brief is still being built; planned features are labelled explicitly below.
+> **Current status:** the executable platform foundation, catalog discovery and product-detail vertical slices work locally. The complete shop described in the product brief is still being built; planned features are labelled explicitly below.
 
 ## What Works Today
 
 - one pnpm workspace orchestrated by Turborepo;
 - a Next.js storefront with URL-owned catalog search, category/price filters,
-  sorting, pagination, and responsive product cards;
+  sorting, pagination, responsive product cards, and server-rendered product
+  detail pages;
 - a NestJS modular-monolith API with validation, CORS, Helmet, health checks, and graceful shutdown;
 - PostgreSQL managed through Prisma schema, committed migration, and deterministic seed data;
 - a backend service console at `http://localhost:3001`;
@@ -29,6 +30,7 @@ After `pnpm local:up` completes:
 | Swagger UI      | [http://localhost:3001/api/docs](http://localhost:3001/api/docs)                       | Interactive OpenAPI documentation     |
 | Readiness       | [http://localhost:3001/api/v1/health/ready](http://localhost:3001/api/v1/health/ready) | API and PostgreSQL readiness          |
 | Products        | [http://localhost:3001/api/v1/products](http://localhost:3001/api/v1/products)         | Seeded catalog endpoint               |
+| Product detail  | [http://localhost:3000/product/citra-hops](http://localhost:3000/product/citra-hops)   | Example database-backed detail page   |
 
 ## Runtime Architecture
 
@@ -154,6 +156,8 @@ Implemented now:
 - `Product` and `Category` database models using integer minor currency units;
 - repeatable catalog migrations and 12 deterministic products across five categories;
 - `GET /api/v1/products`;
+- `GET /api/v1/products/:slug` and one responsive detail template for all 12
+  products;
 - liveness/readiness endpoints;
 - database-backed storefront status and catalog rendering;
 - canonical URL-backed discovery with search, filters, sorting, pagination,
@@ -162,7 +166,6 @@ Implemented now:
 
 Planned product work:
 
-- product detail pages;
 - cart and checkout;
 - order creation with backend-owned totals and inventory correctness;
 - authentication, account, and order history;

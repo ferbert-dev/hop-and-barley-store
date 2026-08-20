@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { cp, mkdtemp, readFile, readdir, rm, symlink } from 'node:fs/promises';
-import { createServer, type Server } from 'node:http';
+import { createServer, type Server, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve, sep } from 'node:path';
 
@@ -39,6 +39,8 @@ export interface CatalogCacheRuntime {
   baseUrl: string;
   failNext(search: string): void;
   fetchCacheEntries(search: string): Promise<CatalogFetchCacheEntry[]>;
+  fetchProductCacheEntries(slug: string): Promise<CatalogFetchCacheEntry[]>;
+  productUpstreamAttempts(slug: string): number;
   rootRouteIsPrerendered: boolean;
   stop(): Promise<void>;
   upstreamAttempts(search: string): number;
@@ -78,6 +80,9 @@ export async function startCatalogCacheRuntime(): Promise<CatalogCacheRuntime> {
       failNext: (search) => upstream.failNext(search),
       fetchCacheEntries: (search) =>
         readFetchCacheEntries(webDirectory, upstream.origin, search),
+      fetchProductCacheEntries: (slug) =>
+        readProductFetchCacheEntries(webDirectory, upstream.origin, slug),
+      productUpstreamAttempts: (slug) => upstream.productAttempts(slug),
       rootRouteIsPrerendered,
       stop: async () => {
         await stopChild(nextProcess);
@@ -195,26 +200,7 @@ async function readFetchCacheEntries(
   apiOrigin: string,
   search: string,
 ): Promise<CatalogFetchCacheEntry[]> {
-  const directory = join(webDirectory, '.next/cache/fetch-cache');
-  let names: string[];
-  try {
-    names = await readdir(directory);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
-    throw error;
-  }
-
-  const entries = await Promise.all(
-    names.map(async (name) => {
-      try {
-        return JSON.parse(
-          await readFile(join(directory, name), 'utf8'),
-        ) as FetchCacheEntry;
-      } catch {
-        return null;
-      }
-    }),
-  );
+  const entries = await readRawFetchCacheEntries(webDirectory);
   const expectedPrefix = `${apiOrigin}/api/v1/products?`;
 
   return entries.flatMap((entry) => {
@@ -236,12 +222,75 @@ async function readFetchCacheEntries(
   });
 }
 
+async function readProductFetchCacheEntries(
+  webDirectory: string,
+  apiOrigin: string,
+  slug: string,
+): Promise<CatalogFetchCacheEntry[]> {
+  const entries = await readRawFetchCacheEntries(webDirectory);
+  const expectedUrl = `${apiOrigin}/api/v1/products/${slug}`;
+
+  return entries.flatMap((entry) => {
+    if (entry?.kind !== 'FETCH' || entry.data?.url !== expectedUrl) return [];
+    return [
+      {
+        revalidate: entry.revalidate,
+        status: entry.data.status,
+        url: entry.data.url,
+      },
+    ];
+  });
+}
+
+async function readRawFetchCacheEntries(
+  webDirectory: string,
+): Promise<Array<FetchCacheEntry | null>> {
+  const directory = join(webDirectory, '.next/cache/fetch-cache');
+  let names: string[];
+  try {
+    names = await readdir(directory);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+
+  return Promise.all(
+    names.map(async (name) => {
+      try {
+        return JSON.parse(
+          await readFile(join(directory, name), 'utf8'),
+        ) as FetchCacheEntry;
+      } catch {
+        return null;
+      }
+    }),
+  );
+}
+
 async function startCountingUpstream() {
   const attempts = new Map<string, number>();
+  const productAttempts = new Map<string, number>();
   const failures = new Set<string>();
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
-    if (request.method !== 'GET' || url.pathname !== '/api/v1/products') {
+    if (request.method !== 'GET') {
+      response.writeHead(404).end();
+      return;
+    }
+
+    const productSlug = url.pathname.match(
+      /^\/api\/v1\/products\/([a-z0-9]+(?:-[a-z0-9]+)*)$/,
+    )?.[1];
+    if (productSlug) {
+      productAttempts.set(
+        productSlug,
+        (productAttempts.get(productSlug) ?? 0) + 1,
+      );
+      respondWithProductDetail(productSlug, response);
+      return;
+    }
+
+    if (url.pathname !== '/api/v1/products') {
       response.writeHead(404).end();
       return;
     }
@@ -264,7 +313,7 @@ async function startCountingUpstream() {
           id: '10000000-0000-4000-8000-000000000001',
           name: `${search} response ${attempt}`,
           priceMinor: 499,
-          slug: 'catalog-cache-runtime-probe',
+          slug: 'mosaic-hops',
         },
       ]),
     );
@@ -279,12 +328,60 @@ async function startCountingUpstream() {
     attempts: (search: string) => attempts.get(search) ?? 0,
     failNext: (search: string) => failures.add(search),
     origin: `http://127.0.0.1:${address.port}`,
+    productAttempts: (slug: string) => productAttempts.get(slug) ?? 0,
     reset: () => {
       attempts.clear();
+      productAttempts.clear();
       failures.clear();
     },
     server,
   };
+}
+
+function respondWithProductDetail(slug: string, response: ServerResponse) {
+  if (slug === 'detail-error') {
+    response.writeHead(503, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ message: 'planned detail failure' }));
+    return;
+  }
+
+  if (slug !== 'citra-hops' && slug !== 'mosaic-hops') {
+    response.writeHead(404, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ message: 'Product not found' }));
+    return;
+  }
+
+  const product = {
+    availability: slug === 'citra-hops' ? 'out-of-stock' : 'in-stock',
+    category: { name: 'Hops', slug: 'hops' },
+    currency: 'USD',
+    description:
+      'A focused runtime product description.\n\nThe second paragraph proves the shared detail template.',
+    id:
+      slug === 'citra-hops'
+        ? '20000000-0000-4000-8000-000000000001'
+        : '20000000-0000-4000-8000-000000000003',
+    imagePath: `/assets/products/${slug}.webp`,
+    name: slug === 'citra-hops' ? 'Citra Hops' : 'Mosaic Hops',
+    priceMinor: slug === 'citra-hops' ? 599 : 689,
+    priceQualifier: 'per 100g',
+    slug,
+    specifications: [
+      { label: 'Origin', value: 'USA' },
+      { label: 'Uses', value: ['Late additions', 'Dry hopping'] },
+    ],
+    teaser: 'Runtime-backed product detail',
+  };
+
+  const send = () => {
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify(product));
+  };
+  if (slug === 'mosaic-hops') {
+    setTimeout(send, 650);
+  } else {
+    send();
+  }
 }
 
 function listen(server: Server) {

@@ -2,17 +2,18 @@
 
 The Hop & Barley backend is a NestJS modular monolith. It owns business rules and persistence, exposes a versioned REST API, publishes an OpenAPI contract, and manages PostgreSQL through Prisma migrations.
 
-> **Current slice:** health checks and a read-only seeded product catalog are implemented. Cart, orders, inventory, authentication, users, and admin modules are planned and must be added as real vertical slices rather than empty placeholders.
+> **Current slice:** health checks plus read-only catalog discovery and product detail are implemented. Cart, orders, inventory, authentication, users, and admin modules are planned and must be added as real vertical slices rather than empty placeholders.
 
 ## Local Entry Points
 
-| Route                      | Purpose                                                             |
-| -------------------------- | ------------------------------------------------------------------- |
-| `GET /`                    | Developer service console with safe API/PostgreSQL status and links |
-| `GET /api/v1/health/live`  | Process liveness                                                    |
-| `GET /api/v1/health/ready` | API readiness including a real PostgreSQL query                     |
-| `GET /api/v1/products`     | Filtered, sorted and paged active USD catalog envelope              |
-| `GET /api/docs`            | Swagger UI generated from the NestJS OpenAPI document               |
+| Route                        | Purpose                                                             |
+| ---------------------------- | ------------------------------------------------------------------- |
+| `GET /`                      | Developer service console with safe API/PostgreSQL status and links |
+| `GET /api/v1/health/live`    | Process liveness                                                    |
+| `GET /api/v1/health/ready`   | API readiness including a real PostgreSQL query                     |
+| `GET /api/v1/products`       | Filtered, sorted and paged active USD catalog envelope              |
+| `GET /api/v1/products/:slug` | One active USD product detail with ordered specifications           |
+| `GET /api/docs`              | Swagger UI generated from the NestJS OpenAPI document               |
 
 Start the complete stack from the repository root with `pnpm local:up`, then open [http://localhost:3001](http://localhost:3001) or [Swagger UI](http://localhost:3001/api/docs).
 
@@ -76,6 +77,19 @@ reads count, page items and product-backed base category facets in one
 Only active USD products are public; stock quantity becomes the literal
 `in-stock`/`out-of-stock` availability and is never exposed. The DTO decorators,
 Swagger document and generated client describe the same nested envelope.
+
+### P1 product-detail contract
+
+`GET /api/v1/products/:slug` uses the same active-USD visibility boundary as
+catalog discovery. The slug is a bounded canonical lowercase value. Unknown,
+inactive and non-USD products all return the same generic 404, while successful
+responses include the public catalog fields, category summary, derived
+availability and the database-ordered specification list. Exact stock quantity,
+category foreign keys and persistence flags never cross the DTO boundary.
+
+No schema migration is needed for this slice: the accepted C1 Product model
+already owns the ordered JSON specification data. Service, HTTP, OpenAPI,
+generated-client and disposable PostgreSQL tests lock the detail contract.
 
 ## PostgreSQL and Prisma
 

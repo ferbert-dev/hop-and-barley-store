@@ -439,6 +439,7 @@ export const routeFamilies = [
       'ready-in-stock',
       'ready-out-of-stock',
       'not-found',
+      'api-error',
       'reviews-empty',
       'reviews-populated',
       'review-validation-error',

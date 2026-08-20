@@ -1,13 +1,17 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
+  ApiParam,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { CatalogService } from './catalog.service';
 import { CATALOG_SORT_VALUES, CatalogQueryDto } from './dto/catalog-query.dto';
 import { CatalogResponseDto } from './dto/catalog-response.dto';
+import { ProductDetailDto } from './dto/product-detail.dto';
+import { ProductSlugDto } from './dto/product-slug.dto';
 
 @ApiTags('catalog')
 @Controller('products')
@@ -82,5 +86,21 @@ export class CatalogController {
   })
   listProducts(@Query() query: CatalogQueryDto): Promise<CatalogResponseDto> {
     return this.catalog.listProducts(query);
+  }
+
+  @Get(':slug')
+  @ApiOkResponse({ type: ProductDetailDto })
+  @ApiBadRequestResponse({ description: 'Invalid product slug' })
+  @ApiNotFoundResponse({ description: 'Product not found' })
+  @ApiParam({
+    name: 'slug',
+    schema: {
+      maxLength: 64,
+      pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$',
+      type: 'string',
+    },
+  })
+  getProduct(@Param() { slug }: ProductSlugDto): Promise<ProductDetailDto> {
+    return this.catalog.getProduct(slug);
   }
 }

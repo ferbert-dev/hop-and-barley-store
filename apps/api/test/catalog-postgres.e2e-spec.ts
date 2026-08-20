@@ -9,6 +9,7 @@ import { configureAppRouting } from '../src/app-routing';
 import { configureAppValidation } from '../src/app-validation';
 import type { Prisma } from '../src/generated/prisma/client';
 import type { CatalogResponseDto } from '../src/catalog/dto/catalog-response.dto';
+import type { ProductDetailDto } from '../src/catalog/dto/product-detail.dto';
 import { PrismaService } from '../src/database/prisma.service';
 
 const runPostgresIntegration =
@@ -86,6 +87,45 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
       catalogProducts.find(({ slug }) => slug === 'west-coast-ipa-kit')
         ?.specifications,
     );
+  });
+
+  it('returns one exact ordered product detail without persistence fields', async () => {
+    const expected = catalogProducts.find(({ slug }) => slug === 'citra-hops');
+    if (!expected) throw new Error('Missing Citra fixture');
+
+    const response = await request(app.getHttpServer() as App)
+      .get('/api/v1/products/citra-hops')
+      .expect(200);
+    const body = JSON.parse(response.text) as ProductDetailDto;
+
+    expect(body).toEqual({
+      availability: 'in-stock',
+      category: { name: 'Hops', slug: 'hops' },
+      currency: 'USD',
+      description: expected.description,
+      id: expected.id,
+      imagePath: expected.imagePath,
+      name: expected.name,
+      priceMinor: expected.priceMinor,
+      priceQualifier: expected.priceQualifier,
+      slug: expected.slug,
+      specifications: expected.specifications,
+      teaser: expected.teaser,
+    });
+    expect(Object.keys(body).sort()).toEqual([
+      'availability',
+      'category',
+      'currency',
+      'description',
+      'id',
+      'imagePath',
+      'name',
+      'priceMinor',
+      'priceQualifier',
+      'slug',
+      'specifications',
+      'teaser',
+    ]);
   });
 
   it('returns the default 12-item USD envelope and product-backed base facets', async () => {
@@ -168,6 +208,16 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
           { name: 'Excluded orphan', slug: 'excluded-orphan' },
         ]),
       );
+      for (const slug of ['hidden-inactive', 'hidden-eur', 'missing-product']) {
+        const hidden = await request(app.getHttpServer() as App)
+          .get(`/api/v1/products/${slug}`)
+          .expect(404);
+        expect(hidden.body).toEqual({
+          error: 'Not Found',
+          message: 'Product not found',
+          statusCode: 404,
+        });
+      }
     } finally {
       await prisma.product.deleteMany({
         where: {

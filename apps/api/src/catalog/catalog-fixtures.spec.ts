@@ -48,6 +48,13 @@ describe('C1 catalog fixtures', () => {
         product.imagePath,
       ]);
     }
+
+    expect(
+      catalogProducts.reduce(
+        (total, product) => total + product.specifications.length,
+        0,
+      ),
+    ).toBe(95);
   });
 
   it('preserves ordered heterogeneous specifications for the brewing kit', () => {
