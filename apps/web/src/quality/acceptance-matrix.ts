@@ -18,7 +18,6 @@ export const evidenceChannels = [
   'vitest',
   'axe',
   'playwright',
-  'visual',
   'manual',
 ] as const;
 
@@ -153,7 +152,6 @@ interface ViewportProbe {
   height: number;
   id: string;
   tier: 'canvas' | 'compact' | 'desktop' | 'mobile' | 'reflow' | 'tablet';
-  visualBaseline: boolean;
   width: number;
 }
 
@@ -164,7 +162,6 @@ export const viewportProbes: readonly ViewportProbe[] = [
     width: 320,
     height: 800,
     core: false,
-    visualBaseline: false,
   },
   {
     id: 'compact-mobile-360',
@@ -172,7 +169,6 @@ export const viewportProbes: readonly ViewportProbe[] = [
     width: 360,
     height: 800,
     core: true,
-    visualBaseline: true,
   },
   {
     id: 'mobile-375',
@@ -180,7 +176,6 @@ export const viewportProbes: readonly ViewportProbe[] = [
     width: 375,
     height: 812,
     core: false,
-    visualBaseline: false,
   },
   {
     id: 'compact-before',
@@ -188,7 +183,6 @@ export const viewportProbes: readonly ViewportProbe[] = [
     width: 479,
     height: 900,
     core: false,
-    visualBaseline: false,
     boundary: { breakpoint: 'compact', position: 'before' },
   },
   {
@@ -197,7 +191,6 @@ export const viewportProbes: readonly ViewportProbe[] = [
     width: 480,
     height: 900,
     core: false,
-    visualBaseline: false,
     boundary: { breakpoint: 'compact', position: 'at' },
   },
   {
@@ -206,7 +199,6 @@ export const viewportProbes: readonly ViewportProbe[] = [
     width: 767,
     height: 1024,
     core: false,
-    visualBaseline: false,
     boundary: { breakpoint: 'medium', position: 'before' },
   },
   {
@@ -215,7 +207,6 @@ export const viewportProbes: readonly ViewportProbe[] = [
     width: 768,
     height: 1024,
     core: true,
-    visualBaseline: true,
     boundary: { breakpoint: 'medium', position: 'at' },
   },
   {
@@ -224,7 +215,6 @@ export const viewportProbes: readonly ViewportProbe[] = [
     width: 1023,
     height: 900,
     core: false,
-    visualBaseline: false,
     boundary: { breakpoint: 'wide', position: 'before' },
   },
   {
@@ -233,7 +223,6 @@ export const viewportProbes: readonly ViewportProbe[] = [
     width: 1024,
     height: 900,
     core: false,
-    visualBaseline: false,
     boundary: { breakpoint: 'wide', position: 'at' },
   },
   {
@@ -242,7 +231,6 @@ export const viewportProbes: readonly ViewportProbe[] = [
     width: 1280,
     height: 900,
     core: true,
-    visualBaseline: true,
   },
   {
     id: 'canvas-before',
@@ -250,7 +238,6 @@ export const viewportProbes: readonly ViewportProbe[] = [
     width: 1439,
     height: 900,
     core: false,
-    visualBaseline: false,
     boundary: { breakpoint: 'canvas', position: 'before' },
   },
   {
@@ -259,7 +246,6 @@ export const viewportProbes: readonly ViewportProbe[] = [
     width: 1440,
     height: 900,
     core: true,
-    visualBaseline: true,
     boundary: { breakpoint: 'canvas', position: 'at' },
   },
 ];
@@ -311,12 +297,6 @@ export const qualityGates = {
     mediaQuery: '(prefers-reduced-motion: reduce)',
     scrollBehavior: 'auto',
   },
-  visualRegression: {
-    animations: 'disabled',
-    caret: 'hide',
-    maximumDiffPixelRatio: 0.01,
-    perPixelThreshold: 0.2,
-  },
 } as const;
 
 interface AcceptanceCheck {
@@ -328,7 +308,7 @@ interface AcceptanceCheck {
 export const acceptanceChecks = [
   {
     id: 'responsive-layout',
-    automatedBy: ['playwright', 'visual'],
+    automatedBy: ['playwright'],
     manualConfirmationRequired: true,
   },
   {
@@ -338,7 +318,7 @@ export const acceptanceChecks = [
   },
   {
     id: 'focus-visible',
-    automatedBy: ['playwright', 'visual'],
+    automatedBy: ['playwright'],
     manualConfirmationRequired: true,
   },
   {
@@ -363,7 +343,7 @@ export const acceptanceChecks = [
   },
   {
     id: 'overflow-and-reflow',
-    automatedBy: ['playwright', 'visual'],
+    automatedBy: ['playwright'],
     manualConfirmationRequired: true,
   },
   {
@@ -619,7 +599,7 @@ export const sliceMaintenanceRequirements = [
   'add-fast-component-evidence',
   'add-axe-evidence-for-rendered-dom',
   'add-playwright-evidence-for-user-path',
-  'add-responsive-and-visual-evidence',
+  'add-responsive-browser-evidence',
   'record-manual-evidence',
   'record-blockers-and-not-applicable-reasons',
   'require-independent-closure-review',

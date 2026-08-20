@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -102,4 +103,26 @@ test('browser runs keep generated screenshots and traces out of retained output'
   assert.match(config, /trace: 'off'/);
   assert.match(gitIgnore, /^\/apps\/e2e\/tests\/__screenshots__\/$/m);
   assert.match(dockerIgnore, /^\*\*\/__screenshots__$/m);
+});
+
+test('the repository tracks no transient test-output artifacts', () => {
+  const trackedPaths = execFileSync('git', ['ls-files', '-z'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+  })
+    .split('\0')
+    .filter(Boolean);
+  const forbidden = trackedPaths.filter(
+    (path) =>
+      path.includes('/__screenshots__/') ||
+      path.includes('/playwright-report/') ||
+      path.includes('/test-results/') ||
+      path.includes('/coverage/') ||
+      path.startsWith('apps/web/src/quality/evidence/') ||
+      /apps\/web\/src\/quality\/(?:c3|d2)-.+-evidence(?:\.test)?\.ts$/u.test(
+        path,
+      ),
+  );
+
+  assert.deepEqual(forbidden, []);
 });

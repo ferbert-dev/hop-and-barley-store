@@ -3,21 +3,21 @@
   "ticket": "R2",
   "agentRun": "https://app.notion.com/p/3bdd78850eab81d69677f7d24401fbcc",
   "correctionAgentRun": null,
-  "policyDigest": "sha256:350da2a9be59ee39437c77364ce515edd8ed43ebd64de88ed471a1a2af61699c",
+  "policyDigest": "sha256:8f33051c646db1f523e468ed2f3ae594b5392f77679fa4b4ac7251e7e403d5b2",
   "rules": [
     {
-      "id": "independent-required-set",
+      "id": "independent-required-checks",
       "owner": "Independent reviewer",
-      "timing": "Before reading the builder evidence ledger",
-      "verification": "Derive requirementId/state/check/channel mappings from ticket and architecture, then require exact set equality.",
-      "rollback": "Return the ticket to In Progress with the missing, duplicate or unexpected mappings."
+      "timing": "Before reading the builder summary",
+      "verification": "Derive required checks from the ticket and architecture, then verify the exact pull-request head and required CI.",
+      "rollback": "Return the ticket to In Progress with the missing check or uncovered behavior."
     },
     {
-      "id": "durable-fail-closed-evidence",
+      "id": "concise-closure-summary",
       "owner": "Builder",
       "timing": "Before requesting closure review",
-      "verification": "Resolve every pass to a durable JSON record and every N/A to a reviewer-approved reason; pending states never close.",
-      "rollback": "Preserve invalid runs as non-closing records and rerun only the affected proof."
+      "verification": "Record changed paths, relevant checks, cleanup, exact head SHA and CI links without committing test outputs.",
+      "rollback": "Keep the ticket In Progress, fix or rerun the affected check, and update the concise summary."
     },
     {
       "id": "isolated-next-build-server",
@@ -48,11 +48,11 @@
       "rollback": "Restore the pre-run client/OpenAPI state, return drift to the API-owning ticket and never hand-edit generated output."
     },
     {
-      "id": "reviewed-patch-binary-manifest",
+      "id": "reviewed-patch-runtime-binaries",
       "owner": "Integrator and independent reviewer",
       "timing": "Before and during combined closure review",
-      "verification": "Recompute exact changed-path equality, dependency/lock deltas, binary hashes, dimensions and visual review records.",
-      "rollback": "Reject and rebuild the combined patch manifest without silently dropping another slice."
+      "verification": "Recompute changed paths, dependency/lock deltas and intentional runtime-binary hashes; reject retained test outputs.",
+      "rollback": "Reject the patch, remove unrequested outputs and rebuild the concise summary without silently dropping another slice."
     },
     {
       "id": "route-layout-ownership-before-auth-admin",
@@ -104,33 +104,17 @@
       "rollback": "Disable the affected cache path, preserve the authoritative backend result and rerun connected, unavailable and privacy checks."
     },
     {
-      "id": "catalog-source-evidence-provenance",
+      "id": "catalog-source-provenance",
       "owner": "Catalog data or asset owner and independent reviewer",
       "timing": "Whenever catalog seed content, slugs, image paths or production asset bytes change",
       "verification": "Require deterministic fixture identity plus exact slug, local path, checksum and reviewer-owned provenance coverage.",
       "rollback": "Restore the last accepted fixture and asset manifest together; keep the ignored reference bundle local and outside Git and Docker contexts."
     }
   ],
-  "evidence": {
-    "requiredSetOwner": "independent-reviewer",
-    "mappingFields": ["requirementId", "state", "check", "channel"],
-    "artifactReferencePattern": "<durable-json-path>#<record-id>",
-    "closureEligibleStatuses": ["pass", "not-applicable"],
-    "nonClosingStatuses": ["pending", "not-run", "blocked", "fail"],
-    "pass": {
-      "requires": [
-        "artifact",
-        "checkedAt",
-        "outcome",
-        "commandOrTestName",
-        "mode",
-        "environment"
-      ]
-    },
-    "notApplicable": {
-      "artifact": null,
-      "requires": ["reason", "reviewerAgreementTrace"]
-    },
+  "verificationSummary": {
+    "builderOwner": "primary-ticket-owner",
+    "reviewOwner": "independent-reviewer",
+    "retainedIn": ["pull-request", "github-checks", "notion-agent-run"],
     "always": [
       "changedPaths",
       "relevantTests",
@@ -138,12 +122,20 @@
       "cleanup",
       "exactHeadSha"
     ],
-    "conditional": {
+    "forbiddenRepositoryArtifacts": [
+      "playwright-screenshots",
+      "playwright-traces",
+      "playwright-reports",
+      "coverage-output",
+      "generated-evidence-ledgers"
+    ],
+    "conditionalChecks": {
       "database": "schema-migration-seed-or-data-touch",
       "playwright": "user-flow-or-browser-state-touch",
-      "visualManual": "visual-bytes-layout-or-manual-risk",
-      "fullBinaryManifest": "binary-dependency-lock-or-multi-slice-integration"
-    }
+      "manual": "layout-or-manual-only-risk",
+      "runtimeBinaryReview": "intentional-runtime-binary-change"
+    },
+    "failedAttemptsRemainVisible": true
   },
   "isolation": {
     "next": {
@@ -205,18 +197,17 @@
         "second-client-equals-first-client"
       ]
     },
-    "patchManifestRequiredFields": [
+    "patchSummaryRequiredFields": [
       "baseObjectId",
       "targetObjectId",
       "changedPaths",
       "textLineCounts",
       "dependencyLockDelta",
-      "binarySha256",
-      "binaryDimensionsOrType",
-      "binaryProvenance",
+      "runtimeBinarySha256",
+      "runtimeBinaryProvenance",
       "reviewMethod",
-      "runArtifacts",
-      "cleanupEvidence"
+      "relevantTests",
+      "cleanupResult"
     ],
     "tooling": {
       "cleaner": "scripts/clean-workspace-artifacts.mjs",
@@ -244,7 +235,7 @@
   "delivery": {
     "branch": {
       "base": "main",
-      "pattern": "^agent/[a-z0-9]+-[a-z0-9-]+$",
+      "pattern": "^codex/[a-z0-9]+-[a-z0-9-]+$",
       "ticketsPerPullRequest": 1,
       "draftBeforeReview": true
     },
@@ -344,10 +335,7 @@
       "publicRevalidateSeconds": 60,
       "requestTimeoutMilliseconds": 1000,
       "catalogStates": 5,
-      "qualityMappings": 135,
-      "qualityPass": 113,
-      "qualityNotApplicable": 22,
-      "visualBaselinesPerPlatform": 24
+      "retainedTestArtifacts": 0
     }
   },
   "nextExperiment": {
@@ -357,21 +345,9 @@
       "dedicatedBranchAndPullRequest": "3/3",
       "ticketsDoneBeforeMerge": 0,
       "reviewRequestsWithIncompleteEvidenceOrRedCi": 0,
-      "unsupportedAutomatedEvidenceMappings": 0,
+      "unsupportedBehaviorClaims": 0,
       "maximumCiRunsPerTicket": 3,
       "maximumExactHeadReviewAttemptsPerTicket": 2
-    },
-    "semanticReporterProposal": {
-      "status": "proposed-non-closing",
-      "activationRequires": [
-        "dedicated-tooling-ticket",
-        "executable-reporter-command",
-        "versioned-artifact-schema",
-        "ticket-template-slot",
-        "ci-contract",
-        "independent-review"
-      ],
-      "blocksTickets": []
     }
   }
 }

@@ -140,7 +140,7 @@ describe('quality acceptance matrix', () => {
     }
   });
 
-  it('pins WCAG, overflow, axe, focus and visual thresholds', () => {
+  it('pins WCAG, overflow, axe and focus thresholds', () => {
     expect(wcag22AAThresholds).toEqual({
       conformanceTarget: 'WCAG 2.2 Level AA',
       contrastRatio: {
@@ -170,12 +170,6 @@ describe('quality acceptance matrix', () => {
       minimumWidthCssPx: 44,
       wcagFloorCssPx: 24,
     });
-    expect(qualityGates.visualRegression).toEqual({
-      animations: 'disabled',
-      caret: 'hide',
-      maximumDiffPixelRatio: 0.01,
-      perPixelThreshold: 0.2,
-    });
   });
 
   it('aligns the reduced-motion gate with the accepted D1 CSS', () => {
@@ -193,13 +187,7 @@ describe('quality acceptance matrix', () => {
   });
 
   it('keeps evidence and per-slice maintenance fail-closed', () => {
-    expect(evidenceChannels).toEqual([
-      'vitest',
-      'axe',
-      'playwright',
-      'visual',
-      'manual',
-    ]);
+    expect(evidenceChannels).toEqual(['vitest', 'axe', 'playwright', 'manual']);
     expect(evidenceStatuses).toEqual([
       'not-run',
       'pass',
@@ -215,7 +203,7 @@ describe('quality acceptance matrix', () => {
       'add-fast-component-evidence',
       'add-axe-evidence-for-rendered-dom',
       'add-playwright-evidence-for-user-path',
-      'add-responsive-and-visual-evidence',
+      'add-responsive-browser-evidence',
       'record-manual-evidence',
       'record-blockers-and-not-applicable-reasons',
       'require-independent-closure-review',

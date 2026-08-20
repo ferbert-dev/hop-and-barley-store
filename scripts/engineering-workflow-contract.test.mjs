@@ -4,7 +4,6 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -50,19 +49,19 @@ const referenceBundleIgnore = '/docs/Hop-and-Barley-main/';
 
 const expectedRuleIds = [
   'catalog-query-parity',
-  'catalog-source-evidence-provenance',
+  'catalog-source-provenance',
+  'concise-closure-summary',
   'cross-workspace-contract-second-consumer',
   'direct-node24-clean-order',
   'disposable-postgres-review',
-  'durable-fail-closed-evidence',
   'exact-head-green-review',
   'generated-contract-drift',
   'immutable-correction-review',
-  'independent-required-set',
+  'independent-required-checks',
   'isolated-next-build-server',
   'one-ticket-branch-pr',
   'public-private-cache-separation',
-  'reviewed-patch-binary-manifest',
+  'reviewed-patch-runtime-binaries',
   'route-layout-ownership-before-auth-admin',
 ];
 
@@ -76,8 +75,7 @@ const expectedCleanOrder = [
 ];
 
 const expectedPolicyDigest =
-  'sha256:350da2a9be59ee39437c77364ce515edd8ed43ebd64de88ed471a1a2af61699c';
-const expectedArtifactReferencePattern = '<durable-json-path>#<record-id>';
+  'sha256:8f33051c646db1f523e468ed2f3ae594b5392f77679fa4b4ac7251e7e403d5b2';
 const expectedNextStrategies = [
   'serialized-build-start-test-stop',
   'unique-build-output-per-server',
@@ -115,18 +113,17 @@ const expectedGeneratedStability = {
     'second-client-equals-first-client',
   ],
 };
-const expectedPatchManifestFields = [
+const expectedPatchSummaryFields = [
   'baseObjectId',
   'targetObjectId',
   'changedPaths',
   'textLineCounts',
   'dependencyLockDelta',
-  'binarySha256',
-  'binaryDimensionsOrType',
-  'binaryProvenance',
+  'runtimeBinarySha256',
+  'runtimeBinaryProvenance',
   'reviewMethod',
-  'runArtifacts',
-  'cleanupEvidence',
+  'relevantTests',
+  'cleanupResult',
 ];
 const expectedRouteDecisionOutputs = [
   'routeGroupTree',
@@ -163,24 +160,25 @@ const expectedTooling = {
   cleaner: 'scripts/clean-workspace-artifacts.mjs',
   generatedVerifier: 'scripts/verify-generated-stability.mjs',
 };
-const expectedAlwaysEvidence = [
-  'changedPaths',
-  'relevantTests',
-  'ci',
-  'cleanup',
-  'exactHeadSha',
-];
-const expectedSemanticReporterProposal = {
-  status: 'proposed-non-closing',
-  activationRequires: [
-    'dedicated-tooling-ticket',
-    'executable-reporter-command',
-    'versioned-artifact-schema',
-    'ticket-template-slot',
-    'ci-contract',
-    'independent-review',
+const expectedVerificationSummary = {
+  builderOwner: 'primary-ticket-owner',
+  reviewOwner: 'independent-reviewer',
+  retainedIn: ['pull-request', 'github-checks', 'notion-agent-run'],
+  always: ['changedPaths', 'relevantTests', 'ci', 'cleanup', 'exactHeadSha'],
+  forbiddenRepositoryArtifacts: [
+    'playwright-screenshots',
+    'playwright-traces',
+    'playwright-reports',
+    'coverage-output',
+    'generated-evidence-ledgers',
   ],
-  blocksTickets: [],
+  conditionalChecks: {
+    database: 'schema-migration-seed-or-data-touch',
+    playwright: 'user-flow-or-browser-state-touch',
+    manual: 'layout-or-manual-only-risk',
+    runtimeBinaryReview: 'intentional-runtime-binary-change',
+  },
+  failedAttemptsRemainVisible: true,
 };
 const expectedTraceability = [
   'ticketUrl',
@@ -237,7 +235,7 @@ const expectedWorkflowHeadings = [
   '## R1 measured retrospective',
   '## R2 measured catalog retrospective',
   '### Measured baseline',
-  '### Conditional evidence tiers',
+  '### Conditional verification tiers',
   '### P1, O0 and O1 experiment',
 ];
 
@@ -355,74 +353,11 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
     }
   }
 
-  if (candidate.evidence?.requiredSetOwner !== 'independent-reviewer') {
-    errors.push('the required evidence set must be reviewer-owned');
-  }
   if (
-    candidate.evidence?.artifactReferencePattern !==
-    expectedArtifactReferencePattern
+    JSON.stringify(candidate.verificationSummary) !==
+    JSON.stringify(expectedVerificationSummary)
   ) {
-    errors.push('the durable artifact reference pattern drifted');
-  }
-  if (
-    JSON.stringify(candidate.evidence?.mappingFields) !==
-    JSON.stringify(['requirementId', 'state', 'check', 'channel'])
-  ) {
-    errors.push('the evidence mapping key drifted');
-  }
-  if (
-    JSON.stringify(candidate.evidence?.closureEligibleStatuses) !==
-    JSON.stringify(['pass', 'not-applicable'])
-  ) {
-    errors.push('closure-eligible statuses drifted');
-  }
-  if (
-    JSON.stringify(candidate.evidence?.nonClosingStatuses) !==
-    JSON.stringify(['pending', 'not-run', 'blocked', 'fail'])
-  ) {
-    errors.push('non-closing statuses drifted');
-  }
-  if (
-    JSON.stringify(candidate.evidence?.pass?.requires) !==
-    JSON.stringify([
-      'artifact',
-      'checkedAt',
-      'outcome',
-      'commandOrTestName',
-      'mode',
-      'environment',
-    ])
-  ) {
-    errors.push('passing evidence requirements drifted');
-  }
-  if (candidate.evidence?.notApplicable?.artifact !== null) {
-    errors.push('not-applicable evidence must have a null artifact');
-  }
-  if (
-    JSON.stringify(candidate.evidence?.notApplicable?.requires) !==
-    JSON.stringify(['reason', 'reviewerAgreementTrace'])
-  ) {
-    errors.push('not-applicable review requirements drifted');
-  }
-  if (
-    JSON.stringify(candidate.evidence?.always) !==
-    JSON.stringify(expectedAlwaysEvidence)
-  ) {
-    errors.push('always-required evidence drifted');
-  }
-  if (
-    JSON.stringify(candidate.evidence?.conditional) !==
-    JSON.stringify({
-      database: 'schema-migration-seed-or-data-touch',
-      playwright: 'user-flow-or-browser-state-touch',
-      visualManual: 'visual-bytes-layout-or-manual-risk',
-      fullBinaryManifest: 'binary-dependency-lock-or-multi-slice-integration',
-    })
-  ) {
-    errors.push('conditional evidence tiers drifted');
-  }
-  if (Object.hasOwn(candidate.evidence ?? {}, 'automatedSemanticProof')) {
-    errors.push('unimplemented semantic reporter must not be a closing gate');
+    errors.push('concise verification summary policy drifted');
   }
 
   if (candidate.isolation?.next?.maxServersPerBuildOutput !== 1) {
@@ -485,10 +420,10 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
     errors.push('generated stability policy drifted');
   }
   if (
-    JSON.stringify(candidate.integration?.patchManifestRequiredFields) !==
-    JSON.stringify(expectedPatchManifestFields)
+    JSON.stringify(candidate.integration?.patchSummaryRequiredFields) !==
+    JSON.stringify(expectedPatchSummaryFields)
   ) {
-    errors.push('the reviewed patch manifest is incomplete');
+    errors.push('the reviewed patch summary is incomplete');
   }
   if (
     JSON.stringify(candidate.integration?.tooling) !==
@@ -525,7 +460,7 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
 
   if (
     candidate.delivery?.branch?.base !== 'main' ||
-    candidate.delivery?.branch?.pattern !== '^agent/[a-z0-9]+-[a-z0-9-]+$' ||
+    candidate.delivery?.branch?.pattern !== '^codex/[a-z0-9]+-[a-z0-9-]+$' ||
     candidate.delivery?.branch?.ticketsPerPullRequest !== 1 ||
     candidate.delivery?.branch?.draftBeforeReview !== true
   ) {
@@ -610,10 +545,7 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
       publicRevalidateSeconds: 60,
       requestTimeoutMilliseconds: 1000,
       catalogStates: 5,
-      qualityMappings: 135,
-      qualityPass: 113,
-      qualityNotApplicable: 22,
-      visualBaselinesPerPlatform: 24,
+      retainedTestArtifacts: 0,
     })
   ) {
     errors.push('accepted catalog baseline drifted');
@@ -627,11 +559,10 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
         dedicatedBranchAndPullRequest: '3/3',
         ticketsDoneBeforeMerge: 0,
         reviewRequestsWithIncompleteEvidenceOrRedCi: 0,
-        unsupportedAutomatedEvidenceMappings: 0,
+        unsupportedBehaviorClaims: 0,
         maximumCiRunsPerTicket: 3,
         maximumExactHeadReviewAttemptsPerTicket: 2,
       },
-      semanticReporterProposal: expectedSemanticReporterProposal,
     })
   ) {
     errors.push('P1/O0/O1 experiment drifted');
@@ -643,13 +574,13 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
     }
   }
   for (const literal of [
-    'requirementId + state + check + channel',
-    'path/to/report.json#record-id',
+    'Do not commit or upload Playwright screenshots, traces, reports, coverage',
+    'The builder records one concise verification summary',
     'one `.next` directory',
     'pnpm exec turbo run typecheck --force',
-    '62 backed passes plus 46 precise reviewer-approved N/A records',
+    'generated ledger files',
     'zero third product cards',
-    'one `agent/<ticket>-<slug>` branch and one draft pull request',
+    'one `codex/<ticket>-<slug>` branch and one draft pull request',
     'A test name or source path is navigation, not semantic proof.',
     '`networkidle` is forbidden',
     'P1 and O0 may proceed in parallel only in separate branches and pull requests',
@@ -746,11 +677,11 @@ test('root README reports the accepted catalog seed and implemented detail scope
   assert.doesNotMatch(plannedProductWork, /product detail/u);
 });
 
-test('ticket template captures every traceability field and tiered evidence', () => {
+test('ticket template captures traceability and the concise verification summary', () => {
   const traceabilityLabels = {
     ticketUrl: '- Ticket URL:',
     agentRunUrl: '- Implementation Agent Run:',
-    branch: '- Branch: `agent/<ticket>-<slug>`',
+    branch: '- Branch: `codex/<ticket>-<slug>`',
     pullRequestUrl: '- Pull request:',
     headSha: '- Head SHA:',
     checkSuiteUrl: '- Required checks / check-suite URL:',
@@ -767,7 +698,7 @@ test('ticket template captures every traceability field and tiered evidence', ()
   for (const literal of Object.values(traceabilityLabels)) {
     assert.ok(ticketTemplate.includes(literal), literal);
   }
-  for (const literal of ['- Evidence tiers:', '- Delivery metrics:']) {
+  for (const literal of ['- Verification summary:', '- Delivery metrics:']) {
     assert.ok(ticketTemplate.includes(literal), literal);
   }
 });
@@ -789,33 +720,13 @@ test('R2 catalog baseline remains grounded in executable source contracts', () =
     join(repositoryRoot, 'apps/e2e/tests/catalog-discovery.spec.ts'),
     'utf8',
   );
-  const evidenceSource = readFileSync(
-    join(repositoryRoot, 'apps/web/src/quality/c3-catalog-evidence.ts'),
+  const acceptanceMatrix = readFileSync(
+    join(repositoryRoot, 'apps/web/src/quality/acceptance-matrix.ts'),
     'utf8',
   );
-  const localRuns = JSON.parse(
-    readFileSync(
-      join(repositoryRoot, 'apps/web/src/quality/evidence/c3-local-runs.json'),
-      'utf8',
-    ),
-  );
-  const manualReview = JSON.parse(
-    readFileSync(
-      join(
-        repositoryRoot,
-        'apps/web/src/quality/evidence/c3-manual-review.json',
-      ),
-      'utf8',
-    ),
-  );
-  const visualBaselines = JSON.parse(
-    readFileSync(
-      join(
-        repositoryRoot,
-        'apps/web/src/quality/evidence/c3-visual-baselines.json',
-      ),
-      'utf8',
-    ),
+  const playwrightConfig = readFileSync(
+    join(repositoryRoot, 'apps/e2e/playwright.config.ts'),
+    'utf8',
   );
 
   assert.match(fixtureTest, /five normalized categories/u);
@@ -831,50 +742,18 @@ test('R2 catalog baseline remains grounded in executable source contracts', () =
   assert.match(transport, /CATALOG_REQUEST_TIMEOUT_MS = 1_000/u);
   assert.match(transport, /next: \{ revalidate: 60 \}/u);
   assert.doesNotMatch(browserSpec, /networkidle/u);
+  assert.doesNotMatch(browserSpec, /toHaveScreenshot|visual baseline/iu);
+  assert.doesNotMatch(playwrightConfig, /toHaveScreenshot|__screenshots__/u);
+  assert.match(playwrightConfig, /screenshot: 'off'/u);
+  assert.match(playwrightConfig, /trace: 'off'/u);
 
-  const catalogStatesBlock = evidenceSource.match(
-    /export const c3CatalogStates = \[([\s\S]*?)\] as const;/u,
+  const catalogStatesBlock = acceptanceMatrix.match(
+    /id: 'catalog',[\s\S]*?states: \[([^\]]+)\]/u,
   )?.[1];
-  assert.ok(catalogStatesBlock, 'C3 catalog states export must exist');
+  assert.ok(catalogStatesBlock, 'catalog route states must remain explicit');
   const catalogStates = [...catalogStatesBlock.matchAll(/'([^']+)'/gu)].map(
     ([, state]) => state,
   );
-
-  const channelMapBlock = evidenceSource.match(
-    /export const c3RequiredChannelsByCheck = \{([\s\S]*?)\} as const satisfies/u,
-  )?.[1];
-  assert.ok(channelMapBlock, 'C3 required-channel map must exist');
-  const channelsByCheck = Object.fromEntries(
-    [...channelMapBlock.matchAll(/('?[^':]+'?): \[([^\]]+)\]/gu)].map(
-      ([, rawCheck, rawChannels]) => [
-        rawCheck.replaceAll("'", ''),
-        [...rawChannels.matchAll(/'([^']+)'/gu)].map(([, channel]) => channel),
-      ],
-    ),
-  );
-  const channelsPerState = Object.values(channelsByCheck).reduce(
-    (total, channels) => total + channels.length,
-    0,
-  );
-
-  const loadingNotApplicableChecks = [
-    ...(evidenceSource
-      .match(
-        /mapping\.state === 'loading'[\s\S]*?\[([^\]]+)\]\.includes\(\s*mapping\.check/u,
-      )?.[1]
-      .matchAll(/'([^']+)'/gu) ?? []),
-  ].map(([, check]) => check);
-  const successfulStates = [
-    ...(evidenceSource
-      .match(/return \(\s*\[([^\]]+)\]\.includes\(mapping\.state\)/u)?.[1]
-      .matchAll(/'([^']+)'/gu) ?? []),
-  ].map(([, state]) => state);
-  const notApplicableCount =
-    loadingNotApplicableChecks.reduce(
-      (total, check) => total + channelsByCheck[check].length,
-      0,
-    ) +
-    successfulStates.length * channelsByCheck['error-messaging'].length;
 
   const publicCurrencies = [
     ...new Set(
@@ -883,23 +762,6 @@ test('R2 catalog baseline remains grounded in executable source contracts', () =
       ),
     ),
   ];
-  const automatedPassCount = localRuns.runs.reduce((total, run) => {
-    assert.equal(run.outcome, 'pass', run.id);
-    assert.equal(
-      run.records.every((record) => record.outcome === 'pass'),
-      true,
-      run.id,
-    );
-    return total + run.records.length;
-  }, 0);
-  assert.equal(
-    manualReview.observations.every(
-      (observation) => observation.status === 'approved',
-    ),
-    true,
-  );
-  assert.equal(visualBaselines.review.outcome, 'approved');
-
   assert.deepEqual(publicCurrencies, [
     contract.catalogBoundary.baseline.currency,
   ]);
@@ -907,31 +769,14 @@ test('R2 catalog baseline remains grounded in executable source contracts', () =
     catalogStates.length,
     contract.catalogBoundary.baseline.catalogStates,
   );
-  assert.equal(
-    catalogStates.length * channelsPerState,
-    contract.catalogBoundary.baseline.qualityMappings,
-  );
-  assert.equal(
-    automatedPassCount +
-      manualReview.observations.length +
-      visualBaselines.evidenceSets.length,
-    contract.catalogBoundary.baseline.qualityPass,
-  );
-  assert.equal(
-    notApplicableCount,
-    contract.catalogBoundary.baseline.qualityNotApplicable,
-  );
-
-  for (const relativeDirectory of [
-    'apps/e2e/tests/__screenshots__/catalog-discovery.spec.ts',
-    'apps/e2e/tests/__screenshots__/linux/catalog-discovery.spec.ts',
+  assert.equal(contract.catalogBoundary.baseline.retainedTestArtifacts, 0);
+  for (const retiredArtifact of [
+    'apps/web/src/quality/c3-catalog-evidence.ts',
+    'apps/web/src/quality/d2-storefront-shell-evidence.ts',
+    'apps/web/src/quality/evidence/c3-local-runs.json',
+    'apps/web/src/quality/evidence/d2-vitest.json',
   ]) {
-    assert.equal(
-      readdirSync(join(repositoryRoot, relativeDirectory)).filter((path) =>
-        path.endsWith('.png'),
-      ).length,
-      contract.catalogBoundary.baseline.visualBaselinesPerPlatform,
-    );
+    assert.equal(existsSync(join(repositoryRoot, retiredArtifact)), false);
   }
 });
 
@@ -954,20 +799,18 @@ test('contract rejects a submitted rule set with a missing mapping', () => {
   );
 });
 
-test('contract rejects fail-open evidence semantics', () => {
+test('contract rejects retained test outputs or incomplete summaries', () => {
   const candidate = clone(contract);
-  candidate.evidence.pass.requires = [];
-  candidate.evidence.notApplicable.artifact = 'checklist.md';
-  candidate.evidence.nonClosingStatuses = ['not-run', 'blocked', 'fail'];
+  candidate.verificationSummary.always = [];
+  candidate.verificationSummary.forbiddenRepositoryArtifacts = [];
+  candidate.verificationSummary.failedAttemptsRemainVisible = false;
 
   const errors = validateWorkflowContract(
     candidate,
     workflow,
     packageJson,
   ).join('\n');
-  assert.match(errors, /passing evidence requirements/);
-  assert.match(errors, /non-closing statuses drifted/);
-  assert.match(errors, /null artifact/);
+  assert.match(errors, /concise verification summary policy/);
 });
 
 test('contract rejects shared build output or database mutation', () => {
@@ -988,7 +831,7 @@ test('contract rejects cached, reordered or incomplete integration closure', () 
   const candidate = clone(contract);
   candidate.integration.turboForce = false;
   candidate.integration.cleanOrder.reverse();
-  candidate.integration.patchManifestRequiredFields = [];
+  candidate.integration.patchSummaryRequiredFields = [];
 
   const errors = validateWorkflowContract(
     candidate,
@@ -997,7 +840,7 @@ test('contract rejects cached, reordered or incomplete integration closure', () 
   ).join('\n');
   assert.match(errors, /uncached/);
   assert.match(errors, /clean-order/);
-  assert.match(errors, /patch manifest/);
+  assert.match(errors, /patch summary/);
 });
 
 test('contract rejects premature sharing and duplicate catalog contracts', () => {
