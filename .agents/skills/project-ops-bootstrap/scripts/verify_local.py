@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that the portable local project-operations files are present."""
+"""Verify installed project-operations files against portable source bytes."""
 from __future__ import annotations
 
 import sys
@@ -30,6 +30,14 @@ def main() -> None:
     missing = [path for path in REQUIRED if not (root / path).is_file()]
     if missing:
         raise SystemExit('Missing: ' + ', '.join(missing))
+    template_root = Path(__file__).resolve().parents[1] / 'assets' / 'repository'
+    drifted = [
+        path
+        for path in REQUIRED
+        if (root / path).read_bytes() != (template_root / path).read_bytes()
+    ]
+    if drifted:
+        raise SystemExit('Drifted project-operations files: ' + ', '.join(drifted))
     agents = (root / 'AGENTS.md').read_text(encoding='utf-8')
     workflow = (root / 'docs/engineering-workflow.md').read_text(encoding='utf-8')
     missing_policy = [

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -42,6 +43,16 @@ const agentInstructionPaths = [
   'apps/e2e/AGENTS.md',
   'apps/web/AGENTS.md',
   '.agents/skills/project-ops-bootstrap/assets/repository/AGENTS.md',
+];
+const projectOpsSkillRoot = join(
+  repositoryRoot,
+  '.agents/skills/project-ops-bootstrap',
+);
+const projectOpsTemplateRoot = join(projectOpsSkillRoot, 'assets/repository');
+const projectOpsInstalledPaths = [
+  'AGENTS.md',
+  'docs/engineering-workflow.md',
+  'tickets/ticket-template.md',
 ];
 
 const workflow = readFileSync(workflowPath, 'utf8');
@@ -344,6 +355,14 @@ function createTemporaryRepository(context) {
   writeFileSync(join(root, 'pnpm-workspace.yaml'), "packages:\n  - 'apps/*'\n");
   writeFileSync(join(root, '.git'), 'gitdir: disposable-test-only\n');
   return root;
+}
+
+function runProjectOpsScript(script, args) {
+  return spawnSync(
+    process.env.PYTHON ?? 'python3',
+    [join(projectOpsSkillRoot, 'scripts', script), ...args],
+    { encoding: 'utf8' },
+  );
 }
 
 function writeRelative(root, relativePath, contents = 'sentinel') {
@@ -802,6 +821,68 @@ test('root and scoped agent instructions inherit bounded model routing', () => {
       `${relativePath} must stay at or below 80 lines`,
     );
   }
+});
+
+test('project-ops bootstrap generates exact, idempotent, fail-closed core templates', (context) => {
+  const temporaryRoot = createTemporaryRepository(context);
+  const initArgs = [
+    temporaryRoot,
+    '--project-name',
+    'Workflow contract verification',
+    '--mode',
+    'core',
+  ];
+
+  const firstInstall = runProjectOpsScript('init_local.py', initArgs);
+  assert.equal(firstInstall.status, 0, firstInstall.stderr);
+  for (const relativePath of projectOpsInstalledPaths) {
+    assert.equal(
+      readFileSync(join(temporaryRoot, relativePath), 'utf8'),
+      readFileSync(join(projectOpsTemplateRoot, relativePath), 'utf8'),
+      relativePath,
+    );
+  }
+
+  const firstVerify = runProjectOpsScript('verify_local.py', [temporaryRoot]);
+  assert.equal(firstVerify.status, 0, firstVerify.stderr);
+
+  const secondInstall = runProjectOpsScript('init_local.py', initArgs);
+  assert.equal(secondInstall.status, 0, secondInstall.stderr);
+  assert.match(secondInstall.stdout, /Existing files were preserved/u);
+  for (const relativePath of projectOpsInstalledPaths) {
+    assert.equal(
+      readFileSync(join(temporaryRoot, relativePath), 'utf8'),
+      readFileSync(join(projectOpsTemplateRoot, relativePath), 'utf8'),
+      relativePath,
+    );
+  }
+
+  writeFileSync(
+    join(temporaryRoot, 'tickets/ticket-template.md'),
+    '# incompatible local ticket template\n',
+  );
+  const preservationInstall = runProjectOpsScript('init_local.py', initArgs);
+  assert.equal(preservationInstall.status, 0, preservationInstall.stderr);
+  assert.equal(
+    readFileSync(join(temporaryRoot, 'tickets/ticket-template.md'), 'utf8'),
+    '# incompatible local ticket template\n',
+  );
+  const driftVerify = runProjectOpsScript('verify_local.py', [temporaryRoot]);
+  assert.notEqual(driftVerify.status, 0);
+  assert.match(
+    driftVerify.stderr,
+    /Drifted project-operations files: tickets\/ticket-template\.md/u,
+  );
+
+  const unsupportedMode = runProjectOpsScript('init_local.py', [
+    temporaryRoot,
+    '--project-name',
+    'Workflow contract verification',
+    '--mode',
+    'light',
+  ]);
+  assert.notEqual(unsupportedMode.status, 0);
+  assert.match(unsupportedMode.stderr, /invalid choice: 'light'/u);
 });
 
 test('R2 catalog baseline remains grounded in executable source contracts', () => {

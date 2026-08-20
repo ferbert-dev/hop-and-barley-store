@@ -25,7 +25,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('project_root', type=Path)
     parser.add_argument('--project-name', required=True)
-    parser.add_argument('--mode', choices=('core', 'light', 'regulated'), default='core')
+    parser.add_argument('--mode', choices=('core',), default='core')
     args = parser.parse_args()
     root = args.project_root.resolve()
     if not root.is_dir():
