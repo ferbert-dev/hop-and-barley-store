@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const transientOutputPathPattern =
+  /(?:^|\/)(?:__screenshots__|playwright-report|test-results|coverage)(?:\/|$)/u;
 
 function read(relativePath) {
   return readFileSync(join(repositoryRoot, relativePath), 'utf8');
@@ -100,6 +103,45 @@ test('browser runs keep generated screenshots and traces out of retained output'
   assert.match(config, /reporter: \[\['list'\]\]/);
   assert.match(config, /screenshot: 'off'/);
   assert.match(config, /trace: 'off'/);
-  assert.match(gitIgnore, /^\/apps\/e2e\/tests\/__screenshots__\/$/m);
+  assert.match(gitIgnore, /^__screenshots__\/$/m);
   assert.match(dockerIgnore, /^\*\*\/__screenshots__$/m);
+});
+
+test('the repository tracks no transient test-output artifacts', () => {
+  for (const path of [
+    '__screenshots__/root.png',
+    'apps/e2e/tests/__screenshots__/nested.png',
+    'playwright-report/index.html',
+    'apps/e2e/playwright-report/index.html',
+    'test-results/trace.zip',
+    'apps/e2e/test-results/trace.zip',
+    'coverage/lcov.info',
+    'apps/web/coverage/lcov.info',
+  ]) {
+    assert.equal(transientOutputPathPattern.test(path), true, path);
+  }
+
+  for (const path of [
+    'docs/coverage-notes.md',
+    'apps/web/public/assets/screenshots/product.webp',
+  ]) {
+    assert.equal(transientOutputPathPattern.test(path), false, path);
+  }
+
+  const trackedPaths = execFileSync('git', ['ls-files', '-z'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+  })
+    .split('\0')
+    .filter(Boolean);
+  const forbidden = trackedPaths.filter(
+    (path) =>
+      transientOutputPathPattern.test(path) ||
+      path.startsWith('apps/web/src/quality/evidence/') ||
+      /apps\/web\/src\/quality\/(?:c3|d2)-.+-evidence(?:\.test)?\.ts$/u.test(
+        path,
+      ),
+  );
+
+  assert.deepEqual(forbidden, []);
 });

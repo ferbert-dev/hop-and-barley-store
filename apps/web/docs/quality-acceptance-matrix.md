@@ -6,8 +6,8 @@ or state becomes implementable. It does not assert that planned routes already
 exist.
 
 The machine-readable source of truth is
-`src/quality/acceptance-matrix.ts`. This document explains how to apply it and
-how to record evidence.
+`src/quality/acceptance-matrix.ts`. This document explains how to apply and
+verify it.
 
 ## Evidence boundary
 
@@ -34,16 +34,16 @@ viewport widths. A slice that changes layout at a D1 breakpoint also runs the
 matching before/at pair. The 375-pixel sample is supplemental and never replaces
 the approved 360-pixel compact-mobile probe.
 
-| Probe                | Viewport    | Purpose                                    | Visual baseline |
-| -------------------- | ----------- | ------------------------------------------ | --------------- |
-| Reflow               | `320×800`   | WCAG 2.2 AA reflow equivalent at 400% zoom | No              |
-| Compact mobile/core  | `360×800`   | Approved compact phone experience          | Yes             |
-| Mobile sample        | `375×812`   | Supplemental common-device probe           | No              |
-| Compact boundary     | `479/480`   | D1 compact gutter boundary                 | When affected   |
-| Tablet boundary/core | `767/768`   | D1 medium and tablet layout boundary       | At 768          |
-| Wide boundary        | `1023/1024` | D1 desktop navigation/grid boundary        | When affected   |
-| Desktop              | `1280×900`  | Normal desktop experience                  | Yes             |
-| Canvas boundary      | `1439/1440` | D1 maximum design-canvas boundary          | At 1440         |
+| Probe                | Viewport    | Purpose                                    |
+| -------------------- | ----------- | ------------------------------------------ |
+| Reflow               | `320×800`   | WCAG 2.2 AA reflow equivalent at 400% zoom |
+| Compact mobile/core  | `360×800`   | Approved compact phone experience          |
+| Mobile sample        | `375×812`   | Supplemental common-device probe           |
+| Compact boundary     | `479/480`   | D1 compact gutter boundary                 |
+| Tablet boundary/core | `767/768`   | D1 medium and tablet layout boundary       |
+| Wide boundary        | `1023/1024` | D1 desktop navigation/grid boundary        |
+| Desktop              | `1280×900`  | Normal desktop experience                  |
+| Canvas boundary      | `1439/1440` | D1 maximum design-canvas boundary          |
 
 Boundary heights are defined in the TypeScript contract. The before probe is
 exactly one CSS pixel below its D1 breakpoint; the at probe is exactly the
@@ -72,10 +72,10 @@ motion, overflow/reflow and route announcement. A check can be marked
 | Admin product edit/visibility/retirement | Unresolved until M4/M5      | loading; ready; validation; saving; visibility updated; retirement blocked/retired; missing-session redirect; authenticated forbidden; API error |
 | Optional admin dashboard                 | Unresolved, P2 M6           | loading; ready; empty; missing-session redirect; authenticated forbidden; API error                                                              |
 
-Success, error, empty and loading states are separate evidence rows. Every
+Success, error, empty and loading states are verified separately. Every
 protected account/admin family also separates a missing-session redirect from
-an authenticated-but-forbidden response. A happy-path screenshot cannot close
-either access-control state.
+an authenticated-but-forbidden response. A happy-path check cannot cover either
+access-control state.
 
 ## Numeric gates
 
@@ -100,10 +100,6 @@ The conformance target is WCAG 2.2 Level AA:
   colour alone never communicates an error;
 - under `prefers-reduced-motion: reduce`, D1 motion-token durations are `0ms`
   and HTML scrolling is `auto`; no content or function can depend on motion;
-- visual snapshots disable animations and hide the caret, use a per-pixel
-  threshold of `0.2`, and allow at most a `0.01` differing-pixel ratio. This
-  keeps the approved preflight tolerance and avoids brittle cross-platform
-  failures while still failing a one-percent regression.
 
 Primary WCAG references: [Contrast minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html),
 [Non-text contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html),
@@ -114,38 +110,36 @@ Ratios are thresholds and must not be rounded up.
 
 ## Evidence ownership
 
-| Channel                  | Automated responsibility                                                                                                                                 | What remains manual                                                           |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Vitest + Testing Library | component/state rendering, keyboard interactions, accessible names, labels, errors and the matrix invariants                                             | Whether wording is clear and focus order matches the task                     |
-| axe                      | programmatically detectable WCAG violations in each rendered DOM state; zero critical/serious                                                            | Contrast over images, meaningful alternative text and screen-reader usability |
-| Playwright               | real route/state path, keyboard-only critical action, focus movement, reduced-motion emulation, overflow measurements, title/h1 and deterministic errors | Assistive-technology announcement quality and platform-specific behaviour     |
-| Visual screenshots       | mobile/tablet/desktop/canvas composition, clipping and visible focus/error states with the pinned diff gate                                              | Whether a deliberate design change is acceptable                              |
-| Manual                   | 400% zoom/reflow, logical focus order, route/error announcements, contrast over imagery, labels/instructions and reduced-motion experience               | The signed evidence itself                                                    |
+| Channel                  | Automated responsibility                                                                                                                                  | What remains manual                                                           |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Vitest + Testing Library | component/state rendering, keyboard interactions, accessible names, labels, errors and the matrix invariants                                              | Whether wording is clear and focus order matches the task                     |
+| axe                      | programmatically detectable WCAG violations in each rendered DOM state; zero critical/serious                                                             | Contrast over images, meaningful alternative text and screen-reader usability |
+| Playwright               | real route/state path, keyboard-only critical action, focus movement/style, responsive boxes, reduced motion, overflow, title/h1 and deterministic errors | Assistive-technology announcement quality and platform-specific behaviour     |
+| Manual                   | 400% zoom/reflow, logical focus order, route/error announcements, contrast over imagery, labels/instructions and reduced-motion experience                | The concise reviewer verdict                                                  |
 
 Vitest cannot prove async Server Components work; those states require
-Playwright against a production build. Axe and screenshot tooling are not added
-by Q1 because there is not yet a real UI state to scan or baseline. The first
-slice that renders one must add the smallest suitable test integration and keep
-these channel boundaries.
+Playwright against a production build. The repository does not retain
+Playwright screenshots, traces, reports or generated evidence ledgers. CI logs
+remain transient; GitHub and the Agent Run retain only the concise check summary.
 
 ## Evidence record
 
 Each affected route/state/check/channel record is a discriminated TypeScript
-union. `channel` is one of `vitest`, `axe`, `playwright`, `visual` or `manual`;
+union. `channel` is one of `vitest`, `axe`, `playwright` or `manual`;
 `note` records the state/fixture or blocker.
 
 | Status           | Required closure evidence                                                                                                      |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `pass`           | Non-empty artifact path/URL and a valid UTC ISO timestamp.                                                                     |
+| `pass`           | Non-empty GitHub check, PR, or Agent Run URL and a valid UTC ISO timestamp.                                                    |
 | `not-applicable` | Artifact is `null` or a non-empty string; non-empty reason, reviewer-agreement trace and valid UTC ISO timestamp are required. |
 | `not-run`        | Artifact and timestamp remain `null`; never closes.                                                                            |
 | `blocked`        | Blocker is recorded in the note, with optional partial artifact/timestamp; never closes.                                       |
 | `fail`           | Failure evidence may be attached, but the status never closes.                                                                 |
 
-`isClosureAcceptedEvidence` is the exported runtime gate for data loaded from
-JSON, reports or future evidence stores. It accepts only a well-evidenced
-`pass` or reviewer-approved `not-applicable`; status text alone cannot close a
-row.
+`isClosureAcceptedEvidence` is the exported runtime gate for lightweight
+closure references. It accepts only a checked `pass` or reviewer-approved
+`not-applicable`; status text alone cannot close a row. Feature branches do not
+generate or commit per-test ledger files.
 
 ## Per-slice maintenance rule
 
@@ -163,11 +157,11 @@ Every future UI slice must complete these steps in the same change:
 5. Add Playwright coverage for the real user path, including negative states,
    keyboard/focus, overflow and reduced-motion emulation.
 6. Run the mandatory 320-pixel reflow probe and all four core viewports. Add
-   relevant breakpoint before/at probes when layout changes there, and approve
-   visual baselines at 360, 768, 1280 and 1440 pixels.
-7. Record manual evidence and any genuine `not-applicable` reason plus its
-   reviewer-agreement trace. Unknown or unavailable evidence is `not-run` or
-   `blocked`, never `pass`.
+   relevant breakpoint before/at probes when layout changes there, and assert
+   the layout, dimensions, overflow, focus and state semantics directly.
+7. Record a concise manual-review outcome and any genuine `not-applicable`
+   reason in the reviewer Agent Run. Unknown or unavailable checks are
+   `not-run` or `blocked`, never `pass`.
 8. Require independent closure review. Any required row outside `pass` or a
    justified `not-applicable` prevents Done.
 

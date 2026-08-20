@@ -70,27 +70,24 @@ closed as an unavailable catalog.
 - labels, named navigation, live result counts, status/alert semantics, visible
   focus, reduced motion, and local image alt text are tested.
 
-Playwright covers ready, filtered, empty, loading, and API-error states. The 24
-catalog baselines comprise all five states at 360, 768, 1280, and 1440 CSS
-pixels plus focused filter, pagination, empty-recovery, and error-retry regions.
-Baselines are platform-specific in CI and use the repository-wide 0.2 channel
-threshold and 1 percent pixel-difference gate.
+Playwright covers ready, filtered, empty, loading, and API-error states at all
+Q1 probes. It checks layout columns, overflow, minimum target size, keyboard
+navigation, visible focus, accessible names, Axe results, reduced motion,
+titles, live announcements, URL history and recovery behavior directly in the
+running application.
 
-The machine-readable C3 bundle independently derives the exact 135 Q1
-state/check/channel mappings and closes only at exactly 113 durable passes plus
-22 reviewed not-applicable rows. It recomputes hashes and dimensions for all 48
-macOS and Linux PNGs and requires exact platform filename parity. The failed
-independent review is used only for the facts it explicitly approved: the
-unchanged visual set and the N/A classification. Applicable manual rows require
-a separate independent manual-evidence review; the later exact-head closure
-review remains a distinct process gate.
+Test screenshots, traces, reports and generated evidence ledgers are temporary
+diagnostics and are not retained in Git or uploaded by CI. Closure uses the
+green exact-head checks, a concise PR/Agent Run summary and an independent
+reviewer verdict.
 
 ## Verification and rollback
 
 Unit tests lock URL grammar, generated-client transport, route behavior,
 component semantics, local assets, and responsive CSS. Browser tests lock URL
 navigation/history, server HTML, all Q1 widths, Axe serious/critical results,
-loading/error behavior, and visual baselines against the running Docker stack.
+loading/error behavior, focus visibility and responsive layout against the
+running Docker stack.
 
 Rollback is atomic: restore the former root page, remove the `(catalog)` route
 group and `features/catalog`, and restore the C2 no-store loader contract. No

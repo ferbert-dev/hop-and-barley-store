@@ -11,7 +11,7 @@
 - Required authority:
 - Ticket URL:
 - Implementation Agent Run:
-- Branch: `agent/<ticket>-<slug>`
+- Branch: `codex/<ticket>-<slug>`
 - Pull request:
 - Head SHA:
 - Required checks / check-suite URL:
@@ -19,13 +19,12 @@
 - Review verdict: `PASS | FAIL | BLOCKED`
 - Merge SHA:
 - Merged at:
-- Evidence tiers:
+- Verification summary:
   - Always: changed paths, relevant tests, CI, cleanup, exact head SHA
   - Database (when schema, migration, seed or stored data changes):
   - Browser (when user flow or browser state changes):
-  - Visual/manual (when visual bytes, layout or manual-only risk changes):
-  - Full binary/dependency manifest (when binaries, dependencies, lockfile or
-    multi-slice integration change):
+  - Manual (when layout or manual-only risk changes):
+  - Runtime binaries (only when intentional production assets change):
 - Delivery metrics:
   - Ready at:
   - First commit at:

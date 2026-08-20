@@ -8,14 +8,14 @@ import {
 
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
-const visualProbes = viewportProbes.filter(
-  ({ visualBaseline }) => visualBaseline,
-);
-
 async function waitForShellAssets(page: Page) {
   const images = await page
     .locator('.site-header img:visible, .site-footer img:visible')
     .all();
+  expect(
+    images.length,
+    'storefront shell must render its image assets',
+  ).toBeGreaterThan(0);
 
   for (const image of images) {
     await image.scrollIntoViewIfNeeded();
@@ -135,51 +135,23 @@ test('has no unexpected horizontal overflow at every Q1 viewport probe', async (
   }
 });
 
-test('matches approved shell visual baselines at every Q1 core viewport', async ({
+test('loads shell assets and exposes the landmark structure', async ({
   page,
 }) => {
-  test.slow();
-
-  for (const probe of visualProbes) {
-    await page.setViewportSize({ width: probe.width, height: probe.height });
-    await page.goto('/');
-    await waitForShellAssets(page);
-    await page.getByRole('main').evaluate((element) => {
-      element.style.display = 'none';
-    });
-
-    const header = page.locator('.site-header');
-    const footer = page.locator('.site-footer__content');
-
-    await header.evaluate((element) =>
-      element.scrollIntoView({ block: 'start' }),
-    );
-    await expect(header).toHaveScreenshot(`${probe.id}-shell-header.png`);
-    await footer.evaluate((element) =>
-      element.scrollIntoView({ block: 'end' }),
-    );
-    await expect(footer).toHaveScreenshot(`${probe.id}-shell-footer.png`);
-  }
-});
-
-test('matches mobile open-menu and visible-focus baselines', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 360, height: 800 });
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
+
   await waitForShellAssets(page);
-
-  const trigger = page.getByRole('button', { name: 'Open menu' });
-  await trigger.click();
-  await expect(page.locator('.site-header')).toHaveScreenshot(
-    'mobile-navigation-open.png',
-  );
-
-  await page.keyboard.press('Escape');
-  await expect(trigger).toBeFocused();
-  await expect(page.locator('.site-header')).toHaveScreenshot(
-    'mobile-visible-focus.png',
-  );
+  await expect(
+    page.getByRole('banner', { name: 'Hop and Barley storefront' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Storefront' }),
+  ).toBeVisible();
+  await expect(page.getByRole('main')).toBeVisible();
+  await expect(
+    page.getByRole('contentinfo', { name: 'Store information' }),
+  ).toBeVisible();
 });
 
 test('honours the reduced-motion contract', async ({ page }) => {
@@ -240,14 +212,5 @@ test('renders the configured API availability state without changing the shell',
     page.getByRole('contentinfo', { name: 'Store information' }),
   ).toBeVisible();
   await expect(page.locator('main')).toHaveCount(1);
-
-  if (process.env.E2E_EXPECT_API_STATUS === 'API unavailable') {
-    await waitForShellAssets(page);
-    await expect(page.locator('.site-header')).toHaveScreenshot(
-      'desktop-1280-shell-header.png',
-    );
-    await expect(page.locator('.site-footer__content')).toHaveScreenshot(
-      'desktop-1280-shell-footer.png',
-    );
-  }
+  await waitForShellAssets(page);
 });

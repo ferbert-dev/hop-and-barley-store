@@ -34,7 +34,7 @@ test-results/
 blob-report/
 /output/playwright/
 .playwright-cli/
-/apps/e2e/tests/__screenshots__/
+__screenshots__/
 graphify-out/
 
 # Logs and temporary files

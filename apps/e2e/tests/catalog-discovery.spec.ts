@@ -7,9 +7,6 @@ import {
 } from '../../web/src/quality/acceptance-matrix';
 
 const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
-const coreViewports = viewportProbes.filter(
-  ({ visualBaseline }) => visualBaseline,
-);
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
 const stateUrls = {
@@ -452,75 +449,6 @@ test('honours reduced motion in ready, filtered, empty, loading, and error state
   await assertReducedMotionState(page, 'empty');
 });
 
-test('matches connected catalog state baselines', async ({ page }) => {
-  test.skip(unavailable, 'requires the connected API');
-  test.slow();
-
-  for (const [state, url] of Object.entries(stateUrls)) {
-    for (const probe of coreViewports) {
-      await page.setViewportSize({ width: probe.width, height: probe.height });
-      await page.goto(url);
-      await waitForProductImages(page);
-      await captureCatalogViewport(page, `catalog-${state}-${probe.width}.png`);
-    }
-  }
-
-  await page.setViewportSize({ width: 360, height: 800 });
-  await page.goto(stateUrls.ready);
-  await stabilizeCatalogScreenshot(page);
-  await page.getByLabel('Search products').focus();
-  await expect(
-    page.getByRole('search', { name: 'Filter products' }),
-  ).toHaveScreenshot('catalog-ready-filter-focus-360.png');
-
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto(stateUrls.filtered);
-  await stabilizeCatalogScreenshot(page);
-  await page.getByRole('link', { name: 'Next' }).focus();
-  await expect(
-    page.getByRole('navigation', { name: 'Catalog pages' }),
-  ).toHaveScreenshot('catalog-filtered-pagination-focus-1280.png');
-
-  await page.setViewportSize({ width: 360, height: 800 });
-  await page.goto(stateUrls.empty);
-  await stabilizeCatalogScreenshot(page);
-  await page.getByRole('link', { name: 'Clear filters' }).focus();
-  await expect(
-    page.getByRole('status').filter({ hasText: 'No products match' }),
-  ).toHaveScreenshot('catalog-empty-recovery-focus-360.png');
-});
-
-test('matches unavailable and loading catalog state baselines', async ({
-  page,
-}) => {
-  test.skip(!unavailable, 'requires the unavailable API phase');
-  test.slow();
-
-  for (const probe of coreViewports) {
-    await page.setViewportSize({ width: probe.width, height: probe.height });
-    await page.goto(`/?search=offline-error-${probe.width}`);
-    await expect(
-      page.getByRole('alert').filter({ hasText: 'Products unavailable' }),
-    ).toBeVisible();
-    await captureCatalogViewport(page, `catalog-error-${probe.width}.png`);
-
-    await page.goto('/?page=201');
-    await startLoadingNavigation(
-      page,
-      `/?search=loading-visual-${probe.width}`,
-    );
-    await captureCatalogViewport(page, `catalog-loading-${probe.width}.png`);
-  }
-
-  await page.setViewportSize({ width: 360, height: 800 });
-  await page.goto('/?search=offline-retry-focus');
-  await stabilizeCatalogScreenshot(page);
-  await page.getByRole('link', { name: 'Try again' }).focus();
-  await expect(
-    page.getByRole('alert').filter({ hasText: 'Products unavailable' }),
-  ).toHaveScreenshot('catalog-error-retry-focus-360.png');
-});
-
 async function startLoadingNavigation(page: Page, targetHref: string) {
   const clear = page.getByRole('link', { name: 'Clear catalog URL' });
   await expect(clear).toBeVisible();
@@ -631,54 +559,4 @@ async function assertGridColumns(articles: Locator, width: number) {
   expect(boxes.every(Boolean)).toBe(true);
   const columns = new Set(boxes.map((box) => Math.round(box!.x)));
   expect(columns.size).toBe(width < 768 ? 1 : width < 1024 ? 2 : 3);
-}
-
-async function waitForProductImages(page: Page) {
-  for (const image of await page.getByRole('article').getByRole('img').all()) {
-    await expect(image).toHaveAttribute('loading', 'lazy');
-    await image.evaluate((element) => {
-      const productImage = element as HTMLImageElement;
-      const optimizedUrl = new URL(productImage.src, window.location.href);
-      const localAssetUrl = optimizedUrl.searchParams.get('url');
-      if (!localAssetUrl?.startsWith('/assets/products/')) {
-        throw new TypeError('Product image must resolve to a local asset.');
-      }
-      productImage.loading = 'eager';
-      productImage.removeAttribute('srcset');
-      productImage.src = localAssetUrl;
-    });
-    await image.evaluate((element) =>
-      element.scrollIntoView({ block: 'center' }),
-    );
-    const accessibleName = await image.getAttribute('alt');
-    await expect
-      .poll(
-        () =>
-          image.evaluate((element) => {
-            const productImage = element as HTMLImageElement;
-            return productImage.complete && productImage.naturalWidth > 0;
-          }),
-        {
-          message: `product image ${accessibleName ?? 'without alt'} loads`,
-          timeout: 15_000,
-        },
-      )
-      .toBe(true);
-  }
-}
-
-async function captureCatalogViewport(page: Page, name: string) {
-  await stabilizeCatalogScreenshot(page);
-  const catalog = page
-    .locator(
-      'section[aria-label="Catalog"], section[aria-labelledby="catalog-title"]',
-    )
-    .first();
-  await expect(catalog).toHaveScreenshot(name);
-}
-
-async function stabilizeCatalogScreenshot(page: Page) {
-  await page.addStyleTag({
-    content: '.skip-link:not(:focus) { visibility: hidden !important; }',
-  });
 }
