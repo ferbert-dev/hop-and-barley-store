@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -36,6 +37,23 @@ const dockerIgnorePath = join(repositoryRoot, '.dockerignore');
 const gitIgnorePath = join(repositoryRoot, '.gitignore');
 const readmePath = join(repositoryRoot, 'README.md');
 const ticketTemplatePath = join(repositoryRoot, 'tickets/ticket-template.md');
+const agentInstructionPaths = [
+  'AGENTS.md',
+  'apps/api/AGENTS.md',
+  'apps/e2e/AGENTS.md',
+  'apps/web/AGENTS.md',
+  '.agents/skills/project-ops-bootstrap/assets/repository/AGENTS.md',
+];
+const projectOpsSkillRoot = join(
+  repositoryRoot,
+  '.agents/skills/project-ops-bootstrap',
+);
+const projectOpsTemplateRoot = join(projectOpsSkillRoot, 'assets/repository');
+const projectOpsInstalledPaths = [
+  'AGENTS.md',
+  'docs/engineering-workflow.md',
+  'tickets/ticket-template.md',
+];
 
 const workflow = readFileSync(workflowPath, 'utf8');
 const contract = JSON.parse(readFileSync(contractPath, 'utf8'));
@@ -48,9 +66,11 @@ const ticketTemplate = readFileSync(ticketTemplatePath, 'utf8');
 const referenceBundleIgnore = '/docs/Hop-and-Barley-main/';
 
 const expectedRuleIds = [
+  'bounded-agent-lifecycle',
   'catalog-query-parity',
   'catalog-source-provenance',
   'concise-closure-summary',
+  'cost-aware-model-routing',
   'cross-workspace-contract-second-consumer',
   'direct-node24-clean-order',
   'disposable-postgres-review',
@@ -75,7 +95,7 @@ const expectedCleanOrder = [
 ];
 
 const expectedPolicyDigest =
-  'sha256:8f33051c646db1f523e468ed2f3ae594b5392f77679fa4b4ac7251e7e403d5b2';
+  'sha256:7538759f7f543161c395ce6780cc3a08478f749df88a98eb5670496cf8498a7a';
 const expectedNextStrategies = [
   'serialized-build-start-test-stop',
   'unique-build-output-per-server',
@@ -180,6 +200,57 @@ const expectedVerificationSummary = {
   },
   failedAttemptsRemainVisible: true,
 };
+const expectedOrchestration = {
+  sourceTicket: 'OPS1',
+  rootOwns: ['vertical-scope', 'integration', 'pull-request', 'final-status'],
+  maxDisjointWorkers: 2,
+  maxIndependentReviewers: 1,
+  reviewStartsAfter: 'green-required-ci',
+  nextScopeStartsAfter: ['merged', 'explicitly-blocked'],
+  completedWorkerAction: ['stop', 'reuse-immediately'],
+  idleAgentPoolAllowed: false,
+  delegationRequires: [
+    'model',
+    'reasoning-effort',
+    'cost-correctness-rationale',
+  ],
+  models: {
+    'gpt-5.6-sol': {
+      work: [
+        'architecture',
+        'security-sensitive',
+        'risky-cross-cutting',
+        'exact-head-review',
+      ],
+      defaultReasoning: 'high',
+    },
+    'gpt-5.6-terra': {
+      work: ['feature-implementation', 'medium-complexity-fix', 'integration'],
+      defaultReasoning: 'medium',
+    },
+    'gpt-5.6-luna': {
+      work: [
+        'mechanical-edit',
+        'fixture',
+        'repetitive-test',
+        'inventory',
+        'documentation',
+      ],
+      defaultReasoning: 'medium',
+    },
+  },
+  fallback: {
+    direction: 'upward-to-sol',
+    triggers: [
+      'unclear-boundary',
+      'security',
+      'data-integrity',
+      'correctness',
+      'worker-uncertainty',
+    ],
+    downwardAfterUncertaintyAllowed: false,
+  },
+};
 const expectedTraceability = [
   'ticketUrl',
   'agentRunUrl',
@@ -223,6 +294,7 @@ const expectedDeliveryMetrics = [
 
 const expectedWorkflowHeadings = [
   '## Evidence boundary',
+  '## Cost-aware multi-model orchestration',
   '## Isolated verification',
   '### Next.js build and server isolation',
   '### PostgreSQL isolation',
@@ -283,6 +355,14 @@ function createTemporaryRepository(context) {
   writeFileSync(join(root, 'pnpm-workspace.yaml'), "packages:\n  - 'apps/*'\n");
   writeFileSync(join(root, '.git'), 'gitdir: disposable-test-only\n');
   return root;
+}
+
+function runProjectOpsScript(script, args) {
+  return spawnSync(
+    process.env.PYTHON ?? 'python3',
+    [join(projectOpsSkillRoot, 'scripts', script), ...args],
+    { encoding: 'utf8' },
+  );
 }
 
 function writeRelative(root, relativePath, contents = 'sentinel') {
@@ -358,6 +438,17 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
     JSON.stringify(expectedVerificationSummary)
   ) {
     errors.push('concise verification summary policy drifted');
+  }
+  if (
+    JSON.stringify(candidate.orchestration) !==
+    JSON.stringify(expectedOrchestration)
+  ) {
+    errors.push('cost-aware orchestration policy drifted');
+  }
+  for (const model of Object.keys(expectedOrchestration.models)) {
+    if (!normalizedMarkdown.includes(model)) {
+      errors.push(`workflow must document ${model}`);
+    }
   }
 
   if (candidate.isolation?.next?.maxServersPerBuildOutput !== 1) {
@@ -698,9 +789,100 @@ test('ticket template captures traceability and the concise verification summary
   for (const literal of Object.values(traceabilityLabels)) {
     assert.ok(ticketTemplate.includes(literal), literal);
   }
-  for (const literal of ['- Verification summary:', '- Delivery metrics:']) {
+  for (const literal of [
+    '- Delegation plan:',
+    '- Model / reasoning effort:',
+    '- Cost/correctness rationale:',
+    '- Worker cleanup:',
+    '- Verification summary:',
+    '- Delivery metrics:',
+  ]) {
     assert.ok(ticketTemplate.includes(literal), literal);
   }
+});
+
+test('root and scoped agent instructions inherit bounded model routing', () => {
+  const rootAgents = readFileSync(join(repositoryRoot, 'AGENTS.md'), 'utf8');
+  for (const literal of [
+    'gpt-5.6-sol',
+    'gpt-5.6-terra',
+    'gpt-5.6-luna',
+    'at most two disjoint workers',
+    'never leave completed agents waiting',
+    'Start one independent exact-head reviewer only after green CI',
+  ]) {
+    assert.ok(rootAgents.includes(literal), literal);
+  }
+
+  for (const relativePath of agentInstructionPaths) {
+    const contents = readFileSync(join(repositoryRoot, relativePath), 'utf8');
+    assert.ok(
+      contents.split(/\r?\n/u).length - 1 <= 80,
+      `${relativePath} must stay at or below 80 lines`,
+    );
+  }
+});
+
+test('project-ops bootstrap generates exact, idempotent, fail-closed core templates', (context) => {
+  const temporaryRoot = createTemporaryRepository(context);
+  const initArgs = [
+    temporaryRoot,
+    '--project-name',
+    'Workflow contract verification',
+    '--mode',
+    'core',
+  ];
+
+  const firstInstall = runProjectOpsScript('init_local.py', initArgs);
+  assert.equal(firstInstall.status, 0, firstInstall.stderr);
+  for (const relativePath of projectOpsInstalledPaths) {
+    assert.equal(
+      readFileSync(join(temporaryRoot, relativePath), 'utf8'),
+      readFileSync(join(projectOpsTemplateRoot, relativePath), 'utf8'),
+      relativePath,
+    );
+  }
+
+  const firstVerify = runProjectOpsScript('verify_local.py', [temporaryRoot]);
+  assert.equal(firstVerify.status, 0, firstVerify.stderr);
+
+  const secondInstall = runProjectOpsScript('init_local.py', initArgs);
+  assert.equal(secondInstall.status, 0, secondInstall.stderr);
+  assert.match(secondInstall.stdout, /Existing files were preserved/u);
+  for (const relativePath of projectOpsInstalledPaths) {
+    assert.equal(
+      readFileSync(join(temporaryRoot, relativePath), 'utf8'),
+      readFileSync(join(projectOpsTemplateRoot, relativePath), 'utf8'),
+      relativePath,
+    );
+  }
+
+  writeFileSync(
+    join(temporaryRoot, 'tickets/ticket-template.md'),
+    '# incompatible local ticket template\n',
+  );
+  const preservationInstall = runProjectOpsScript('init_local.py', initArgs);
+  assert.equal(preservationInstall.status, 0, preservationInstall.stderr);
+  assert.equal(
+    readFileSync(join(temporaryRoot, 'tickets/ticket-template.md'), 'utf8'),
+    '# incompatible local ticket template\n',
+  );
+  const driftVerify = runProjectOpsScript('verify_local.py', [temporaryRoot]);
+  assert.notEqual(driftVerify.status, 0);
+  assert.match(
+    driftVerify.stderr,
+    /Drifted project-operations files: tickets\/ticket-template\.md/u,
+  );
+
+  const unsupportedMode = runProjectOpsScript('init_local.py', [
+    temporaryRoot,
+    '--project-name',
+    'Workflow contract verification',
+    '--mode',
+    'light',
+  ]);
+  assert.notEqual(unsupportedMode.status, 0);
+  assert.match(unsupportedMode.stderr, /invalid choice: 'light'/u);
 });
 
 test('R2 catalog baseline remains grounded in executable source contracts', () => {
@@ -811,6 +993,19 @@ test('contract rejects retained test outputs or incomplete summaries', () => {
     packageJson,
   ).join('\n');
   assert.match(errors, /concise verification summary policy/);
+});
+
+test('contract rejects extra workers, idle pools or weakened model routing', () => {
+  const candidate = clone(contract);
+  candidate.orchestration.maxDisjointWorkers = 3;
+  candidate.orchestration.idleAgentPoolAllowed = true;
+  candidate.orchestration.models['gpt-5.6-sol'].work = [];
+  candidate.orchestration.fallback.downwardAfterUncertaintyAllowed = true;
+
+  assert.match(
+    validateWorkflowContract(candidate, workflow, packageJson).join('\n'),
+    /cost-aware orchestration policy/,
+  );
 });
 
 test('contract rejects shared build output or database mutation', () => {

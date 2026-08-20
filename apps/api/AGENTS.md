@@ -1,10 +1,14 @@
 # Hop & Barley API
 
-- Read the repository-root `AGENTS.md` and the relevant architecture/ticket before state-changing work.
-- Keep the NestJS 11 application as a modular monolith. Use `nestjs-best-practices` as a review checklist and Context7 for current NestJS API and configuration syntax.
-- Public application routes are versioned under `/api/v1`; `GET /` is only the developer service console and must never expose raw logs or secrets. Swagger UI lives at `/api/docs`. Keep `main.ts`, OpenAPI generation, and end-to-end test routing aligned.
-- Prisma schema and committed migrations are the database source of truth. Use `prisma-cli`, `prisma-client-api`, and `prisma-database-setup` for the matching task, and `supabase-postgres-best-practices` for PostgreSQL design/performance guidance.
-- Use `local-stack-operations` for Docker Compose, migrations, seed data, readiness, and safe local data handling.
-- Create migrations for schema changes. Never replace migration history with `db push`, reset a database, delete a volume, or embed credentials without explicit authority.
-- Validate environment input, DTO boundaries, generated OpenAPI/client output, unit tests, and API end-to-end tests before handoff.
-- Production hosting is provider-neutral and undecided; keep runtime configuration portable.
+- Follow the root `AGENTS.md`, relevant ticket and architecture first. API tickets use one branch/PR and the root model-routing/lifecycle rules.
+- Keep NestJS 11 as a modular monolith. Use `nestjs-best-practices` as a checklist and Context7 for current NestJS syntax.
+- Public routes live under `/api/v1`; `GET /` is a developer service index and must not expose logs or secrets. Swagger UI is `/api/docs`.
+- Keep `main.ts`, validation/bootstrap behavior, OpenAPI generation, generated client and production-like e2e routing aligned.
+- Prisma schema plus committed migrations define database history. Create migrations for schema changes; never replace history with `db push`.
+- The API owns prices, inventory, permissions, totals and state transitions. The web must not import backend source or access PostgreSQL.
+- Validate environment input and DTO boundaries. Default-deny unknown input; avoid leaking entity fields, credentials or internal errors.
+- Use `prisma-cli`, `prisma-client-api` or `prisma-database-setup` for their matching tasks; use PostgreSQL guidance only as a design/performance checklist.
+- Use `local-stack-operations` for Compose, readiness, migrations, seed and disposable database verification.
+- Database tests/reviews use ticket/run-named disposable resources. Never mutate shared Compose data or delete volumes without explicit approval.
+- Handoff evidence is concise: changed paths, targeted unit/API/PostgreSQL checks, generated-contract status, cleanup and exact head SHA. Do not commit generated test reports.
+- Keep runtime configuration provider-neutral and secrets outside repository files, Notion, prompts and logs.

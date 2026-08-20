@@ -3,7 +3,7 @@
   "ticket": "R2",
   "agentRun": "https://app.notion.com/p/3bdd78850eab81d69677f7d24401fbcc",
   "correctionAgentRun": null,
-  "policyDigest": "sha256:8f33051c646db1f523e468ed2f3ae594b5392f77679fa4b4ac7251e7e403d5b2",
+  "policyDigest": "sha256:7538759f7f543161c395ce6780cc3a08478f749df88a98eb5670496cf8498a7a",
   "rules": [
     {
       "id": "independent-required-checks",
@@ -76,6 +76,20 @@
       "rollback": "Close the mixed-scope pull request without merging and split the work into ticket-owned branches."
     },
     {
+      "id": "cost-aware-model-routing",
+      "owner": "Root orchestrator",
+      "timing": "Before every delegation",
+      "verification": "Select Sol, Terra or Luna explicitly with reasoning effort and record a one-line cost/correctness rationale in the Agent Run.",
+      "rollback": "Stop the delegation and route upward to Sol when scope, security, data integrity or correctness is uncertain."
+    },
+    {
+      "id": "bounded-agent-lifecycle",
+      "owner": "Root orchestrator",
+      "timing": "Throughout one ticket-owned vertical scope",
+      "verification": "Use at most two disjoint workers, start one reviewer only after green CI and stop or reuse every completed worker immediately after handoff.",
+      "rollback": "Stop excess or idle agents, keep the current PR as the only active vertical scope and resume from its recorded handoff."
+    },
+    {
       "id": "exact-head-green-review",
       "owner": "Independent reviewer",
       "timing": "After required CI is green and before merge",
@@ -111,6 +125,66 @@
       "rollback": "Restore the last accepted fixture and asset manifest together; keep the ignored reference bundle local and outside Git and Docker contexts."
     }
   ],
+  "orchestration": {
+    "sourceTicket": "OPS1",
+    "rootOwns": [
+      "vertical-scope",
+      "integration",
+      "pull-request",
+      "final-status"
+    ],
+    "maxDisjointWorkers": 2,
+    "maxIndependentReviewers": 1,
+    "reviewStartsAfter": "green-required-ci",
+    "nextScopeStartsAfter": ["merged", "explicitly-blocked"],
+    "completedWorkerAction": ["stop", "reuse-immediately"],
+    "idleAgentPoolAllowed": false,
+    "delegationRequires": [
+      "model",
+      "reasoning-effort",
+      "cost-correctness-rationale"
+    ],
+    "models": {
+      "gpt-5.6-sol": {
+        "work": [
+          "architecture",
+          "security-sensitive",
+          "risky-cross-cutting",
+          "exact-head-review"
+        ],
+        "defaultReasoning": "high"
+      },
+      "gpt-5.6-terra": {
+        "work": [
+          "feature-implementation",
+          "medium-complexity-fix",
+          "integration"
+        ],
+        "defaultReasoning": "medium"
+      },
+      "gpt-5.6-luna": {
+        "work": [
+          "mechanical-edit",
+          "fixture",
+          "repetitive-test",
+          "inventory",
+          "documentation"
+        ],
+        "defaultReasoning": "medium"
+      }
+    },
+    "fallback": {
+      "direction": "upward-to-sol",
+      "triggers": [
+        "unclear-boundary",
+        "security",
+        "data-integrity",
+        "correctness",
+        "worker-uncertainty"
+      ],
+      "downwardAfterUncertaintyAllowed": false
+    }
+  },
   "verificationSummary": {
     "builderOwner": "primary-ticket-owner",
     "reviewOwner": "independent-reviewer",
