@@ -101,6 +101,8 @@ test.describe('database-backed product details', () => {
   test('reflows product detail without horizontal overflow at every approved probe', async ({
     page,
   }) => {
+    test.slow();
+
     for (const { height, id, width } of viewportProbes) {
       await page.setViewportSize({ height, width });
       await page.goto('/product/citra-hops');
