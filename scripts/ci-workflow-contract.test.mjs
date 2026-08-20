@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
@@ -15,8 +15,9 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
 
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /update_visual_baselines:/);
   assert.doesNotMatch(workflow, /pull_request_target:/);
+  assert.doesNotMatch(workflow, /update_visual_baselines|update-snapshots/);
+  assert.doesNotMatch(workflow, /actions\/upload-artifact|__screenshots__/);
   assert.match(workflow, /permissions:\n\s+contents: read/);
   assert.match(workflow, /node-version: ['"]24\.5\.0['"]/);
   assert.match(workflow, /version: ['"]11\.21\.0['"]/);
@@ -25,7 +26,6 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
     'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803',
     'pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1',
     'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020',
-    'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
   ]) {
     assert.ok(workflow.includes(action), `${action} must stay pinned`);
   }
@@ -50,11 +50,7 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
     'docker compose rm --stop --force web',
     'setTimeout(()=>{response.statusCode=503;response.end("delayed unavailable")},2000)',
     'pnpm --filter @hop-and-barley/e2e test:e2e',
-    'pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots',
-    'matches connected catalog state baselines',
-    'matches unavailable and loading catalog state baselines',
     "E2E_EXPECT_API_STATUS='API unavailable'",
-    'apps/e2e/tests/__screenshots__/linux',
     'docker rm --force "${COMPOSE_PROJECT_NAME}-delayed-api"',
     'docker compose down --remove-orphans',
   ]) {
@@ -96,40 +92,14 @@ test('the security override and Docker context privacy guards remain exact', () 
   assert.match(dockerIgnore, /^\*\*\/\.DS_Store$/m);
 });
 
-test('visual regression baselines are platform-specific without weaker gates', () => {
+test('browser runs keep generated screenshots and traces out of retained output', () => {
   const config = read('apps/e2e/playwright.config.ts');
+  const gitIgnore = read('.gitignore');
+  const dockerIgnore = read('.dockerignore');
 
-  assert.match(config, /process\.platform === 'darwin'/);
-  assert.ok(
-    config.includes("'{testDir}/__screenshots__/{testFilePath}/{arg}{ext}'"),
-  );
-  assert.ok(
-    config.includes(
-      "'{testDir}/__screenshots__/{platform}/{testFilePath}/{arg}{ext}'",
-    ),
-  );
-  assert.match(config, /maxDiffPixelRatio: 0\.01/);
-  assert.match(config, /threshold: 0\.2/);
-
-  const expectedBaselines = [
-    'api-unavailable-hero.png',
-    'canvas-at-shell-footer.png',
-    'canvas-at-shell-header.png',
-    'compact-mobile-360-shell-footer.png',
-    'compact-mobile-360-shell-header.png',
-    'desktop-1280-shell-footer.png',
-    'desktop-1280-shell-header.png',
-    'mobile-navigation-open.png',
-    'mobile-visible-focus.png',
-    'tablet-768-shell-footer.png',
-    'tablet-768-shell-header.png',
-  ];
-  const linuxBaselines = readdirSync(
-    join(
-      repositoryRoot,
-      'apps/e2e/tests/__screenshots__/linux/storefront-shell.spec.ts',
-    ),
-  ).sort();
-
-  assert.deepEqual(linuxBaselines, expectedBaselines);
+  assert.match(config, /reporter: \[\['list'\]\]/);
+  assert.match(config, /screenshot: 'off'/);
+  assert.match(config, /trace: 'off'/);
+  assert.match(gitIgnore, /^\/apps\/e2e\/tests\/__screenshots__\/$/m);
+  assert.match(dockerIgnore, /^\*\*\/__screenshots__$/m);
 });

@@ -2,7 +2,7 @@
 
 The Hop & Barley storefront is a Next.js App Router application. Its workspace build is dependency-aware and builds the generated API client first. The running storefront is designed to use the NestJS API and PostgreSQL database from the repository root.
 
-> **Current slice:** the home page proves server-rendered frontend-to-API-to-database connectivity and displays the seeded catalog. Product details, cart, checkout, authentication, account, and admin flows are planned but are not implemented yet.
+> **Current slice:** catalog discovery and database-backed product detail pages are server rendered through the generated API client. Cart, checkout, authentication, account, and admin flows are planned but are not implemented yet.
 
 ## Responsibilities
 
@@ -27,6 +27,10 @@ sequenceDiagram
     DB-->>API: Product rows
     API-->>Web: {items, meta} catalog envelope
     Web-->>Browser: Rendered storefront + API status
+    Browser->>Web: GET /product/[slug]
+    Web->>API: generated GET /api/v1/products/{slug} (revalidate 60s)
+    API-->>Web: Public product detail or generic 404
+    Web-->>Browser: Shared detail template or safe route state
 ```
 
 The API request is server-side. In Docker, `API_INTERNAL_URL` uses the Compose service hostname `api`; that hostname is never sent to the browser.
@@ -81,6 +85,12 @@ and canonicalizes `search`, `category`, price, sort, page, and limit before the
 API call. See [Catalog discovery](docs/catalog-discovery.md) for the exact
 rendering, responsive, cache, accessibility, and rollback contract.
 
+The `/product/[slug]` route uses the same client boundary and local asset
+manifest. It renders image, price, description, public availability and ordered
+technical specifications through one server-first template for all twelve
+products. Loading, not-found and API-error boundaries are route-owned. See
+[Product detail](docs/product-detail.md) for the contract and current deferrals.
+
 ## Design Foundation
 
 Production-safe design tokens and the typed local asset manifest live under
@@ -108,13 +118,21 @@ src/
 │   │   └── page.tsx
 │   ├── globals.css
 │   ├── icon.svg
+│   ├── product/[slug]/
+│   │   ├── error.tsx
+│   │   ├── loading.tsx
+│   │   ├── not-found.tsx
+│   │   └── page.tsx
 │   └── layout.tsx
 ├── features/
-│   └── catalog/
-│       ├── catalog-controls.tsx
-│       ├── catalog-pagination.tsx
-│       ├── catalog-query.ts
-│       └── catalog-screen.tsx
+│   ├── catalog/
+│   │   ├── catalog-controls.tsx
+│   │   ├── catalog-pagination.tsx
+│   │   ├── catalog-query.ts
+│   │   └── catalog-screen.tsx
+│   └── product-detail/
+│       ├── product-detail.module.css
+│       └── product-detail.tsx
 ├── design-system/
 │   ├── assets.ts
 │   ├── assets.sha256.json
@@ -123,6 +141,8 @@ src/
 ├── lib/
 │   ├── catalog.test.ts
 │   ├── catalog.ts
+│   ├── product-detail.test.ts
+│   ├── product-detail.ts
 │   ├── format-price.test.ts
 │   └── format-price.ts
 ├── quality/

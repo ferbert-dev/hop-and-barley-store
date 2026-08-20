@@ -12,6 +12,7 @@ type OpenApiSchema = {
   enum?: string[];
   format?: string;
   items?: { $ref?: string };
+  maxLength?: number;
   maximum?: number;
   minimum?: number;
   pattern?: string;
@@ -49,6 +50,29 @@ jest.mock('./../src/database/prisma.service', () => ({
     };
     product = {
       count: jest.fn().mockResolvedValue(1),
+      findFirst: jest
+        .fn()
+        .mockImplementation(({ where }: { where: { slug: string } }) =>
+          where.slug === 'cascade-hops'
+            ? Promise.resolve({
+                category: { name: 'Hops', slug: 'hops' },
+                currency: 'USD',
+                description: 'Bright whole-cone hops',
+                id: '20000000-0000-4000-8000-000000000002',
+                imagePath: '/assets/products/cascade-hops.webp',
+                name: 'Cascade Hops',
+                priceMinor: 699,
+                priceQualifier: 'per pound',
+                slug: 'cascade-hops',
+                specifications: [
+                  { label: 'Origin', value: 'USA' },
+                  { label: 'Uses', value: ['Late additions', 'Dry hopping'] },
+                ],
+                stockQuantity: 100,
+                teaser: 'Citrus and floral whole-cone hops.',
+              })
+            : Promise.resolve(null),
+        ),
       findMany: jest.fn().mockResolvedValue([
         {
           category: { name: 'Hops', slug: 'hops' },
@@ -336,6 +360,121 @@ describe('Platform API (e2e)', () => {
       'totalItems',
       'totalPages',
     ]);
+  });
+
+  it('documents and returns the exact public product-detail contract', async () => {
+    const server = app.getHttpServer() as App;
+    const documentResponse = await request(server)
+      .get('/api/docs-json')
+      .expect(200);
+    const document = JSON.parse(documentResponse.text) as {
+      components: { schemas: Record<string, OpenApiSchema> };
+      paths: Record<string, { get: Record<string, unknown> }>;
+    };
+    const operation = document.paths['/api/v1/products/{slug}'].get as {
+      parameters: Array<{
+        name: string;
+        required: boolean;
+        schema: OpenApiSchema;
+      }>;
+      responses: Record<
+        string,
+        { content?: { 'application/json': { schema: { $ref: string } } } }
+      >;
+    };
+
+    expect(operation.parameters).toHaveLength(1);
+    expect(operation.parameters[0]).toMatchObject({
+      name: 'slug',
+      required: true,
+    });
+    expect(operation.parameters[0]?.schema).toEqual({
+      maxLength: 64,
+      pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$',
+      type: 'string',
+    });
+    expect(
+      operation.responses['200'].content?.['application/json'].schema,
+    ).toEqual({ $ref: '#/components/schemas/ProductDetailDto' });
+    expect(operation.responses).toHaveProperty('404');
+    expect(
+      document.components.schemas.ProductDetailDto.required?.sort(),
+    ).toEqual([
+      'availability',
+      'category',
+      'currency',
+      'description',
+      'id',
+      'imagePath',
+      'name',
+      'priceMinor',
+      'priceQualifier',
+      'slug',
+      'specifications',
+      'teaser',
+    ]);
+    expect(
+      document.components.schemas.ProductDetailDto.properties?.specifications,
+    ).toMatchObject({
+      items: { $ref: '#/components/schemas/ProductSpecificationDto' },
+      minItems: 1,
+      type: 'array',
+    });
+    expect(
+      document.components.schemas.ProductSpecificationDto.required?.sort(),
+    ).toEqual(['label', 'value']);
+    expect(
+      document.components.schemas.ProductSpecificationDto.properties?.label,
+    ).toMatchObject({ minLength: 1, type: 'string' });
+    expect(
+      document.components.schemas.ProductSpecificationDto.properties?.value,
+    ).toMatchObject({
+      oneOf: [
+        { minLength: 1, type: 'string' },
+        {
+          items: { minLength: 1, type: 'string' },
+          minItems: 1,
+          type: 'array',
+        },
+      ],
+    });
+
+    const response = await request(server)
+      .get('/api/v1/products/cascade-hops')
+      .expect(200);
+    expect(response.body).toEqual({
+      availability: 'in-stock',
+      category: { name: 'Hops', slug: 'hops' },
+      currency: 'USD',
+      description: 'Bright whole-cone hops',
+      id: '20000000-0000-4000-8000-000000000002',
+      imagePath: '/assets/products/cascade-hops.webp',
+      name: 'Cascade Hops',
+      priceMinor: 699,
+      priceQualifier: 'per pound',
+      slug: 'cascade-hops',
+      specifications: [
+        { label: 'Origin', value: 'USA' },
+        { label: 'Uses', value: ['Late additions', 'Dry hopping'] },
+      ],
+      teaser: 'Citrus and floral whole-cone hops.',
+    });
+    expect(response.body).not.toHaveProperty('stockQuantity');
+    expect(response.body).not.toHaveProperty('isActive');
+  });
+
+  it('fails product detail closed for invalid and unknown slugs', async () => {
+    const server = app.getHttpServer() as App;
+
+    await request(server).get('/api/v1/products/Invalid_Slug').expect(400);
+    const response = await request(server)
+      .get('/api/v1/products/unknown-product')
+      .expect(404);
+    expect(response.body).toEqual({
+      error: 'Not Found',
+      message: 'Product not found',
+      statusCode: 404,
+    });
   });
 
   it('uses the production validation helper for valid normalized query input', async () => {

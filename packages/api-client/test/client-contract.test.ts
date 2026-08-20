@@ -4,6 +4,7 @@ import {
   normalizeCatalogResponse,
   type ApiClientOptions,
   type CatalogCompatibilityResult,
+  type components,
 } from '../src/index.js';
 
 const options: ApiClientOptions = { cache: 'no-store' };
@@ -32,6 +33,30 @@ const request = configuredClient.GET('/api/v1/products', {
   },
 });
 void request;
+
+const detailRequest = configuredClient.GET('/api/v1/products/{slug}', {
+  params: { path: { slug: 'citra-hops' } },
+});
+void detailRequest;
+
+const detail: components['schemas']['ProductDetailDto'] = {
+  availability: 'in-stock',
+  category: { name: 'Hops', slug: 'hops' },
+  currency: 'USD',
+  description: 'Three-paragraph detail copy',
+  id: '20000000-0000-4000-8000-000000000001',
+  imagePath: '/assets/products/citra-hops.webp',
+  name: 'Citra Hops',
+  priceMinor: 599,
+  priceQualifier: 'per 100g',
+  slug: 'citra-hops',
+  specifications: [
+    { label: 'Origin', value: 'USA' },
+    { label: 'Uses', value: ['Late additions', 'Dry hopping'] },
+  ],
+  teaser: 'Ideal for IPAs and Pale Ales',
+};
+void detail;
 
 const normalized: CatalogCompatibilityResult = normalizeCatalogResponse([]);
 void normalized;

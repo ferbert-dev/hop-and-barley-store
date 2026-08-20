@@ -733,11 +733,17 @@ test('local reference bundle stays outside Git and Docker build contexts', () =>
   }
 });
 
-test('root README reports the accepted catalog seed and remaining detail scope', () => {
+test('root README reports the accepted catalog seed and implemented detail scope', () => {
   assert.match(readme, /12 deterministic products across five categories/u);
-  assert.match(readme, /product detail pages/u);
+  assert.match(readme, /GET \/api\/v1\/products\/:slug/u);
+  assert.match(readme, /responsive detail template for all 12/u);
   assert.doesNotMatch(readme, /two seeded products/u);
   assert.doesNotMatch(readme, /product details and categories/u);
+  const plannedProductWork = readme
+    .split('Planned product work:')[1]
+    ?.split('The backend remains')[0];
+  assert.ok(plannedProductWork, 'planned product-work section must remain');
+  assert.doesNotMatch(plannedProductWork, /product detail/u);
 });
 
 test('ticket template captures every traceability field and tiered evidence', () => {

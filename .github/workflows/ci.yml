@@ -6,12 +6,6 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      update_visual_baselines:
-        description: Generate Ubuntu visual baselines as a downloadable artifact
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -26,7 +20,6 @@ env:
 jobs:
   quality:
     name: Quality and build
-    if: github.event_name != 'workflow_dispatch' || !inputs.update_visual_baselines
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -60,7 +53,6 @@ jobs:
 
   postgresql:
     name: PostgreSQL migration contract
-    if: github.event_name != 'workflow_dispatch' || !inputs.update_visual_baselines
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -108,17 +100,7 @@ jobs:
         run: pnpm --filter @hop-and-barley/e2e exec playwright install --with-deps chromium
       - name: Start the isolated full stack
         run: docker compose up -d --build --wait
-      - name: Generate connected Ubuntu visual baselines
-        if: github.event_name == 'workflow_dispatch' && inputs.update_visual_baselines
-        env:
-          PLAYWRIGHT_HTML_OUTPUT_DIR: apps/e2e/playwright-report/connected
-          PLAYWRIGHT_OUTPUT_DIR: apps/e2e/test-results/connected
-        run: pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots=all --grep 'matches approved shell visual baselines|matches mobile open-menu and visible-focus baselines|matches connected catalog state baselines'
       - name: Test the connected storefront
-        if: github.event_name != 'workflow_dispatch' || !inputs.update_visual_baselines
-        env:
-          PLAYWRIGHT_HTML_OUTPUT_DIR: apps/e2e/playwright-report/connected
-          PLAYWRIGHT_OUTPUT_DIR: apps/e2e/test-results/connected
         run: pnpm --filter @hop-and-barley/e2e test:e2e
       - name: Remove only the isolated API service
         run: |
@@ -145,37 +127,13 @@ jobs:
           done
           docker compose ps -a
           exit 1
-      - name: Generate API-unavailable Ubuntu visual baselines
-        if: github.event_name == 'workflow_dispatch' && inputs.update_visual_baselines
-        env:
-          E2E_EXPECT_API_STATUS: API unavailable
-          PLAYWRIGHT_HTML_OUTPUT_DIR: apps/e2e/playwright-report/unavailable
-          PLAYWRIGHT_OUTPUT_DIR: apps/e2e/test-results/unavailable
-        run: E2E_EXPECT_API_STATUS='API unavailable' pnpm --filter @hop-and-barley/e2e test:e2e --update-snapshots=all --grep 'renders the configured API availability state|matches unavailable and loading catalog state baselines'
       - name: Test the safe API-unavailable storefront
-        if: github.event_name != 'workflow_dispatch' || !inputs.update_visual_baselines
-        env:
-          E2E_EXPECT_API_STATUS: API unavailable
-          PLAYWRIGHT_HTML_OUTPUT_DIR: apps/e2e/playwright-report/unavailable
-          PLAYWRIGHT_OUTPUT_DIR: apps/e2e/test-results/unavailable
         run: E2E_EXPECT_API_STATUS='API unavailable' pnpm --filter @hop-and-barley/e2e test:e2e
       - name: Capture Compose diagnostics
-        if: always()
+        if: failure()
         run: |
-          mkdir -p apps/e2e/test-results
-          docker compose ps -a > apps/e2e/test-results/compose-ps.txt
-          docker compose logs --no-color > apps/e2e/test-results/compose.log
-      - name: Upload browser evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: browser-evidence-${{ github.run_attempt }}
-          if-no-files-found: error
-          retention-days: 14
-          path: |
-            apps/e2e/playwright-report
-            apps/e2e/test-results
-            apps/e2e/tests/__screenshots__/linux
+          docker compose ps -a
+          docker compose logs --no-color
       - name: Stop the delayed unavailable API stub
         if: always()
         run: docker rm --force "${COMPOSE_PROJECT_NAME}-delayed-api" 2>/dev/null || true

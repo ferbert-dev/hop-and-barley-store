@@ -8,6 +8,7 @@
 **/node_modules
 **/playwright-report
 **/test-results
+**/__screenshots__
 graphify-out
 **/*.tsbuildinfo
 **/.env

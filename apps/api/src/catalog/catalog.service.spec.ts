@@ -21,6 +21,11 @@ const productSelect = {
   teaser: true,
 };
 
+const productDetailSelect = {
+  ...productSelect,
+  specifications: true,
+};
+
 const facetQuery = {
   orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }, { slug: 'asc' }],
   select: { name: true, slug: true },
@@ -35,6 +40,7 @@ describe('CatalogService', () => {
   const findProducts = jest.fn();
   const rootCategoryFindMany = jest.fn();
   const rootProductCount = jest.fn();
+  const rootProductFindFirst = jest.fn();
   const rootProductFindMany = jest.fn();
   const transaction = jest.fn();
   const transactionClient = {
@@ -54,6 +60,7 @@ describe('CatalogService', () => {
             category: { findMany: rootCategoryFindMany },
             product: {
               count: rootProductCount,
+              findFirst: rootProductFindFirst,
               findMany: rootProductFindMany,
             },
           },
@@ -84,7 +91,87 @@ describe('CatalogService', () => {
         teaser: 'Citrus and floral whole-cone hops.',
       },
     ]);
+    rootProductFindFirst.mockResolvedValue({
+      category: { name: 'Hops', slug: 'hops' },
+      currency: 'USD',
+      description: 'Bright whole-cone hops',
+      id: 'product-id',
+      imagePath: '/assets/products/cascade-hops.webp',
+      name: 'Cascade Hops',
+      priceMinor: 699,
+      priceQualifier: 'per pound',
+      slug: 'cascade-hops',
+      specifications: [
+        { label: 'Origin', value: 'USA' },
+        { label: 'Uses', value: ['Late additions', 'Dry hopping'] },
+      ],
+      stockQuantity: 0,
+      teaser: 'Citrus and floral whole-cone hops.',
+    });
   });
+
+  it('returns one active USD detail with ordered specifications and derived availability', async () => {
+    await expect(service.getProduct('cascade-hops')).resolves.toEqual({
+      availability: 'out-of-stock',
+      category: { name: 'Hops', slug: 'hops' },
+      currency: 'USD',
+      description: 'Bright whole-cone hops',
+      id: 'product-id',
+      imagePath: '/assets/products/cascade-hops.webp',
+      name: 'Cascade Hops',
+      priceMinor: 699,
+      priceQualifier: 'per pound',
+      slug: 'cascade-hops',
+      specifications: [
+        { label: 'Origin', value: 'USA' },
+        { label: 'Uses', value: ['Late additions', 'Dry hopping'] },
+      ],
+      teaser: 'Citrus and floral whole-cone hops.',
+    });
+    expect(rootProductFindFirst).toHaveBeenCalledWith({
+      select: productDetailSelect,
+      where: { currency: 'USD', isActive: true, slug: 'cascade-hops' },
+    });
+  });
+
+  it('returns the same generic not-found result for every non-public product', async () => {
+    rootProductFindFirst.mockResolvedValue(null);
+
+    await expect(service.getProduct('hidden-product')).rejects.toMatchObject({
+      message: 'Product not found',
+      status: 404,
+    });
+  });
+
+  it.each([
+    {},
+    [],
+    [{ label: '', value: 'USA' }],
+    [{ label: 'Origin', value: [] }],
+    [{ label: 'Origin', value: [1] }],
+  ])(
+    'fails closed when stored specifications are malformed: %j',
+    async (specifications) => {
+      rootProductFindFirst.mockResolvedValue({
+        category: { name: 'Hops', slug: 'hops' },
+        currency: 'USD',
+        description: 'Bright whole-cone hops',
+        id: 'product-id',
+        imagePath: '/assets/products/cascade-hops.webp',
+        name: 'Cascade Hops',
+        priceMinor: 699,
+        priceQualifier: 'per pound',
+        slug: 'cascade-hops',
+        specifications,
+        stockQuantity: 1,
+        teaser: 'Citrus and floral whole-cone hops.',
+      });
+
+      await expect(service.getProduct('cascade-hops')).rejects.toThrow(
+        'Stored product specifications are invalid',
+      );
+    },
+  );
 
   it('uses one default where and a RepeatableRead transaction for count, items and independent facets', async () => {
     const result = await service.listProducts({
