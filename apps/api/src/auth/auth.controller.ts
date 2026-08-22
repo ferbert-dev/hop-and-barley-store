@@ -9,6 +9,7 @@ import {
 import {
   ApiAcceptedResponse,
   ApiBadRequestResponse,
+  ApiBody,
   ApiForbiddenResponse,
   ApiServiceUnavailableResponse,
   ApiTags,
@@ -31,6 +32,7 @@ export class AuthController {
   @Post('register')
   @HttpCode(202)
   @UseGuards(RegistrationRequestGuard)
+  @ApiBody({ required: true, type: RegisterDto })
   @ApiAcceptedResponse({ type: RegistrationAcceptedDto })
   @ApiBadRequestResponse({ description: 'Invalid registration input' })
   @ApiForbiddenResponse({ description: 'Origin is not allowed' })

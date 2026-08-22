@@ -180,6 +180,15 @@ export interface components {
             category: components["schemas"]["ProductCategoryDto"];
             specifications: components["schemas"]["ProductSpecificationDto"][];
         };
+        RegisterDto: {
+            /**
+             * @description Email with an ASCII dot-atom local part and an IDNA-compatible domain.
+             * @example brewer@example.com
+             */
+            email: string;
+            /** @description NFC password, 15–128 Unicode code points, at most 512 UTF-8 bytes. */
+            password: string;
+        };
         RegistrationAcceptedDto: {
             /**
              * @example accepted
@@ -410,7 +419,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterDto"];
+            };
+        };
         responses: {
             202: {
                 headers: {

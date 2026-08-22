@@ -229,7 +229,25 @@ describe('Platform API (e2e)', () => {
       paths: Record<string, { post?: unknown }>;
     };
 
-    expect(document.paths['/api/v1/auth/register'].post).toBeDefined();
+    const registrationOperation = document.paths['/api/v1/auth/register']
+      .post as {
+      requestBody?: {
+        content?: {
+          'application/json'?: { schema?: { $ref?: string } };
+        };
+        required?: boolean;
+      };
+    };
+
+    expect(registrationOperation).toBeDefined();
+    expect(registrationOperation.requestBody).toMatchObject({
+      content: {
+        'application/json': {
+          schema: { $ref: '#/components/schemas/RegisterDto' },
+        },
+      },
+      required: true,
+    });
     expect(document.components.schemas.RegisterDto.required?.sort()).toEqual([
       'email',
       'password',

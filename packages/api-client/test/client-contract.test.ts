@@ -39,6 +39,14 @@ const detailRequest = configuredClient.GET('/api/v1/products/{slug}', {
 });
 void detailRequest;
 
+const registrationRequest = configuredClient.POST('/api/v1/auth/register', {
+  body: {
+    email: 'brewer@example.com',
+    password: 'correct horse battery staple',
+  },
+});
+void registrationRequest;
+
 const detail: components['schemas']['ProductDetailDto'] = {
   availability: 'in-stock',
   category: { name: 'Hops', slug: 'hops' },
