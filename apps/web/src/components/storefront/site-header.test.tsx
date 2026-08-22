@@ -3,7 +3,18 @@ import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { SiteHeader } from './site-header';
+import { SiteHeaderClient } from './site-header';
+
+const logoutAction = vi.fn();
+
+function SiteHeader() {
+  return (
+    <SiteHeaderClient
+      logoutAction={logoutAction}
+      sessionState={{ kind: 'anonymous' }}
+    />
+  );
+}
 
 let pathname = '/';
 let mediaQueryListeners = new Set<(event: MediaQueryListEvent) => void>();
@@ -149,5 +160,56 @@ describe('SiteHeader', () => {
       'aria-expanded',
       'false',
     );
+  });
+
+  it('shows only anonymous account actions without assuming a session', () => {
+    render(<SiteHeader />);
+
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/login',
+    );
+    expect(screen.getByRole('link', { name: 'Register' })).toHaveAttribute(
+      'href',
+      '/register',
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Account' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows account and logout only for a Nest-verified session', () => {
+    render(
+      <SiteHeaderClient
+        logoutAction={logoutAction}
+        sessionState={{ kind: 'authenticated' }}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute(
+      'href',
+      '/account',
+    );
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeEnabled();
+    expect(
+      screen.queryByRole('link', { name: 'Sign in' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('exposes authentication unavailability instead of rendering anonymous actions', () => {
+    render(
+      <SiteHeaderClient
+        logoutAction={logoutAction}
+        sessionState={{ kind: 'unavailable' }}
+      />,
+    );
+
+    expect(screen.getByText('Account unavailable')).toHaveAttribute(
+      'aria-live',
+      'polite',
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Sign in' }),
+    ).not.toBeInTheDocument();
   });
 });

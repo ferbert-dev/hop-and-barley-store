@@ -104,6 +104,12 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Install the pinned Chromium runtime
         run: pnpm --filter @hop-and-barley/e2e exec playwright install --with-deps chromium
+      - name: Configure disposable authentication settings
+        run: >-
+          node -e 'const { randomBytes } = require("node:crypto");
+          const { appendFileSync } = require("node:fs");
+          appendFileSync(process.env.GITHUB_ENV,
+          `AUTH_CSRF_KEYRING=ci-v1:${randomBytes(32).toString("hex")}\nAUTH_SESSIONS_ENABLED=true\n`);'
       - name: Start the isolated full stack
         run: docker compose up -d --build --wait
       - name: Test the connected storefront

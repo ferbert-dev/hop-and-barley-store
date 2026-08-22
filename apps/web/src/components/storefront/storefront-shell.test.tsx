@@ -4,6 +4,22 @@ import { expect, it, vi } from 'vitest';
 
 import { StorefrontShell } from './storefront-shell';
 
+vi.mock('server-only', () => ({}));
+vi.mock('../../features/auth/read-current-session', () => ({
+  readCurrentSession: vi.fn(async () => ({ kind: 'anonymous' })),
+}));
+vi.mock('./site-header-server', () => ({
+  SiteHeaderServer: () => (
+    <header aria-label="Hop and Barley storefront">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        alt="Hop and Barley logo"
+        src="/assets/brand/hop-and-barley-mark.svg"
+      />
+      <nav aria-label="Storefront">Products</nav>
+    </header>
+  ),
+}));
 vi.mock('next/navigation', () => ({
   usePathname: () => '/',
 }));

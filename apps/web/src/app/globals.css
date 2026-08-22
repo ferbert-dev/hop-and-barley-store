@@ -205,6 +205,30 @@ main {
   width: 28px;
 }
 
+.storefront-nav__session {
+  align-items: center;
+  color: var(--hb-color-text-muted);
+  display: flex;
+  min-block-size: 44px;
+  padding: var(--hb-space-3) var(--hb-space-4);
+}
+
+.storefront-nav__logout {
+  align-items: center;
+  display: flex;
+  gap: var(--hb-space-2);
+}
+
+.storefront-nav__logout button {
+  min-block-size: 44px;
+  width: 100%;
+}
+
+.storefront-nav__logout [role='alert'] {
+  color: var(--hb-color-danger);
+  font-size: var(--hb-font-size-xs);
+}
+
 .site-footer {
   background: var(--hb-color-ink);
   color: var(--hb-color-text-inverse);
@@ -464,6 +488,10 @@ h1 {
 
   .storefront-nav a {
     justify-content: center;
+  }
+
+  .storefront-nav__logout button {
+    width: auto;
   }
 }
 

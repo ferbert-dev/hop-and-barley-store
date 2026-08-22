@@ -3,9 +3,12 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 
 import { assets } from '../../design-system/assets';
+import type { AuthFormAction } from '../../features/auth/auth-form';
+import { INITIAL_AUTH_FORM_STATE } from '../../features/auth/auth-state';
+import { Button } from '../ui/button';
 
 const WIDE_VIEWPORT_QUERY = '(min-width: 64rem)';
 
@@ -13,17 +16,32 @@ function isProductsPath(pathname: string) {
   return pathname === '/' || pathname.startsWith('/product/');
 }
 
-export function SiteHeader() {
+export type HeaderSessionState =
+  | Readonly<{ kind: 'anonymous' | 'loading' | 'unavailable' }>
+  | Readonly<{ kind: 'authenticated' }>;
+
+type SiteHeaderClientProps = Readonly<{
+  logoutAction: AuthFormAction;
+  sessionState: HeaderSessionState;
+}>;
+
+export function SiteHeaderClient(props: SiteHeaderClientProps) {
   const pathname = usePathname();
 
-  return <SiteHeaderDisclosure key={pathname} pathname={pathname} />;
+  return <SiteHeaderDisclosure key={pathname} pathname={pathname} {...props} />;
 }
 
 type SiteHeaderDisclosureProps = Readonly<{
+  logoutAction: AuthFormAction;
   pathname: string;
+  sessionState: HeaderSessionState;
 }>;
 
-function SiteHeaderDisclosure({ pathname }: SiteHeaderDisclosureProps) {
+function SiteHeaderDisclosure({
+  logoutAction,
+  pathname,
+  sessionState,
+}: SiteHeaderDisclosureProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -125,9 +143,69 @@ function SiteHeaderDisclosure({ pathname }: SiteHeaderDisclosureProps) {
                 <span>Shopping cart</span>
               </Link>
             </li>
+            {sessionState.kind === 'authenticated' ? (
+              <>
+                <li>
+                  <Link
+                    href="/account"
+                    aria-current={pathname === '/account' ? 'page' : undefined}
+                    onClick={closeMenu}
+                  >
+                    Account
+                  </Link>
+                </li>
+                <li>
+                  <LogoutForm action={logoutAction} />
+                </li>
+              </>
+            ) : sessionState.kind === 'anonymous' ? (
+              <>
+                <li>
+                  <Link href="/login" onClick={closeMenu}>
+                    Sign in
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/register" onClick={closeMenu}>
+                    Register
+                  </Link>
+                </li>
+              </>
+            ) : (
+              <li>
+                <span aria-live="polite" className="storefront-nav__session">
+                  {sessionState.kind === 'loading'
+                    ? 'Checking account…'
+                    : 'Account unavailable'}
+                </span>
+              </li>
+            )}
           </ul>
         </nav>
       </div>
     </header>
+  );
+}
+
+function LogoutForm({ action }: Readonly<{ action: AuthFormAction }>) {
+  const [state, formAction, pending] = useActionState(
+    action,
+    INITIAL_AUTH_FORM_STATE,
+  );
+
+  return (
+    <form action={formAction} className="storefront-nav__logout">
+      <Button
+        pending={pending}
+        pendingLabel="Signing out…"
+        type="submit"
+        variant="secondary"
+      >
+        Sign out
+      </Button>
+      {state.status === 'unavailable' ? (
+        <span role="alert">Sign out is temporarily unavailable.</span>
+      ) : null}
+    </form>
   );
 }
