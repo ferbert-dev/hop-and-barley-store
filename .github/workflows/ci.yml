@@ -77,6 +77,8 @@ jobs:
         run: pnpm test:a1:postgres
       - name: Verify session migration, constraints, and concurrency
         run: pnpm test:a1b:postgres
+      - name: Verify guest cart migration, constraints, and concurrency
+        run: pnpm test:o0:postgres
       - name: Verify the A1B Argon2 resource profile
         run: pnpm test:a1b:argon2:alpine
 

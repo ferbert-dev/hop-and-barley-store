@@ -500,6 +500,13 @@ describe('Platform API (e2e)', () => {
     };
 
     expect(document.components.securitySchemes).toEqual({
+      cartCookie: {
+        description:
+          'Host-only local-http opaque guest-cart capability cookie. The raw capability and its digest never appear in response bodies.',
+        in: 'cookie',
+        name: 'hb_cart',
+        type: 'apiKey',
+      },
       sessionCookie: {
         description: 'Host-only local-http session cookie.',
         in: 'cookie',

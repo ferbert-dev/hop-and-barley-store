@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { CartModule } from './cart/cart.module';
 import { validateEnvironment } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
@@ -16,6 +17,7 @@ import { HealthModule } from './health/health.module';
     DatabaseModule,
     HealthModule,
     CatalogModule,
+    CartModule,
     AuthModule,
   ],
   controllers: [AppController],

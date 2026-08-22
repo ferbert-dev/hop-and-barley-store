@@ -70,6 +70,78 @@ void currentSessionRequest;
 void csrfRequest;
 void logoutRequest;
 
+const cartRequest = configuredClient.GET('/api/v1/cart');
+const cartCsrfRequest = configuredClient.GET('/api/v1/cart/csrf');
+const firstCartAdd = configuredClient.POST('/api/v1/cart/items', {
+  body: { productSlug: 'cascade-hops', quantity: 2 },
+  params: { header: { Origin: 'http://localhost:3000' } },
+});
+const existingCartAdd = configuredClient.POST('/api/v1/cart/items', {
+  body: { productSlug: 'cascade-hops', quantity: 1 },
+  params: {
+    header: {
+      Origin: 'http://localhost:3000',
+      'X-CSRF-Token': `cart-v1.${'A'.repeat(43)}`,
+    },
+  },
+});
+const cartPatch = configuredClient.PATCH('/api/v1/cart/items/{productSlug}', {
+  body: { quantity: 3 },
+  params: {
+    header: {
+      Origin: 'http://localhost:3000',
+      'X-CSRF-Token': `cart-v1.${'A'.repeat(43)}`,
+    },
+    path: { productSlug: 'cascade-hops' },
+  },
+});
+const cartDelete = configuredClient.DELETE('/api/v1/cart/items/{productSlug}', {
+  params: {
+    header: {
+      Origin: 'http://localhost:3000',
+      'X-CSRF-Token': `cart-v1.${'A'.repeat(43)}`,
+    },
+    path: { productSlug: 'cascade-hops' },
+  },
+});
+const cartClear = configuredClient.DELETE('/api/v1/cart/items', {
+  params: {
+    header: {
+      Origin: 'http://localhost:3000',
+      'X-CSRF-Token': `cart-v1.${'A'.repeat(43)}`,
+    },
+  },
+});
+void cartRequest;
+void cartCsrfRequest;
+void firstCartAdd;
+void existingCartAdd;
+void cartPatch;
+void cartDelete;
+void cartClear;
+
+const safeCart: components['schemas']['CartDto'] = {
+  checkoutEligible: true,
+  currency: 'USD',
+  distinctItemCount: 1,
+  items: [
+    {
+      availability: 'available',
+      currentUnitPriceMinor: 699,
+      imagePath: '/assets/products/cascade-hops.webp',
+      lineTotalMinor: 1398,
+      name: 'Cascade Hops',
+      priceQualifier: 'per pound',
+      productId: '20000000-0000-4000-8000-000000000002',
+      productSlug: 'cascade-hops',
+      quantity: 2,
+    },
+  ],
+  subtotalMinor: 1398,
+  totalQuantity: 2,
+};
+void safeCart;
+
 const safeSession: components['schemas']['AuthSessionDto'] = {
   absoluteExpiresAt: '2026-08-29T10:00:00.000Z',
   idleExpiresAt: '2026-08-23T10:00:00.000Z',

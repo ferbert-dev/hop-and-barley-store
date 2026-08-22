@@ -10,6 +10,13 @@ const schema = Joi.object({
     .optional(),
   AUTH_ORIGIN: Joi.string().custom(validateExactOrigin).required(),
   AUTH_SESSIONS_ENABLED: Joi.boolean().default(false),
+  CART_COOKIE_MODE: Joi.string().valid('local-http', 'secure-https').required(),
+  CART_CSRF_KEYRING: Joi.string()
+    .pattern(
+      /^[A-Za-z0-9_-]{1,16}:[a-f0-9]{64}(?:,[A-Za-z0-9_-]{1,16}:[a-f0-9]{64}){0,2}$/,
+    )
+    .required(),
+  CART_ORIGIN: Joi.string().custom(validateExactOrigin).required(),
   CORS_ORIGINS: Joi.string().default('http://localhost:3000'),
   DATABASE_URL: Joi.string()
     .uri({ scheme: ['postgresql', 'postgres'] })
@@ -49,6 +56,19 @@ export function validateEnvironment(config: Record<string, unknown>) {
     );
   }
 
+  const cartOrigin = new URL(value.CART_ORIGIN as string);
+  const cartCookieMode = value.CART_COOKIE_MODE;
+  if (
+    (cartCookieMode === 'secure-https' && cartOrigin.protocol !== 'https:') ||
+    (cartCookieMode === 'local-http' &&
+      (cartOrigin.protocol !== 'http:' ||
+        !['localhost', '127.0.0.1', '::1'].includes(cartOrigin.hostname)))
+  ) {
+    throw new Error(
+      'Environment validation failed: CART_ORIGIN is incompatible with CART_COOKIE_MODE',
+    );
+  }
+
   if (value.AUTH_SESSIONS_ENABLED && !value.AUTH_CSRF_KEYRING) {
     throw new Error(
       'Environment validation failed: AUTH_CSRF_KEYRING is required when AUTH_SESSIONS_ENABLED=true',
@@ -64,6 +84,24 @@ export function validateEnvironment(config: Record<string, unknown>) {
         'Environment validation failed: AUTH_CSRF_KEYRING versions must be unique',
       );
     }
+  }
+
+  const cartVersions = (value.CART_CSRF_KEYRING as string)
+    .split(',')
+    .map((entry) => entry.split(':', 1)[0]);
+  if (new Set(cartVersions).size !== cartVersions.length) {
+    throw new Error(
+      'Environment validation failed: CART_CSRF_KEYRING versions must be unique',
+    );
+  }
+
+  const corsOrigins = (value.CORS_ORIGINS as string)
+    .split(',')
+    .map((entry) => entry.trim());
+  if (!corsOrigins.includes(value.CART_ORIGIN as string)) {
+    throw new Error(
+      'Environment validation failed: CORS_ORIGINS must include CART_ORIGIN',
+    );
   }
 
   return value;

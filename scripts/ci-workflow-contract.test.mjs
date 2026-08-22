@@ -48,6 +48,7 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
     'pnpm test:catalog:postgres',
     'pnpm test:a1:postgres',
     'pnpm test:a1b:postgres',
+    'pnpm test:o0:postgres',
     'pnpm test:a1b:argon2:alpine',
     'docker compose up -d --build --wait',
     'docker compose rm --force api',
