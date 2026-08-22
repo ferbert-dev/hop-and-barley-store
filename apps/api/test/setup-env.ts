@@ -1,5 +1,9 @@
 process.env.DATABASE_URL ??=
   'postgresql://hopbarley:hopbarley@localhost:5432/hopbarley?schema=public';
+process.env.AUTH_COOKIE_MODE ??= 'local-http';
+process.env.AUTH_CSRF_KEYRING ??= `test-v1:${'11'.repeat(32)}`;
+process.env.AUTH_ORIGIN ??= 'http://localhost:3000';
+process.env.AUTH_SESSIONS_ENABLED ??= 'true';
 process.env.NODE_ENV = 'test';
 process.env.REGISTRATION_ENABLED ??= 'true';
 process.env.REGISTRATION_ORIGIN ??= 'http://localhost:3000';

@@ -6,4 +6,4 @@ export const REGISTRATION_UNAVAILABLE = Object.freeze({
 });
 
 export const REGISTRATION_CACHE_CONTROL = 'private, no-store';
-export const REGISTRATION_VARY = 'Origin';
+export const REGISTRATION_VARY = 'Cookie, Origin';

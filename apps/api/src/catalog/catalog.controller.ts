@@ -12,9 +12,11 @@ import { CATALOG_SORT_VALUES, CatalogQueryDto } from './dto/catalog-query.dto';
 import { CatalogResponseDto } from './dto/catalog-response.dto';
 import { ProductDetailDto } from './dto/product-detail.dto';
 import { ProductSlugDto } from './dto/product-slug.dto';
+import { Public } from '../auth/public.decorator';
 
 @ApiTags('catalog')
 @Controller('products')
+@Public()
 export class CatalogController {
   constructor(private readonly catalog: CatalogService) {}
 
