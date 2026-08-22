@@ -35,7 +35,7 @@ If a read-back fails after an external checkpoint, stop immediately and record t
 - Create an Agent Run before delegation and finalize every run, including blocked and cancelled ones.
 - Require one independent closure review for mutating tickets. Do not mark a ticket Done without verified evidence.
 - The root orchestrator owns one vertical scope, integration, PR and final status; do not start another scope until the current PR is merged or explicitly blocked.
-- Delegate to at most two disjoint workers and never maintain an idle agent pool. Stop or reuse completed workers immediately after handoff.
+- Follow the worker concurrency limit in the target repository's root `AGENTS.md`; never maintain an idle agent pool. Stop or reuse completed workers immediately after handoff.
 - Route Sol to architecture, security-sensitive work and exact-head review; Terra to routine feature implementation/integration; Luna to bounded mechanical, repetitive test/data and documentation work.
 - Set model and reasoning effort explicitly and record a cost/correctness rationale. Unclear boundaries, security, data integrity, correctness or worker uncertainty always escalate upward to Sol.
 - Start one independent reviewer only after required CI is green. A new head invalidates the verdict.

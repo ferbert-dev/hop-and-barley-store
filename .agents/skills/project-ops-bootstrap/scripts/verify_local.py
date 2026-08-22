@@ -2,6 +2,7 @@
 """Verify installed project-operations files against portable source bytes."""
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -11,7 +12,7 @@ REQUIRED_AGENT_MARKERS = (
     'gpt-5.6-sol',
     'gpt-5.6-terra',
     'gpt-5.6-luna',
-    'at most two disjoint workers',
+    'sole source of truth for the worker concurrency limit',
     'does not keep an idle agent pool',
     'Start one Sol reviewer',
 )
@@ -20,6 +21,15 @@ REQUIRED_WORKFLOW_MARKERS = (
     'explicit model, reasoning effort',
     'escalates upward to Sol',
     'A new PR head invalidates the prior review verdict',
+)
+WORKER_LIMIT_PATTERN = re.compile(
+    r'\bone root orchestrator plus at most [a-z0-9-]+ spawned workers concurrently\b',
+    re.IGNORECASE,
+)
+NUMERIC_WORKER_LIMIT_PATTERN = re.compile(
+    r'\b(?:at most|up to|maximum(?: of)?|max(?:imum)?(?: of)?)\s+'
+    r'(?:\d+|one|two|three|four|five)\s+(?:disjoint\s+|spawned\s+)?workers?\b',
+    re.IGNORECASE,
 )
 
 
@@ -51,6 +61,10 @@ def main() -> None:
     ]
     if missing_policy:
         raise SystemExit('Missing orchestration policy: ' + ', '.join(missing_policy))
+    if len(WORKER_LIMIT_PATTERN.findall(agents)) != 1:
+        raise SystemExit('AGENTS.md must contain exactly one numeric spawned-worker limit')
+    if NUMERIC_WORKER_LIMIT_PATTERN.search(workflow):
+        raise SystemExit('Engineering workflow must defer its worker limit to AGENTS.md')
     if len(agents.splitlines()) > 80:
         raise SystemExit('AGENTS.md exceeds the 80-line portability limit')
     print('Local project-operations templates are installed.')

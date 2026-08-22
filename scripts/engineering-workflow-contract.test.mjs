@@ -54,6 +54,19 @@ const projectOpsInstalledPaths = [
   'docs/engineering-workflow.md',
   'tickets/ticket-template.md',
 ];
+const portableAgentsPath =
+  '.agents/skills/project-ops-bootstrap/assets/repository/AGENTS.md';
+const workerPolicyWithoutNumericLimitPaths = [
+  'docs/engineering-workflow.md',
+  '.agents/skills/project-ops-bootstrap/SKILL.md',
+  '.agents/skills/project-ops-bootstrap/assets/repository/docs/engineering-workflow.md',
+  '.agents/skills/project-ops-bootstrap/assets/notion/agent-roles.md',
+  '.agents/skills/project-ops-bootstrap/scripts/verify_local.py',
+];
+const workerLimitPattern =
+  /\bone root orchestrator plus at most ([a-z0-9-]+) spawned workers concurrently\b/iu;
+const numericWorkerLimitPattern =
+  /\b(?:at most|up to|maximum(?: of)?|max(?:imum)?(?: of)?)\s+(?:\d+|one|two|three|four|five)\s+(?:disjoint\s+|spawned\s+)?workers?\b/iu;
 
 const workflow = readFileSync(workflowPath, 'utf8');
 const contract = JSON.parse(readFileSync(contractPath, 'utf8'));
@@ -800,8 +813,12 @@ test('ticket template captures traceability and the concise verification summary
   }
 });
 
-test('root agent instructions own the worker limit and link the workflow', () => {
+test('root agent instructions are the only numeric worker-limit sources', () => {
   const rootAgents = readFileSync(join(repositoryRoot, 'AGENTS.md'), 'utf8');
+  const portableAgents = readFileSync(
+    join(repositoryRoot, portableAgentsPath),
+    'utf8',
+  );
   for (const literal of [
     '[`docs/engineering-workflow.md`](docs/engineering-workflow.md)',
     'sole source of truth for the worker concurrency limit',
@@ -814,15 +831,31 @@ test('root agent instructions own the worker limit and link the workflow', () =>
     assert.ok(rootAgents.includes(literal), literal);
   }
 
-  const workerLimitLines =
-    rootAgents.match(/^.*at most .*spawned workers concurrently.*$/gimu) ?? [];
-  assert.equal(workerLimitLines.length, 1);
+  const rootWorkerLimit = rootAgents.match(workerLimitPattern);
+  const portableWorkerLimit = portableAgents.match(workerLimitPattern);
+  assert.ok(rootWorkerLimit, 'root AGENTS.md must own one worker limit');
+  assert.ok(
+    portableWorkerLimit,
+    'portable AGENTS.md must own one worker limit',
+  );
+  assert.equal(rootWorkerLimit[1], portableWorkerLimit[1]);
+  assert.match(
+    portableAgents,
+    /sole source of truth for the worker concurrency limit/iu,
+  );
 
   assert.match(
     workflow,
     /AGENTS\.md.*sole source of truth for the worker\s+concurrency limit/su,
   );
-  assert.doesNotMatch(workflow, /at most \w+ disjoint workers/iu);
+  for (const relativePath of workerPolicyWithoutNumericLimitPaths) {
+    const contents = readFileSync(join(repositoryRoot, relativePath), 'utf8');
+    assert.doesNotMatch(
+      contents,
+      numericWorkerLimitPattern,
+      `${relativePath} must defer the numeric worker limit to root AGENTS.md`,
+    );
+  }
   assert.equal('maxDisjointWorkers' in contract.orchestration, false);
 
   for (const relativePath of agentInstructionPaths) {

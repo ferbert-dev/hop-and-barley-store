@@ -8,7 +8,9 @@ Trace completed engineering as: Notion Epic/Ticket/Agent Runs → Git branch/PR/
 
 ## Multi-model orchestration
 
-The root orchestrator owns one vertical scope and its integration, PR, and final status. Use at most two disjoint workers and no idle pool. Stop or reuse workers immediately after handoff; do not start a second scope before merge or an explicit Blocked state.
+The root [`AGENTS.md`](../AGENTS.md) is the sole source of truth for the worker concurrency limit. Read it before delegation; this document intentionally does not duplicate a numeric worker limit.
+
+The root orchestrator owns one vertical scope and its integration, PR, and final status. Do not maintain an idle pool. Stop or reuse workers immediately after handoff; do not start a second scope before merge or an explicit Blocked state.
 
 - Sol: architecture, security-sensitive/risky cross-cutting work, and the single exact-head reviewer after green CI.
 - Terra: routine feature implementation, medium-complexity fixes, and integration.
