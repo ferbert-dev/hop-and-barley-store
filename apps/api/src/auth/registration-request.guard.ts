@@ -18,6 +18,7 @@ import {
   REGISTRATION_VARY,
 } from './auth.constants';
 import { RegistrationRateLimiter } from './registration-rate-limiter';
+import { clientRateIdentity } from './client-rate-identity';
 
 const SAFE_REQUEST_ID = /^[A-Za-z0-9._-]{8,64}$/;
 
@@ -63,7 +64,7 @@ export class RegistrationRequestGuard implements CanActivate {
       throw new UnsupportedMediaTypeException({ status: 'invalid' });
     }
 
-    const clientAddress = request.socket.remoteAddress ?? 'unknown';
+    const clientAddress = clientRateIdentity(request);
     if (!this.rateLimiter.consume(clientAddress)) {
       this.reject('rate_limit', requestId);
       throw new HttpException(

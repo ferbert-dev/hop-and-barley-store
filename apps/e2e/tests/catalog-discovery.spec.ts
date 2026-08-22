@@ -82,6 +82,10 @@ test('supports keyboard-only catalog filtering with Tab, Shift+Tab, and Enter', 
   ).toBeFocused();
 
   await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Sign in' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Register' })).toBeFocused();
+  await page.keyboard.press('Tab');
   await expect(search).toBeFocused();
   await assertProjectFocusVisible(search, 'ready');
   await page.keyboard.type('Citra');
@@ -198,7 +202,7 @@ test('supports keyboard-only empty recovery with visible focus', async ({
   ).toBeVisible();
   await expect(clear).toBeVisible();
 
-  await pressTab(page, 12);
+  await pressTab(page, 14);
   await expect(clear).toBeFocused();
   await assertProjectFocusVisible(clear, 'empty recovery');
 
@@ -337,16 +341,22 @@ test('supports keyboard-only error retry with visible focus', async ({
   ).toBeVisible();
   await expect(retry).toBeVisible();
 
-  await pressTab(page, 5);
+  await pressTab(page, 7);
   await expect(retry).toBeFocused();
   await assertProjectFocusVisible(retry, 'error retry');
 
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.getByRole('link', { name: 'Register' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.getByRole('link', { name: 'Sign in' })).toBeFocused();
   await page.keyboard.press('Shift+Tab');
   await expect(
     page
       .getByRole('navigation', { name: 'Storefront' })
       .getByRole('link', { name: 'Shopping cart' }),
   ).toBeFocused();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
   await page.keyboard.press('Tab');
   await expect(retry).toBeFocused();
 

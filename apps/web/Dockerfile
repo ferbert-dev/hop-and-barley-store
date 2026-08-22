@@ -15,6 +15,8 @@ COPY packages/typescript-config/package.json packages/typescript-config/package.
 RUN pnpm install --frozen-lockfile
 
 COPY . .
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN pnpm --filter @hop-and-barley/api-client build && pnpm --filter @hop-and-barley/web build
 
 EXPOSE 3000

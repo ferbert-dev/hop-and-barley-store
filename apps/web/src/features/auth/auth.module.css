@@ -1,0 +1,124 @@
+.screen {
+  background:
+    linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--hb-color-ink) 90%, transparent),
+      color-mix(in srgb, var(--hb-color-brand) 76%, transparent)
+    ),
+    url('/assets/backgrounds/auth-pattern.webp') center / cover;
+  display: grid;
+  min-block-size: min(52rem, calc(100dvh - 10rem));
+  padding: clamp(var(--hb-space-6), 7vw, var(--hb-space-16))
+    var(--hb-page-gutter);
+  place-items: center;
+}
+
+.panel,
+.feedback,
+.protectedPanel {
+  background: var(--hb-color-surface);
+  border: 1px solid var(--hb-color-border);
+  border-radius: var(--hb-radius-lg);
+  box-shadow: var(--hb-shadow-md);
+  inline-size: min(100%, 34rem);
+  padding: clamp(var(--hb-space-6), 5vw, var(--hb-space-12));
+}
+
+.panel h1,
+.feedback h1,
+.protectedPanel h1 {
+  font-size: clamp(2.25rem, 8vw, 4rem);
+  line-height: 0.95;
+  margin-bottom: var(--hb-space-4);
+}
+
+.eyebrow {
+  color: var(--hb-color-brand);
+  font-size: var(--hb-font-size-xs);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  margin-bottom: var(--hb-space-3);
+  text-transform: uppercase;
+}
+
+.intro,
+.alternate,
+.feedback p,
+.protectedPanel p {
+  line-height: var(--hb-line-height-relaxed);
+}
+
+.intro {
+  color: var(--hb-color-text-muted);
+  margin-bottom: var(--hb-space-8);
+}
+
+.form,
+.fieldset {
+  display: grid;
+  gap: var(--hb-space-6);
+}
+
+.fieldset {
+  border: 0;
+  margin: 0;
+  min-inline-size: 0;
+  padding: 0;
+}
+
+.notice,
+.errorSummary {
+  border-radius: var(--hb-radius-md);
+  margin-bottom: var(--hb-space-6);
+  padding: var(--hb-space-4);
+}
+
+.notice {
+  background: var(--hb-color-brand-soft);
+}
+
+.errorSummary {
+  background: var(--hb-color-danger-soft);
+  border: 1px solid var(--hb-color-danger);
+  color: var(--hb-color-danger);
+}
+
+.alternate {
+  margin: var(--hb-space-6) 0 0;
+}
+
+.alternate a {
+  font-weight: 700;
+  text-underline-offset: var(--hb-space-1);
+}
+
+.feedback:focus,
+.errorSummary:focus {
+  outline: 3px solid var(--hb-color-brand);
+  outline-offset: 3px;
+}
+
+.protectedPanel {
+  inline-size: min(100%, var(--hb-layout-reading));
+}
+
+@media (max-width: 29.999rem) {
+  .screen {
+    padding-inline: var(--hb-space-3);
+  }
+
+  .panel,
+  .feedback,
+  .protectedPanel {
+    border-radius: var(--hb-radius-md);
+    padding: var(--hb-space-6) var(--hb-space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .feedback,
+  .protectedPanel {
+    scroll-behavior: auto;
+  }
+}

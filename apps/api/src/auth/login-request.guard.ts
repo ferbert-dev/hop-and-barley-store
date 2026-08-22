@@ -12,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import type { AuthRequest } from './auth-request';
 import { AuthOriginService } from './auth-origin.service';
 import { LoginRateLimiter } from './login-rate-limiter';
+import { clientRateIdentity } from './client-rate-identity';
 
 const AUTH_UNAVAILABLE = Object.freeze({ status: 'unavailable' as const });
 
@@ -47,9 +48,7 @@ export class LoginRequestGuard implements CanActivate {
       throw new UnsupportedMediaTypeException({ status: 'invalid' });
     }
 
-    if (
-      !this.rateLimiter.consumeIp(request.socket.remoteAddress ?? 'unknown')
-    ) {
+    if (!this.rateLimiter.consumeIp(clientRateIdentity(request))) {
       this.reject('rate_limit_ip', requestId);
       throw new HttpException(AUTH_UNAVAILABLE, HttpStatus.TOO_MANY_REQUESTS);
     }
