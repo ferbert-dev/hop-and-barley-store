@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import {
   qualityGates,
@@ -16,15 +16,18 @@ test.describe('API-backed guest cart', () => {
     await clearCart(page);
   });
 
-  test('renders canonical cart changes for add, update, remove, and clear', async ({
+  test('renders canonical cart changes after a fixture is seeded, then updates, removes, and clears through the provider', async ({
     page,
   }) => {
     await page.goto('/cart');
     await expect(
+      page.getByRole('heading', { level: 1, name: 'Shopping cart' }),
+    ).toBeVisible();
+    await expect(
       page.getByRole('heading', { name: 'Your cart is empty' }),
     ).toBeVisible();
 
-    await addCartLine(page, 'citra-hops');
+    await seedCartLine(page, 'citra-hops');
     await page.reload();
     await expect(
       page.getByRole('heading', { name: 'Citra Hops' }),
@@ -43,7 +46,7 @@ test.describe('API-backed guest cart', () => {
       page.getByLabel('Cart summary').getByText('US$11.98'),
     ).toBeVisible();
 
-    await addCartLine(page, 'mosaic-hops');
+    await seedCartLine(page, 'mosaic-hops');
     await page.reload();
     await page.getByRole('button', { name: 'Remove Citra Hops' }).click();
     await expect(page.getByRole('heading', { name: 'Citra Hops' })).toHaveCount(
@@ -62,7 +65,7 @@ test.describe('API-backed guest cart', () => {
   test('validates the cart form and hands off to checkout without contact data in the URL', async ({
     page,
   }) => {
-    await addCartLine(page, 'citra-hops');
+    await seedCartLine(page, 'citra-hops');
     await page.goto('/cart');
     await expect(
       page.getByRole('heading', { name: 'Citra Hops' }),
@@ -87,7 +90,7 @@ test.describe('API-backed guest cart', () => {
   test('keeps the populated cart responsive, keyboard-operable and free of blocking axe findings', async ({
     page,
   }) => {
-    await addCartLine(page, 'citra-hops');
+    await seedCartLine(page, 'citra-hops');
     await page.emulateMedia({ reducedMotion: 'reduce' });
 
     for (const { height, id, width } of viewportProbes) {
@@ -106,20 +109,39 @@ test.describe('API-backed guest cart', () => {
 
     await page.setViewportSize({ height: 800, width: 360 });
     await page.goto('/cart');
-    await page
-      .getByRole('button', { name: 'Increase Citra Hops quantity' })
-      .focus();
+    await assertReducedMotion(page, 'ready cart');
+    const increase = page.getByRole('button', {
+      name: 'Increase Citra Hops quantity',
+    });
+    await focusWithKeyboard(page, increase);
+    await assertProjectFocusVisible(increase, 'increase cart quantity');
     await page.keyboard.press('Enter');
     await expect(
       page.getByLabel('Quantity for Citra Hops').getByRole('status'),
     ).toHaveText('2');
 
-    const results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
-    expect(
-      results.violations.filter(
-        ({ impact }) => impact === 'critical' || impact === 'serious',
-      ),
-    ).toEqual([]);
+    await assertNoBlockingAxeViolations(page, 'ready cart');
+  });
+
+  test('has no blocking axe findings in empty and seeded-ready cart states', async ({
+    page,
+  }) => {
+    await clearCart(page);
+    await page.goto('/cart');
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Shopping cart' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Your cart is empty' }),
+    ).toBeVisible();
+    await assertNoBlockingAxeViolations(page, 'empty cart');
+
+    await seedCartLine(page, 'citra-hops');
+    await page.goto('/cart');
+    await expect(
+      page.getByRole('heading', { name: 'Citra Hops' }),
+    ).toBeVisible();
+    await assertNoBlockingAxeViolations(page, 'ready cart');
   });
 });
 
@@ -136,11 +158,15 @@ test.describe('cart unavailable state', () => {
       .filter({ hasText: 'Your cart is unavailable' });
     await expect(alert).toContainText('Your cart is unavailable');
     await expect(alert).not.toContainText(/csrf|token|cookie|fetch|stack/i);
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Shopping cart' }),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+    await assertNoBlockingAxeViolations(page, 'unavailable cart');
   });
 });
 
-async function addCartLine(page: Page, productSlug: string) {
+async function seedCartLine(page: Page, productSlug: string) {
   await page.goto('/cart');
   const response = await page.evaluate(async (slug) => {
     const apiUrl = 'http://localhost:3001/api/v1';
@@ -162,6 +188,67 @@ async function addCartLine(page: Page, productSlug: string) {
     return { ok: add.ok, status: add.status };
   }, productSlug);
   expect(response).toEqual({ ok: true, status: 200 });
+}
+
+async function assertNoBlockingAxeViolations(page: Page, label: string) {
+  const results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
+  expect(
+    results.violations.filter(
+      ({ impact }) => impact === 'critical' || impact === 'serious',
+    ),
+    `${label} Axe results`,
+  ).toEqual([]);
+}
+
+async function focusWithKeyboard(page: Page, target: Locator) {
+  for (let index = 0; index < 24; index += 1) {
+    await page.keyboard.press('Tab');
+    if (
+      await target.evaluate((element) => document.activeElement === element)
+    ) {
+      return;
+    }
+  }
+  throw new Error('Keyboard focus did not reach the requested cart control.');
+}
+
+async function assertProjectFocusVisible(target: Locator, label: string) {
+  const outline = await target.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      style: style.outlineStyle,
+      widthCssPx: Number.parseFloat(style.outlineWidth),
+    };
+  });
+  expect(outline.style, `${label} outline style`).toBe('solid');
+  expect(outline.widthCssPx, `${label} outline width`).toBeGreaterThanOrEqual(
+    qualityGates.focus.minimumIndicatorThicknessCssPx,
+  );
+}
+
+async function assertReducedMotion(page: Page, label: string) {
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      ),
+    )
+    .toBe(true);
+
+  const cart = page.locator('section[aria-labelledby="cart-title"]').first();
+  await expect(cart, `${label} container`).toBeVisible();
+  const motion = await cart.evaluate((element) => ({
+    animationDuration: getComputedStyle(element).animationDuration,
+    animationName: getComputedStyle(element).animationName,
+    scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
+    transitionDuration: getComputedStyle(element).transitionDuration,
+  }));
+  expect(motion, `${label} reduced motion`).toEqual({
+    animationDuration: '1e-05s',
+    animationName: 'none',
+    scrollBehavior: qualityGates.reducedMotion.scrollBehavior,
+    transitionDuration: '0s',
+  });
 }
 
 async function clearCart(page: Page) {

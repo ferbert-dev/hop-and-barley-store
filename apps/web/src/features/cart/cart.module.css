@@ -14,9 +14,14 @@
 }
 
 .heading h1,
+.stateTitle,
 .form h2 {
   font-size: clamp(2.5rem, 8vw, 5rem);
   margin-bottom: 0;
+}
+
+.stateTitle {
+  margin-bottom: var(--hb-space-8);
 }
 
 .message {

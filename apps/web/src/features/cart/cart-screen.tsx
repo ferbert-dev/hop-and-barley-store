@@ -64,7 +64,10 @@ function CartScreenContent({
 }: Partial<CartScreenContentProps> & Pick<CartScreenContentProps, 'state'>) {
   if (state.kind === 'loading') {
     return (
-      <section aria-label="Shopping cart" className={styles.page}>
+      <section aria-labelledby="cart-title" className={styles.page}>
+        <h1 className={styles.stateTitle} id="cart-title">
+          Shopping cart
+        </h1>
         <LoadingState title="Loading your cart">
           Checking the latest cart details.
         </LoadingState>
@@ -73,7 +76,10 @@ function CartScreenContent({
   }
   if (state.kind === 'unavailable') {
     return (
-      <section aria-label="Shopping cart" className={styles.page}>
+      <section aria-labelledby="cart-title" className={styles.page}>
+        <h1 className={styles.stateTitle} id="cart-title">
+          Shopping cart
+        </h1>
         <ErrorState
           action={
             refresh ? (
@@ -97,7 +103,10 @@ function CartScreenContent({
   const cartItems = items ?? state.cart.items;
   if (cartItems.length === 0 && !totalsAreRefreshing) {
     return (
-      <section aria-label="Shopping cart" className={styles.page}>
+      <section aria-labelledby="cart-title" className={styles.page}>
+        <h1 className={styles.stateTitle} id="cart-title">
+          Shopping cart
+        </h1>
         <EmptyState
           action={<Button href="/">Continue shopping</Button>}
           title="Your cart is empty"

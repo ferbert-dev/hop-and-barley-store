@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CartProvider } from './cart-context';
+import { CartProvider, type CartState } from './cart-context';
 import { CartScreen } from './cart-screen';
 import type { CartTransport } from './cart-transport';
 
@@ -38,9 +38,40 @@ const cart = {
   totalQuantity: 1,
 };
 
+const routeStates: readonly (readonly [string, CartState])[] = [
+  ['loading', { kind: 'loading' }],
+  ['unavailable', { kind: 'unavailable' }],
+  [
+    'empty',
+    {
+      cart: {
+        ...cart,
+        checkoutEligible: false,
+        distinctItemCount: 0,
+        items: [],
+        subtotalMinor: 0,
+        totalQuantity: 0,
+      },
+      kind: 'ready',
+    },
+  ],
+  ['ready', { cart, kind: 'ready' }],
+];
+
 beforeEach(() => push.mockReset());
 
 describe('CartScreen', () => {
+  it.each(routeStates)(
+    'exposes exactly one meaningful route heading in the %s state',
+    (_stateName, initialState) => {
+      render(<CartScreen initialState={initialState} />);
+
+      expect(
+        screen.getAllByRole('heading', { level: 1, name: 'Shopping cart' }),
+      ).toHaveLength(1);
+    },
+  );
+
   it('renders the accessible loading state before the canonical cart arrives', () => {
     render(<CartScreen initialState={{ kind: 'loading' }} />);
 

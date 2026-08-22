@@ -53,27 +53,30 @@ export function CartProvider({
   const transport = injectedTransport ?? browserTransport;
   const [state, setState] = useState<CartState>({ kind: 'loading' });
   const [pending, setPending] = useState<CartPendingOperation | null>(null);
-  const operationId = useRef(0);
+  const responseId = useRef(0);
   const pendingRef = useRef<CartPendingOperation | null>(null);
+  const pendingMutation = useRef<Promise<void> | null>(null);
 
   const loadCanonical = useCallback(
     async (showLoading: boolean) => {
-      const requestId = ++operationId.current;
+      const requestId = ++responseId.current;
       if (showLoading) setState({ kind: 'loading' });
       try {
         const cart = await transport.load();
-        if (operationId.current === requestId) {
+        if (responseId.current === requestId) {
           setState({ cart, kind: 'ready' });
         }
       } catch {
-        if (operationId.current === requestId)
-          setState({ kind: 'unavailable' });
+        if (responseId.current === requestId) setState({ kind: 'unavailable' });
       }
     },
     [transport],
   );
 
   const refresh = useCallback(async () => {
+    // A refresh requested while a mutation is in flight waits until the
+    // mutation settles, so a pre-mutation read cannot win the response race.
+    await pendingMutation.current;
     await loadCanonical(true);
   }, [loadCanonical]);
 
@@ -81,35 +84,40 @@ export function CartProvider({
     async (nextPending: CartPendingOperation, action: () => Promise<Cart>) => {
       if (pendingRef.current) return;
 
-      const requestId = ++operationId.current;
+      const requestId = ++responseId.current;
       pendingRef.current = nextPending;
       setPending(nextPending);
-      try {
-        const cart = await action();
-        if (operationId.current === requestId) {
-          setState({ cart, kind: 'ready' });
-        }
-      } catch {
+      const mutation = (async () => {
         try {
-          const cart = await transport.load();
-          if (operationId.current === requestId) {
-            setState({
-              cart,
-              kind: 'ready',
-              message:
-                'Your cart was refreshed after the change could not be completed.',
-            });
+          const cart = await action();
+          if (responseId.current === requestId) {
+            setState({ cart, kind: 'ready' });
           }
         } catch {
-          if (operationId.current === requestId)
-            setState({ kind: 'unavailable' });
-        }
-      } finally {
-        if (operationId.current === requestId) {
+          try {
+            const cart = await transport.load();
+            if (responseId.current === requestId) {
+              setState({
+                cart,
+                kind: 'ready',
+                message:
+                  'Your cart was refreshed after the change could not be completed.',
+              });
+            }
+          } catch {
+            if (responseId.current === requestId)
+              setState({ kind: 'unavailable' });
+          }
+        } finally {
+          // Refreshes use their own response ordering. They must never retain
+          // this mutation's lock after the mutation itself has settled.
           pendingRef.current = null;
+          pendingMutation.current = null;
           setPending(null);
         }
-      }
+      })();
+      pendingMutation.current = mutation;
+      await mutation;
     },
     [transport],
   );
