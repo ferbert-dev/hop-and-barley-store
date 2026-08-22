@@ -44,7 +44,7 @@ test.describe('database-backed product details', () => {
       if (!href || !name) throw new TypeError('Product link is incomplete');
       const slug = href.replace('/product/', '');
       visitedSlugs.push(slug);
-      await page.goto(href);
+      await page.goto(href, { waitUntil: 'domcontentloaded' });
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
       await expect(
         page.getByRole('heading', { name: 'Technical specifications' }),

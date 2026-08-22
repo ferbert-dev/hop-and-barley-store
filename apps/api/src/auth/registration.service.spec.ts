@@ -6,11 +6,11 @@ describe('RegistrationService', () => {
   const passwordHash = {
     algorithm: 'argon2id',
     hashLength: 32,
-    memoryCost: 65_536,
+    memoryCost: 7_168,
     parallelism: 1,
-    passwordHash: '$argon2id$v=19$m=65536,p=1,t=3$salt$hash',
+    passwordHash: '$argon2id$v=19$m=7168,p=1,t=5$salt$hash',
     saltLength: 16,
-    timeCost: 3,
+    timeCost: 5,
     version: 19,
   } as const;
 

@@ -1,10 +1,12 @@
 import { Controller, Get, Header } from '@nestjs/common';
 import { ApiExcludeEndpoint } from '@nestjs/swagger';
 import { PrismaService } from './database/prisma.service';
+import { Public } from './auth/public.decorator';
 
 type DatabaseStatus = 'up' | 'unavailable';
 
 @Controller()
+@Public()
 export class AppController {
   constructor(private readonly prisma: PrismaService) {}
 

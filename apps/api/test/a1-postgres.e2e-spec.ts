@@ -6,7 +6,7 @@ const describePostgres = process.env.RUN_A1_POSTGRES_INTEGRATION
   ? describe
   : describe.skip;
 
-const HASH_PREFIX = '$argon2id$v=19$m=65536,p=1,t=3$';
+const HASH_PREFIX = '$argon2id$v=19$m=7168,p=1,t=5$';
 
 describePostgres('A1 secure registration with PostgreSQL', () => {
   let postgres: Client;
@@ -91,7 +91,7 @@ describePostgres('A1 secure registration with PostgreSQL', () => {
           email: 'atomic@example.com',
           normalizedEmail: 'atomic@example.com',
           passwordCredential: {
-            create: { ...credential('B'.repeat(43)), memoryCost: 65_535 },
+            create: { ...credential('B'.repeat(43)), memoryCost: 7_167 },
           },
         },
       }),
@@ -123,11 +123,11 @@ function credential(hashBody: string) {
   return {
     algorithm: 'argon2id',
     hashLength: 32,
-    memoryCost: 65_536,
+    memoryCost: 7_168,
     parallelism: 1,
     passwordHash: `${HASH_PREFIX}${'c2FsdHNhbHRzYWx0MTIzNA'}$${hashBody}`,
     saltLength: 16,
-    timeCost: 3,
+    timeCost: 5,
     version: 19,
   } as const;
 }

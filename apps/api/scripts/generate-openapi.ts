@@ -6,6 +6,9 @@ import { configureOpenApi } from '../src/openapi';
 
 process.env.DATABASE_URL ??=
   'postgresql://hopbarley:hopbarley@localhost:5432/hopbarley?schema=public';
+process.env.AUTH_COOKIE_MODE ??= 'local-http';
+process.env.AUTH_ORIGIN ??= 'http://localhost:3000';
+process.env.AUTH_SESSIONS_ENABLED ??= 'false';
 
 async function generateOpenApi() {
   const { AppModule } = await import('../src/app.module.js');

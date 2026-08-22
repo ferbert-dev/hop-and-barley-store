@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types';
@@ -8,6 +8,11 @@ import { configureAppValidation } from './../src/app-validation';
 import type { CatalogResponseDto } from './../src/catalog/dto/catalog-response.dto';
 import { PrismaService } from './../src/database/prisma.service';
 import { configureOpenApi } from './../src/openapi';
+import { LoginService } from './../src/auth/login.service';
+import {
+  SessionService,
+  type ActiveSession,
+} from './../src/auth/session/session.service';
 
 type OpenApiSchema = {
   enum?: string[];
@@ -107,11 +112,11 @@ jest.mock('./../src/auth/password/password-hash-executor', () => ({
     hash = jest.fn().mockResolvedValue({
       algorithm: 'argon2id',
       hashLength: 32,
-      memoryCost: 65_536,
+      memoryCost: 7_168,
       parallelism: 1,
-      passwordHash: '$argon2id$v=19$m=65536,p=1,t=3$salt$hash',
+      passwordHash: '$argon2id$v=19$m=7168,p=1,t=5$salt$hash',
       saltLength: 16,
-      timeCost: 3,
+      timeCost: 5,
       version: 19,
     });
   },
@@ -119,17 +124,72 @@ jest.mock('./../src/auth/password/password-hash-executor', () => ({
 
 describe('Platform API (e2e)', () => {
   let app: INestApplication;
+  const activeSessions = new Map<string, ActiveSession>();
+  const sessionService = {
+    authenticate: jest.fn((rawToken: string) =>
+      Promise.resolve(activeSessions.get(rawToken) ?? null),
+    ),
+    issue: jest.fn((userId: string, presented: string | null) => {
+      if (presented) activeSessions.delete(presented);
+      const rawToken = 'A'.repeat(43);
+      const session: ActiveSession = {
+        expiresAt: new Date('2026-08-29T10:00:00.000Z'),
+        issuedAt: new Date('2026-08-22T10:00:00.000Z'),
+        lastSeenAt: new Date('2026-08-22T10:00:00.000Z'),
+        rawToken,
+        role: 'CUSTOMER',
+        sessionId: '20000000-0000-4000-8000-000000000001',
+        userId,
+      };
+      activeSessions.set(rawToken, session);
+      return Promise.resolve(session);
+    }),
+    revokeAll: jest.fn().mockResolvedValue(0),
+    revokeCurrent: jest.fn((rawToken: string) => {
+      const revoked = activeSessions.delete(rawToken);
+      return Promise.resolve(revoked);
+    }),
+  };
+  const loginService = {
+    login: jest.fn(
+      async (
+        dto: { email: string; password: string },
+        presented: string | null,
+      ) => {
+        if (
+          dto.email.toLowerCase() !== 'brewer@example.com' ||
+          dto.password !== 'correct-password-value'
+        ) {
+          throw new UnauthorizedException({ status: 'unauthorized' });
+        }
+        return sessionService.issue(
+          '10000000-0000-4000-8000-000000000001',
+          presented,
+        );
+      },
+    ),
+  };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(SessionService)
+      .useValue(sessionService)
+      .overrideProvider(LoginService)
+      .useValue(loginService)
+      .compile();
 
     app = moduleFixture.createNestApplication();
     configureAppRouting(app);
     configureAppValidation(app);
     configureOpenApi(app);
     await app.init();
+  });
+
+  beforeEach(() => {
+    activeSessions.clear();
+    jest.clearAllMocks();
   });
 
   it('GET / renders the backend service console', async () => {
@@ -165,7 +225,7 @@ describe('Platform API (e2e)', () => {
 
     expect(response.body).toEqual({ status: 'accepted' });
     expect(response.headers['cache-control']).toBe('private, no-store');
-    expect(response.headers.vary).toBe('Origin');
+    expect(response.headers.vary).toBe('Cookie, Origin');
     expect(response.headers['x-request-id']).toBe('safe-request-1');
     expect(response.headers['set-cookie']).toBeUndefined();
     expect(JSON.stringify(response.body)).not.toMatch(
@@ -215,9 +275,152 @@ describe('Platform API (e2e)', () => {
 
     for (const response of [invalidOrigin, invalidMediaType]) {
       expect(response.headers['cache-control']).toBe('private, no-store');
-      expect(response.headers.vary).toBe('Origin');
+      expect(response.headers.vary).toBe('Cookie, Origin');
       expect(response.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
     }
+  });
+
+  it('runs login, current session, CSRF and logout through the guarded HTTP contract', async () => {
+    const server = app.getHttpServer() as App;
+    const login = await request(server)
+      .post('/api/v1/auth/login')
+      .set('Origin', 'http://localhost:3000')
+      .set('X-Request-Id', 'a1b-login-request')
+      .send({
+        email: 'brewer@example.com',
+        password: 'correct-password-value',
+      })
+      .expect(200);
+
+    expect(login.body).toEqual({
+      absoluteExpiresAt: '2026-08-29T10:00:00.000Z',
+      idleExpiresAt: '2026-08-23T10:00:00.000Z',
+      issuedAt: '2026-08-22T10:00:00.000Z',
+      user: {
+        id: '10000000-0000-4000-8000-000000000001',
+        role: 'CUSTOMER',
+        status: 'ACTIVE',
+      },
+    });
+    expect(login.headers['cache-control']).toBe('private, no-store');
+    expect(login.headers.vary).toBe('Cookie, Origin');
+    expect(login.headers['x-request-id']).toBe('a1b-login-request');
+    const setCookie = login.headers['set-cookie']?.[0];
+    expect(setCookie).toBeDefined();
+    if (!setCookie) throw new Error('Expected a session cookie');
+    expect(setCookie).toMatch(
+      /^hb_session=[A-Za-z0-9_-]{43}; Max-Age=604800; Expires=.*; Path=\/; HttpOnly; SameSite=Lax$/,
+    );
+    expect(setCookie).not.toContain('Domain=');
+    expect(setCookie).not.toContain('Secure');
+    expect(JSON.stringify(login.body)).not.toMatch(/token|email|sessionId/i);
+    const cookie = setCookie.split(';', 1)[0];
+
+    const current = await request(server)
+      .get('/api/v1/auth/session')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(current.body).toEqual(login.body);
+    expect(current.headers['cache-control']).toBe('private, no-store');
+
+    const csrf = await request(server)
+      .get('/api/v1/auth/csrf')
+      .set('Cookie', cookie)
+      .expect(200);
+    const csrfBody = csrf.body as unknown as { csrfToken: string };
+    expect(csrfBody.csrfToken).toMatch(/^test-v1\.[A-Za-z0-9_-]{43}$/);
+    expect(csrf.headers['cache-control']).toBe('private, no-store');
+
+    const logout = await request(server)
+      .post('/api/v1/auth/logout')
+      .set('Cookie', cookie)
+      .set('Origin', 'http://localhost:3000')
+      .set('X-CSRF-Token', csrfBody.csrfToken)
+      .expect(200);
+    expect(logout.body).toEqual({ status: 'signed-out' });
+    expect(logout.headers['set-cookie']?.[0]).toBe(
+      'hb_session=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; HttpOnly; SameSite=Lax',
+    );
+    expect(logout.headers['cache-control']).toBe('private, no-store');
+
+    await request(server)
+      .get('/api/v1/auth/session')
+      .set('Cookie', cookie)
+      .expect(401);
+  });
+
+  it('returns byte-identical private 401 failures for unknown and wrong credentials', async () => {
+    const server = app.getHttpServer() as App;
+    const unknown = await request(server)
+      .post('/api/v1/auth/login')
+      .set('Origin', 'http://localhost:3000')
+      .send({ email: 'unknown@example.com', password: 'some-password-value' })
+      .expect(401);
+    const wrong = await request(server)
+      .post('/api/v1/auth/login')
+      .set('Origin', 'http://localhost:3000')
+      .send({ email: 'brewer@example.com', password: 'wrong-password-value' })
+      .expect(401);
+
+    expect(JSON.stringify(unknown.body)).toBe(JSON.stringify(wrong.body));
+    expect(unknown.body).toEqual({ status: 'unauthorized' });
+    for (const response of [unknown, wrong]) {
+      expect(response.headers['cache-control']).toBe('private, no-store');
+      expect(response.headers.vary).toBe('Cookie, Origin');
+      expect(response.headers['set-cookie']).toBeUndefined();
+    }
+  });
+
+  it('fails closed for missing, malformed, expired and revoked session cookies', async () => {
+    const server = app.getHttpServer() as App;
+    const expired = 'D'.repeat(43);
+
+    for (const cookie of [
+      undefined,
+      'hb_session=malformed',
+      `hb_session=${expired}`,
+    ]) {
+      const call = request(server).get('/api/v1/auth/session');
+      if (cookie) call.set('Cookie', cookie);
+      const response = await call.expect(401);
+      expect(response.body).toEqual({ status: 'unauthorized' });
+      expect(response.headers['cache-control']).toBe('private, no-store');
+      expect(response.headers.vary).toBe('Cookie, Origin');
+    }
+  });
+
+  it('rejects unsafe cookie requests with missing CSRF or non-exact Origin', async () => {
+    const server = app.getHttpServer() as App;
+    const rawToken = 'E'.repeat(43);
+    activeSessions.set(rawToken, {
+      expiresAt: new Date('2026-08-29T10:00:00.000Z'),
+      issuedAt: new Date('2026-08-22T10:00:00.000Z'),
+      lastSeenAt: new Date('2026-08-22T10:00:00.000Z'),
+      rawToken,
+      role: 'CUSTOMER',
+      sessionId: '20000000-0000-4000-8000-000000000002',
+      userId: '10000000-0000-4000-8000-000000000001',
+    });
+    const cookie = `hb_session=${rawToken}`;
+
+    const missingCsrf = await request(server)
+      .post('/api/v1/auth/logout')
+      .set('Cookie', cookie)
+      .set('Origin', 'http://localhost:3000')
+      .expect(403);
+    const wrongOrigin = await request(server)
+      .post('/api/v1/auth/logout')
+      .set('Cookie', cookie)
+      .set('Origin', 'http://evil.example')
+      .set('X-CSRF-Token', `test-v1.${'A'.repeat(43)}`)
+      .expect(403);
+
+    for (const response of [missingCsrf, wrongOrigin]) {
+      expect(response.body).toEqual({ status: 'forbidden' });
+      expect(response.headers['cache-control']).toBe('private, no-store');
+      expect(response.headers.vary).toBe('Cookie, Origin');
+    }
+    expect(activeSessions.has(rawToken)).toBe(true);
   });
 
   it('documents only the registration request and generic response DTOs', async () => {
@@ -266,6 +469,60 @@ describe('Platform API (e2e)', () => {
     expect(Object.keys(document.components.schemas).join(' ')).not.toMatch(
       /PasswordCredential|passwordHash|normalizedEmail/i,
     );
+  });
+
+  it('documents the exact cookie-auth session transport contract', async () => {
+    const response = await request(app.getHttpServer() as App)
+      .get('/api/docs-json')
+      .expect(200);
+    const document = JSON.parse(response.text) as {
+      components: {
+        securitySchemes: Record<
+          string,
+          { description: string; in: string; name: string; type: string }
+        >;
+      };
+      paths: Record<
+        string,
+        Record<
+          string,
+          {
+            parameters?: Array<{
+              name: string;
+              required: boolean;
+              schema: OpenApiSchema;
+            }>;
+            responses: Record<string, { headers?: Record<string, unknown> }>;
+            security?: Array<Record<string, unknown[]>>;
+          }
+        >
+      >;
+    };
+
+    expect(document.components.securitySchemes).toEqual({
+      sessionCookie: {
+        description: 'Host-only local-http session cookie.',
+        in: 'cookie',
+        name: 'hb_session',
+        type: 'apiKey',
+      },
+    });
+
+    const login = document.paths['/api/v1/auth/login'].post;
+    const current = document.paths['/api/v1/auth/session'].get;
+    const csrf = document.paths['/api/v1/auth/csrf'].get;
+    const logout = document.paths['/api/v1/auth/logout'].post;
+    expect(login.security).toBeUndefined();
+    expect(login.parameters?.map(({ name }) => name)).toEqual(['Origin']);
+    expect(login.responses['200'].headers).toHaveProperty('Set-Cookie');
+    expect(current.security).toEqual([{ sessionCookie: [] }]);
+    expect(csrf.security).toEqual([{ sessionCookie: [] }]);
+    expect(logout.security).toEqual([{ sessionCookie: [] }]);
+    expect(logout.parameters?.map(({ name }) => name).sort()).toEqual([
+      'Origin',
+      'X-CSRF-Token',
+    ]);
+    expect(logout.responses['200'].headers).toHaveProperty('Set-Cookie');
   });
 
   it('documents the exact catalog query, envelope and nested DTO bounds', async () => {

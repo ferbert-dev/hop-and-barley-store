@@ -41,6 +41,10 @@ services:
         condition: service_completed_successfully
     environment:
       <<: *api-environment
+      AUTH_COOKIE_MODE: local-http
+      AUTH_ORIGIN: http://localhost:3000
+      AUTH_SESSIONS_ENABLED: ${AUTH_SESSIONS_ENABLED:-false}
+      AUTH_CSRF_KEYRING: ${AUTH_CSRF_KEYRING:-}
       CORS_ORIGINS: http://localhost:3000
       PORT: 3001
       REGISTRATION_ENABLED: 'true'

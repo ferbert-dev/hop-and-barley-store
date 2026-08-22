@@ -73,6 +73,12 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Verify migrations, seed, PostgreSQL API, and rollback
         run: pnpm test:catalog:postgres
+      - name: Verify secure registration migration and constraints
+        run: pnpm test:a1:postgres
+      - name: Verify session migration, constraints, and concurrency
+        run: pnpm test:a1b:postgres
+      - name: Verify the A1B Argon2 resource profile
+        run: pnpm test:a1b:argon2:alpine
 
   browser:
     name: Connected and unavailable browser flows

@@ -47,6 +47,41 @@ const registrationRequest = configuredClient.POST('/api/v1/auth/register', {
 });
 void registrationRequest;
 
+const loginRequest = configuredClient.POST('/api/v1/auth/login', {
+  body: {
+    email: 'brewer@example.com',
+    password: 'correct-password-value',
+  },
+  params: { header: { Origin: 'http://localhost:3000' } },
+});
+void loginRequest;
+
+const currentSessionRequest = configuredClient.GET('/api/v1/auth/session');
+const csrfRequest = configuredClient.GET('/api/v1/auth/csrf');
+const logoutRequest = configuredClient.POST('/api/v1/auth/logout', {
+  params: {
+    header: {
+      Origin: 'http://localhost:3000',
+      'X-CSRF-Token': `v1.${'A'.repeat(43)}`,
+    },
+  },
+});
+void currentSessionRequest;
+void csrfRequest;
+void logoutRequest;
+
+const safeSession: components['schemas']['AuthSessionDto'] = {
+  absoluteExpiresAt: '2026-08-29T10:00:00.000Z',
+  idleExpiresAt: '2026-08-23T10:00:00.000Z',
+  issuedAt: '2026-08-22T10:00:00.000Z',
+  user: {
+    id: '10000000-0000-4000-8000-000000000001',
+    role: 'CUSTOMER',
+    status: 'ACTIVE',
+  },
+};
+void safeSession;
+
 const detail: components['schemas']['ProductDetailDto'] = {
   availability: 'in-stock',
   category: { name: 'Hops', slug: 'hops' },
