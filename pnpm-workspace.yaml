@@ -9,6 +9,7 @@ overrides:
 allowBuilds:
   '@prisma/engines': true
   '@scarf/scarf': false
+  argon2: true
   esbuild: true
   prisma: true
   sharp: true

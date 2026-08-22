@@ -9,6 +9,20 @@ const schema = Joi.object({
     .valid('development', 'test', 'production')
     .default('development'),
   PORT: Joi.number().port().default(3001),
+  REGISTRATION_ENABLED: Joi.boolean().default(false),
+  REGISTRATION_ORIGIN: Joi.string()
+    .custom((value: string, helpers) => {
+      try {
+        const parsed = new URL(value);
+        if (parsed.origin !== value || parsed.username || parsed.password) {
+          return helpers.error('any.invalid');
+        }
+        return parsed.origin;
+      } catch {
+        return helpers.error('any.invalid');
+      }
+    })
+    .default('http://localhost:3000'),
 }).unknown(true);
 
 export function validateEnvironment(config: Record<string, unknown>) {

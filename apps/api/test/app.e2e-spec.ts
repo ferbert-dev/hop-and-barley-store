@@ -6,6 +6,7 @@ import { AppModule } from './../src/app.module';
 import { configureAppRouting } from './../src/app-routing';
 import { configureAppValidation } from './../src/app-validation';
 import type { CatalogResponseDto } from './../src/catalog/dto/catalog-response.dto';
+import { PrismaService } from './../src/database/prisma.service';
 import { configureOpenApi } from './../src/openapi';
 
 type OpenApiSchema = {
@@ -19,6 +20,7 @@ type OpenApiSchema = {
   properties?: Record<string, OpenApiSchema & { $ref?: string }>;
   required?: string[];
   type?: string;
+  writeOnly?: boolean;
 };
 
 type CatalogOpenApiDocument = {
@@ -89,11 +91,29 @@ jest.mock('./../src/database/prisma.service', () => ({
         },
       ]),
     };
+    user = {
+      create: jest.fn().mockResolvedValue({ id: 'private-user-id' }),
+    };
     $transaction = jest.fn(
       async (callback: (client: this) => Promise<unknown>) => callback(this),
     );
     $disconnect = jest.fn().mockResolvedValue(undefined);
     $queryRaw = jest.fn().mockResolvedValue([{ result: 1 }]);
+  },
+}));
+
+jest.mock('./../src/auth/password/password-hash-executor', () => ({
+  PasswordHashExecutor: class PasswordHashExecutor {
+    hash = jest.fn().mockResolvedValue({
+      algorithm: 'argon2id',
+      hashLength: 32,
+      memoryCost: 65_536,
+      parallelism: 1,
+      passwordHash: '$argon2id$v=19$m=65536,p=1,t=3$salt$hash',
+      saltLength: 16,
+      timeCost: 3,
+      version: 19,
+    });
   },
 }));
 
@@ -130,6 +150,104 @@ describe('Platform API (e2e)', () => {
     const response = await request(server).get('/api/docs').expect(200);
 
     expect(response.text).toContain('Swagger UI');
+  });
+
+  it('POST /api/v1/auth/register returns only the generic private accepted contract', async () => {
+    const response = await request(app.getHttpServer() as App)
+      .post('/api/v1/auth/register')
+      .set('Origin', 'http://localhost:3000')
+      .set('X-Request-Id', 'safe-request-1')
+      .send({
+        email: 'Brew.Master@BÜCHER.example',
+        password: 'correct horse battery staple',
+      })
+      .expect(202);
+
+    expect(response.body).toEqual({ status: 'accepted' });
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(response.headers.vary).toBe('Origin');
+    expect(response.headers['x-request-id']).toBe('safe-request-1');
+    expect(response.headers['set-cookie']).toBeUndefined();
+    expect(JSON.stringify(response.body)).not.toMatch(
+      /email|role|user|hash|credential|cookie/i,
+    );
+  });
+
+  it('returns the exact same 202 body for a canonical-email duplicate', async () => {
+    const prisma = app.get(PrismaService);
+    jest.spyOn(prisma.user, 'create').mockRejectedValueOnce({
+      code: 'P2002',
+      meta: { target: 'User_normalizedEmail_key' },
+    });
+
+    const response = await request(app.getHttpServer() as App)
+      .post('/api/v1/auth/register')
+      .set('Origin', 'http://localhost:3000')
+      .send({
+        email: 'BREW.MASTER@xn--bcher-kva.example',
+        password: 'another correct horse battery staple',
+      })
+      .expect(202);
+
+    expect(JSON.stringify(response.body)).toBe(
+      JSON.stringify({ status: 'accepted' }),
+    );
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(response.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('rejects an unconfigured Origin and non-JSON media type before registration', async () => {
+    const server = app.getHttpServer() as App;
+    const invalidOrigin = await request(server)
+      .post('/api/v1/auth/register')
+      .set('Origin', 'http://evil.example')
+      .send({
+        email: 'brew@example.com',
+        password: 'correct horse battery staple',
+      })
+      .expect(403);
+    const invalidMediaType = await request(server)
+      .post('/api/v1/auth/register')
+      .set('Origin', 'http://localhost:3000')
+      .set('Content-Type', 'text/plain')
+      .send('not-json')
+      .expect(415);
+
+    for (const response of [invalidOrigin, invalidMediaType]) {
+      expect(response.headers['cache-control']).toBe('private, no-store');
+      expect(response.headers.vary).toBe('Origin');
+      expect(response.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+    }
+  });
+
+  it('documents only the registration request and generic response DTOs', async () => {
+    const response = await request(app.getHttpServer() as App)
+      .get('/api/docs-json')
+      .expect(200);
+    const document = JSON.parse(response.text) as {
+      components: { schemas: Record<string, OpenApiSchema> };
+      paths: Record<string, { post?: unknown }>;
+    };
+
+    expect(document.paths['/api/v1/auth/register'].post).toBeDefined();
+    expect(document.components.schemas.RegisterDto.required?.sort()).toEqual([
+      'email',
+      'password',
+    ]);
+    expect(
+      document.components.schemas.RegisterDto.properties?.password,
+    ).toMatchObject({
+      maxLength: 128,
+      minLength: 15,
+      type: 'string',
+      writeOnly: true,
+    });
+    expect(
+      document.components.schemas.RegistrationAcceptedDto.required,
+    ).toEqual(['status']);
+    expect(Object.keys(document.components.schemas).join(' ')).not.toMatch(
+      /PasswordCredential|passwordHash|normalizedEmail/i,
+    );
   });
 
   it('documents the exact catalog query, envelope and nested DTO bounds', async () => {
