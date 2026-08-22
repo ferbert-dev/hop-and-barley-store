@@ -68,6 +68,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the current guest cart
+         * @description Read-only. A request without the configured cart cookie returns an empty cart and never creates database state or a cookie.
+         */
+        get: operations["CartController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cart/csrf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CartController_csrfToken"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cart/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a product quantity to the guest cart
+         * @description With no configured cart cookie, exact Origin bootstraps the first cart after validation succeeds. Any presented cart cookie disables bootstrap and requires a valid cart-bound CSRF token.
+         */
+        post: operations["CartController_add"];
+        delete: operations["CartController_clear"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cart/items/{productSlug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["CartController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["CartController_update"];
+        trace?: never;
+    };
     "/api/v1/auth/register": {
         parameters: {
             query?: never;
@@ -243,6 +315,46 @@ export interface components {
             availability: "in-stock" | "out-of-stock";
             category: components["schemas"]["ProductCategoryDto"];
             specifications: components["schemas"]["ProductSpecificationDto"][];
+        };
+        CartItemDto: {
+            /** Format: uuid */
+            productId: string;
+            productSlug: string;
+            name: string;
+            imagePath: string;
+            priceQualifier: string;
+            /** Format: int32 */
+            quantity: number;
+            /** Format: int32 */
+            currentUnitPriceMinor: number | null;
+            /** Format: int32 */
+            lineTotalMinor: number | null;
+            /** @enum {string} */
+            availability: "available" | "unavailable";
+        };
+        CartDto: {
+            /** @enum {string} */
+            currency: "USD";
+            items: components["schemas"]["CartItemDto"][];
+            /** Format: int32 */
+            distinctItemCount: number;
+            /** Format: int32 */
+            totalQuantity: number;
+            /** Format: int32 */
+            subtotalMinor: number;
+            checkoutEligible: boolean;
+        };
+        CartCsrfResponseDto: {
+            csrfToken: string;
+        };
+        AddCartItemDto: {
+            productSlug: string;
+            /** Format: int32 */
+            quantity: number;
+        };
+        UpdateCartItemDto: {
+            /** Format: int32 */
+            quantity: number;
         };
         RegisterDto: {
             /**
@@ -505,6 +617,266 @@ export interface operations {
             };
             /** @description Product not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CartController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartDto"];
+                };
+            };
+            /** @description Presented cart capability is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CartController_csrfToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartCsrfResponseDto"];
+                };
+            };
+            /** @description Presented cart capability is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CartController_add: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required whenever the configured cart cookie is present. */
+                "X-CSRF-Token"?: string;
+                Origin: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddCartItemDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    /** @description Set only after a successful first-cart bootstrap. */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartDto"];
+                };
+            };
+            /** @description Invalid body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Presented cart capability is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Origin or CSRF is not valid */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description JSON body required */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Product, stock, quantity or line limit is unavailable */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CartController_clear: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartDto"];
+                };
+            };
+            /** @description Presented cart capability is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Origin or CSRF is not valid */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CartController_remove: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path: {
+                productSlug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartDto"];
+                };
+            };
+            /** @description Presented cart capability is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Origin or CSRF is not valid */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cart line not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CartController_update: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path: {
+                productSlug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCartItemDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartDto"];
+                };
+            };
+            /** @description Invalid body or product slug */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Presented cart capability is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Origin or CSRF is not valid */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cart line not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Product or stock is unavailable */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

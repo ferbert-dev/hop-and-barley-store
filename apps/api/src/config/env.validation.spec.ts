@@ -4,6 +4,9 @@ const BASE = {
   AUTH_COOKIE_MODE: 'local-http',
   AUTH_ORIGIN: 'http://localhost:3000',
   AUTH_SESSIONS_ENABLED: false,
+  CART_COOKIE_MODE: 'local-http',
+  CART_CSRF_KEYRING: `cart-v1:${'22'.repeat(32)}`,
+  CART_ORIGIN: 'http://localhost:3000',
   DATABASE_URL: 'postgresql://user:password@localhost:5432/database',
 };
 
@@ -12,6 +15,31 @@ describe('auth environment validation', () => {
     expect(() =>
       validateEnvironment({ ...BASE, AUTH_COOKIE_MODE: undefined }),
     ).toThrow(/AUTH_COOKIE_MODE/);
+  });
+
+  it('validates cart cookie mode, exact Origin, CORS and unique CSRF versions', () => {
+    expect(() =>
+      validateEnvironment({ ...BASE, CART_COOKIE_MODE: undefined }),
+    ).toThrow(/CART_COOKIE_MODE/);
+    expect(() =>
+      validateEnvironment({
+        ...BASE,
+        CART_COOKIE_MODE: 'secure-https',
+        CART_ORIGIN: 'http://shop.example.com',
+      }),
+    ).toThrow(/CART_ORIGIN/);
+    expect(() =>
+      validateEnvironment({
+        ...BASE,
+        CART_CSRF_KEYRING: `v1:${'11'.repeat(32)},v1:${'22'.repeat(32)}`,
+      }),
+    ).toThrow(/versions must be unique/);
+    expect(() =>
+      validateEnvironment({
+        ...BASE,
+        CORS_ORIGINS: 'https://shop.example.com',
+      }),
+    ).toThrow(/CORS_ORIGINS/);
   });
 
   it('requires HTTPS origin for secure mode and loopback HTTP for local mode', () => {

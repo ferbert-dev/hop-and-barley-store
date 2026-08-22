@@ -87,10 +87,37 @@ model Product {
   specifications Json     @db.JsonB
   categoryId     String   @db.Uuid
   category       Category @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Product_categoryId_fkey")
+  cartItems      CartItem[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   @@index([categoryId, isActive], map: "Product_categoryId_isActive_idx")
   @@index([isActive, priceMinor], map: "Product_isActive_priceMinor_idx")
   @@index([name], map: "Product_name_idx")
+}
+
+model Cart {
+  id          String     @id(map: "Cart_pkey") @default(uuid()) @db.Uuid
+  tokenDigest Bytes      @unique(map: "Cart_tokenDigest_key")
+  expiresAt   DateTime
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  items       CartItem[]
+
+  @@index([expiresAt], map: "Cart_expiresAt_idx")
+}
+
+model CartItem {
+  id        String   @id(map: "CartItem_pkey") @default(uuid()) @db.Uuid
+  cartId    String   @db.Uuid
+  productId String   @db.Uuid
+  quantity  Int      @db.SmallInt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "CartItem_cartId_fkey")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "CartItem_productId_fkey")
+
+  @@unique([cartId, productId], map: "CartItem_cartId_productId_key")
+  @@index([cartId], map: "CartItem_cartId_idx")
+  @@index([productId], map: "CartItem_productId_idx")
 }

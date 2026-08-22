@@ -9,6 +9,9 @@ process.env.DATABASE_URL ??=
 process.env.AUTH_COOKIE_MODE ??= 'local-http';
 process.env.AUTH_ORIGIN ??= 'http://localhost:3000';
 process.env.AUTH_SESSIONS_ENABLED ??= 'false';
+process.env.CART_COOKIE_MODE ??= 'local-http';
+process.env.CART_CSRF_KEYRING ??= `openapi-v1:${'22'.repeat(32)}`;
+process.env.CART_ORIGIN ??= 'http://localhost:3000';
 
 async function generateOpenApi() {
   const { AppModule } = await import('../src/app.module.js');
