@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { StorefrontShell } from '../components/storefront/storefront-shell';
+import { CartProvider } from '../features/cart/cart-context';
 import '../styles/design-tokens.css';
 import './globals.css';
 
@@ -17,7 +18,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en-GB">
       <body>
-        <StorefrontShell>{children}</StorefrontShell>
+        <CartProvider>
+          <StorefrontShell>{children}</StorefrontShell>
+        </CartProvider>
       </body>
     </html>
   );
