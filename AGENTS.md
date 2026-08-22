@@ -19,7 +19,7 @@
 ## Cost-aware orchestration
 
 - The root orchestrator owns one vertical scope, integration, PR and final status. It does not maintain an idle agent pool.
-- Use at most two disjoint workers. Stop or reuse each worker immediately after its handoff; never leave completed agents waiting.
+- Use at most three disjoint workers concurrently: one root orchestrator plus three spawned workers, for four total slots. Stop or reuse each worker immediately after its handoff; never leave completed agents waiting.
 - `gpt-5.6-sol`: architecture, security-sensitive work, risky cross-cutting changes and independent exact-head closure review.
 - `gpt-5.6-terra`: ordinary feature implementation, medium-complexity fixes and integration work.
 - `gpt-5.6-luna`: bounded mechanical edits, fixtures, repetitive tests, inventories and documentation.
