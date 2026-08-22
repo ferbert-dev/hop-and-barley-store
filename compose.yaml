@@ -65,6 +65,8 @@ services:
 
   web:
     build:
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
       context: .
       dockerfile: apps/web/Dockerfile
     depends_on:
@@ -72,6 +74,7 @@ services:
         condition: service_healthy
     environment:
       API_INTERNAL_URL: http://api:3001/api/v1
+      NEXT_PUBLIC_API_URL: http://localhost:3001
       HOSTNAME: 0.0.0.0
       NODE_ENV: production
       PORT: 3000

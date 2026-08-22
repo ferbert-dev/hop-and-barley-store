@@ -6,53 +6,8 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { selectSessionCookieHeader, type SessionCookie } from './auth-cookie';
-import {
-  loginWithPassword,
-  logoutCurrentSession,
-  registerWithPassword,
-} from './auth-transport';
+import { logoutCurrentSession } from './auth-transport';
 import type { AuthFormState } from './auth-state';
-import {
-  safeReturnPath,
-  validateLoginInput,
-  validateRegistrationInput,
-  type AuthCredentials,
-} from './auth-validation';
-
-export async function registerAction(
-  _previousState: AuthFormState,
-  formData: FormData,
-): Promise<AuthFormState> {
-  const validated = validateRegistrationInput(readCredentials(formData));
-  if (!validated.ok) return { errors: validated.errors, status: 'invalid' };
-
-  const origin = await readExactRequestOrigin();
-  if (!origin) return { status: 'unavailable' };
-
-  const result = await registerWithPassword(validated.value, origin);
-  if (result.kind === 'accepted') return { status: 'accepted' };
-  if (result.kind === 'invalid') return { status: 'invalid' };
-  return { status: 'unavailable' };
-}
-
-export async function loginAction(
-  returnTo: string,
-  _previousState: AuthFormState,
-  formData: FormData,
-): Promise<AuthFormState> {
-  const validated = validateLoginInput(readCredentials(formData));
-  if (!validated.ok) return { errors: validated.errors, status: 'invalid' };
-
-  const origin = await readExactRequestOrigin();
-  if (!origin) return { status: 'unavailable' };
-
-  const result = await loginWithPassword(validated.value, origin);
-  if (result.kind === 'invalid') return { status: 'invalid' };
-  if (result.kind === 'unavailable') return { status: 'unavailable' };
-
-  (await cookies()).set(result.cookie);
-  redirect(safeReturnPath(returnTo));
-}
 
 export async function logoutAction(
   _previousState: AuthFormState,
@@ -74,15 +29,6 @@ export async function logoutAction(
     cookieStore.set(clearCookieFor(sessionCookie));
   }
   redirect('/login?status=signed-out');
-}
-
-function readCredentials(formData: FormData): AuthCredentials {
-  const email = formData.get('email');
-  const password = formData.get('password');
-  return {
-    email: typeof email === 'string' ? email : '',
-    password: typeof password === 'string' ? password : '',
-  };
 }
 
 async function readExactRequestOrigin(): Promise<string | null> {

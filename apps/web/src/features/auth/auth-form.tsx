@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState, useEffect, useRef } from 'react';
+import { useActionState, useCallback, useEffect, useRef } from 'react';
 
 import { Button } from '../../components/ui/button';
 import { Field } from '../../components/ui/field';
+import { loginFromBrowser, registerFromBrowser } from './auth-browser-actions';
 import { INITIAL_AUTH_FORM_STATE, type AuthFormState } from './auth-state';
 import styles from './auth.module.css';
 
@@ -14,8 +15,9 @@ export type AuthFormAction = (
 ) => Promise<AuthFormState>;
 
 type AuthFormProps = Readonly<{
-  action: AuthFormAction;
+  action?: AuthFormAction;
   kind: 'login' | 'register';
+  returnTo?: string;
   signedOut?: boolean;
 }>;
 
@@ -42,7 +44,19 @@ const formCopy = {
   },
 } as const;
 
-export function AuthForm({ action, kind, signedOut = false }: AuthFormProps) {
+export function AuthForm({
+  action: suppliedAction,
+  kind,
+  returnTo = '/',
+  signedOut = false,
+}: AuthFormProps) {
+  const loginAction = useCallback(
+    (state: AuthFormState, formData: FormData) =>
+      loginFromBrowser(returnTo, state, formData),
+    [returnTo],
+  );
+  const action =
+    suppliedAction ?? (kind === 'login' ? loginAction : registerFromBrowser);
   const [state, formAction, pending] = useActionState(
     action,
     INITIAL_AUTH_FORM_STATE,
