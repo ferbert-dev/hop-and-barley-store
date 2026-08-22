@@ -54,6 +54,19 @@ const projectOpsInstalledPaths = [
   'docs/engineering-workflow.md',
   'tickets/ticket-template.md',
 ];
+const portableAgentsPath =
+  '.agents/skills/project-ops-bootstrap/assets/repository/AGENTS.md';
+const workerPolicyWithoutNumericLimitPaths = [
+  'docs/engineering-workflow.md',
+  '.agents/skills/project-ops-bootstrap/SKILL.md',
+  '.agents/skills/project-ops-bootstrap/assets/repository/docs/engineering-workflow.md',
+  '.agents/skills/project-ops-bootstrap/assets/notion/agent-roles.md',
+  '.agents/skills/project-ops-bootstrap/scripts/verify_local.py',
+];
+const workerLimitPattern =
+  /\bone root orchestrator plus at most ([a-z0-9-]+) spawned workers concurrently\b/iu;
+const numericWorkerLimitPattern =
+  /\b(?:at most|up to|maximum(?: of)?|max(?:imum)?(?: of)?)\s+(?:\d+|one|two|three|four|five)\s+(?:disjoint\s+|spawned\s+)?workers?\b/iu;
 
 const workflow = readFileSync(workflowPath, 'utf8');
 const contract = JSON.parse(readFileSync(contractPath, 'utf8'));
@@ -95,7 +108,7 @@ const expectedCleanOrder = [
 ];
 
 const expectedPolicyDigest =
-  'sha256:7538759f7f543161c395ce6780cc3a08478f749df88a98eb5670496cf8498a7a';
+  'sha256:fcc4012937e0de9aef415354eb7ea25427d81e6033aab2830a3c663339c0871a';
 const expectedNextStrategies = [
   'serialized-build-start-test-stop',
   'unique-build-output-per-server',
@@ -203,7 +216,6 @@ const expectedVerificationSummary = {
 const expectedOrchestration = {
   sourceTicket: 'OPS1',
   rootOwns: ['vertical-scope', 'integration', 'pull-request', 'final-status'],
-  maxDisjointWorkers: 2,
   maxIndependentReviewers: 1,
   reviewStartsAfter: 'green-required-ci',
   nextScopeStartsAfter: ['merged', 'explicitly-blocked'],
@@ -801,18 +813,50 @@ test('ticket template captures traceability and the concise verification summary
   }
 });
 
-test('root and scoped agent instructions inherit bounded model routing', () => {
+test('root agent instructions are the only numeric worker-limit sources', () => {
   const rootAgents = readFileSync(join(repositoryRoot, 'AGENTS.md'), 'utf8');
+  const portableAgents = readFileSync(
+    join(repositoryRoot, portableAgentsPath),
+    'utf8',
+  );
   for (const literal of [
+    '[`docs/engineering-workflow.md`](docs/engineering-workflow.md)',
+    'sole source of truth for the worker concurrency limit',
     'gpt-5.6-sol',
     'gpt-5.6-terra',
     'gpt-5.6-luna',
-    'at most two disjoint workers',
     'never leave completed agents waiting',
     'Start one independent exact-head reviewer only after green CI',
   ]) {
     assert.ok(rootAgents.includes(literal), literal);
   }
+
+  const rootWorkerLimit = rootAgents.match(workerLimitPattern);
+  const portableWorkerLimit = portableAgents.match(workerLimitPattern);
+  assert.ok(rootWorkerLimit, 'root AGENTS.md must own one worker limit');
+  assert.ok(
+    portableWorkerLimit,
+    'portable AGENTS.md must own one worker limit',
+  );
+  assert.equal(rootWorkerLimit[1], portableWorkerLimit[1]);
+  assert.match(
+    portableAgents,
+    /sole source of truth for the worker concurrency limit/iu,
+  );
+
+  assert.match(
+    workflow,
+    /AGENTS\.md.*sole source of truth for the worker\s+concurrency limit/su,
+  );
+  for (const relativePath of workerPolicyWithoutNumericLimitPaths) {
+    const contents = readFileSync(join(repositoryRoot, relativePath), 'utf8');
+    assert.doesNotMatch(
+      contents,
+      numericWorkerLimitPattern,
+      `${relativePath} must defer the numeric worker limit to root AGENTS.md`,
+    );
+  }
+  assert.equal('maxDisjointWorkers' in contract.orchestration, false);
 
   for (const relativePath of agentInstructionPaths) {
     const contents = readFileSync(join(repositoryRoot, relativePath), 'utf8');
@@ -995,9 +1039,9 @@ test('contract rejects retained test outputs or incomplete summaries', () => {
   assert.match(errors, /concise verification summary policy/);
 });
 
-test('contract rejects extra workers, idle pools or weakened model routing', () => {
+test('contract rejects a duplicated worker limit or weakened model routing', () => {
   const candidate = clone(contract);
-  candidate.orchestration.maxDisjointWorkers = 3;
+  candidate.orchestration.duplicatedPolicy = 'worker-concurrency-limit';
   candidate.orchestration.idleAgentPoolAllowed = true;
   candidate.orchestration.models['gpt-5.6-sol'].work = [];
   candidate.orchestration.fallback.downwardAfterUncertaintyAllowed = true;

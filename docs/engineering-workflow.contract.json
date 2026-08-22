@@ -3,7 +3,7 @@
   "ticket": "R2",
   "agentRun": "https://app.notion.com/p/3bdd78850eab81d69677f7d24401fbcc",
   "correctionAgentRun": null,
-  "policyDigest": "sha256:7538759f7f543161c395ce6780cc3a08478f749df88a98eb5670496cf8498a7a",
+  "policyDigest": "sha256:fcc4012937e0de9aef415354eb7ea25427d81e6033aab2830a3c663339c0871a",
   "rules": [
     {
       "id": "independent-required-checks",
@@ -86,7 +86,7 @@
       "id": "bounded-agent-lifecycle",
       "owner": "Root orchestrator",
       "timing": "Throughout one ticket-owned vertical scope",
-      "verification": "Use at most two disjoint workers, start one reviewer only after green CI and stop or reuse every completed worker immediately after handoff.",
+      "verification": "Use the worker concurrency limit from the root AGENTS.md, start one reviewer only after green CI and stop or reuse every completed worker immediately after handoff.",
       "rollback": "Stop excess or idle agents, keep the current PR as the only active vertical scope and resume from its recorded handoff."
     },
     {
@@ -133,7 +133,6 @@
       "pull-request",
       "final-status"
     ],
-    "maxDisjointWorkers": 2,
     "maxIndependentReviewers": 1,
     "reviewStartsAfter": "green-required-ci",
     "nextScopeStartsAfter": ["merged", "explicitly-blocked"],

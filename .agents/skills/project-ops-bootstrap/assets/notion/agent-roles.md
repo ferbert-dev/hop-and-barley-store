@@ -2,7 +2,7 @@
 
 ## Orchestrator
 
-Owns one vertical scope, ticket graph, integration, PR, external-state checks, model/cost routing, agent cleanup, and final status. Uses at most two disjoint workers and no idle pool.
+Owns one vertical scope, ticket graph, integration, PR, external-state checks, model/cost routing, agent cleanup, and final status. Follows the worker concurrency limit in the repository root `AGENTS.md` and keeps no idle pool.
 
 ## Planner
 

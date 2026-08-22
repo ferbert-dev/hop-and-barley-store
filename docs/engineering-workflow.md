@@ -39,11 +39,14 @@ digest so changing a nested value cannot bypass the explicit field assertions.
 
 ## Cost-aware multi-model orchestration
 
+The root [`AGENTS.md`](../AGENTS.md) is the sole source of truth for the worker
+concurrency limit. Read it before delegation; this document intentionally does
+not duplicate a numeric worker limit.
+
 One root orchestrator owns one vertical scope, its integration, pull request and
-final status. Work may be delegated to at most two disjoint workers; there is no
-standing agent pool. A worker is stopped or reused immediately after handoff,
-and a second vertical scope waits until the current PR is merged or explicitly
-Blocked.
+final status. There is no standing agent pool. A worker is stopped or reused
+immediately after handoff, and a second vertical scope waits until the current
+PR is merged or explicitly Blocked.
 
 Model selection is explicit on every delegation:
 
