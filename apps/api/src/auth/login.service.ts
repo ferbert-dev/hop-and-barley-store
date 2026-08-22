@@ -9,6 +9,7 @@ import type { LoginDto } from './dto/login.dto';
 import { canonicalizeRegistrationEmail } from './email-normalization';
 import { LoginRateLimiter } from './login-rate-limiter';
 import { PasswordHashExecutor } from './password/password-hash-executor';
+import { normalizePasswordForHashing } from './password/password-policy';
 import {
   hashLoginAccountKey,
   SessionIssueRejectedError,
@@ -82,7 +83,7 @@ export class LoginService {
       user?.passwordCredential?.passwordHash ?? UNKNOWN_ACCOUNT_PHC;
     const verified = await this.passwordHasher.verify(
       passwordHash,
-      dto.password,
+      normalizePasswordForHashing(dto.password),
     );
 
     if (

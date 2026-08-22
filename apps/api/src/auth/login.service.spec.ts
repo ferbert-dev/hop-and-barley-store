@@ -69,6 +69,23 @@ describe('LoginService', () => {
     expect(result.userId).toBe(USER_ID);
   });
 
+  it('verifies the same NFC password representation used at registration', async () => {
+    const fixture = createFixture(activeUser(), true);
+
+    await fixture.service.login(
+      {
+        email: 'brewer@example.com',
+        password: 'Cafe\u0301-Long-Passphrase',
+      },
+      null,
+    );
+
+    expect(fixture.hasher.verify).toHaveBeenCalledWith(
+      PASSWORD_HASH,
+      'Café-Long-Passphrase',
+    );
+  });
+
   it('uses a non-reversible account bucket key independent from the IP bucket', async () => {
     const fixture = createFixture(activeUser(), true);
 

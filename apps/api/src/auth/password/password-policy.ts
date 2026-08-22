@@ -41,7 +41,7 @@ export function loadCommonPasswordBlocklist(): ReadonlySet<string> {
 }
 
 export function normalizeRegistrationPassword(input: string): string {
-  const password = input.normalize('NFC');
+  const password = normalizePasswordForHashing(input);
   const codePointLength = [...password].length;
 
   if (
@@ -55,4 +55,8 @@ export function normalizeRegistrationPassword(input: string): string {
   }
 
   return password;
+}
+
+export function normalizePasswordForHashing(input: string): string {
+  return input.normalize('NFC');
 }
