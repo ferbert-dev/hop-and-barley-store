@@ -68,6 +68,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AuthController_register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -163,6 +179,22 @@ export interface components {
             availability: "in-stock" | "out-of-stock";
             category: components["schemas"]["ProductCategoryDto"];
             specifications: components["schemas"]["ProductSpecificationDto"][];
+        };
+        RegisterDto: {
+            /**
+             * @description Email with an ASCII dot-atom local part and an IDNA-compatible domain.
+             * @example brewer@example.com
+             */
+            email: string;
+            /** @description NFC password, 15–128 Unicode code points, at most 512 UTF-8 bytes. */
+            password: string;
+        };
+        RegistrationAcceptedDto: {
+            /**
+             * @example accepted
+             * @enum {string}
+             */
+            status: "accepted";
         };
     };
     responses: never;
@@ -373,6 +405,64 @@ export interface operations {
             };
             /** @description Product not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterDto"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationAcceptedDto"];
+                };
+            };
+            /** @description Invalid registration input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Origin is not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description JSON body required */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Registration unavailable */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Registration unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

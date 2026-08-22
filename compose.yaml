@@ -43,6 +43,8 @@ services:
       <<: *api-environment
       CORS_ORIGINS: http://localhost:3000
       PORT: 3001
+      REGISTRATION_ENABLED: 'true'
+      REGISTRATION_ORIGIN: http://localhost:3000
     healthcheck:
       test:
         [

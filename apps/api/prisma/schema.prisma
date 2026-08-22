@@ -8,6 +8,41 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id                 String              @id(map: "User_pkey") @default(uuid()) @db.Uuid
+  email              String              @db.VarChar(320)
+  normalizedEmail    String              @unique(map: "User_normalizedEmail_key") @db.VarChar(320)
+  role               UserRole            @default(CUSTOMER)
+  status             UserStatus          @default(ACTIVE)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  passwordCredential PasswordCredential?
+}
+
+model PasswordCredential {
+  userId       String   @id(map: "PasswordCredential_pkey") @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "PasswordCredential_userId_fkey")
+  passwordHash String   @db.VarChar(255)
+  algorithm    String   @db.VarChar(16)
+  version      Int      @db.SmallInt
+  memoryCost   Int
+  timeCost     Int      @db.SmallInt
+  parallelism  Int      @db.SmallInt
+  hashLength   Int      @db.SmallInt
+  saltLength   Int      @db.SmallInt
+  changedAt    DateTime @default(now())
+}
+
 model Category {
   id           String    @id(map: "Category_pkey") @default(uuid()) @db.Uuid
   name         String
