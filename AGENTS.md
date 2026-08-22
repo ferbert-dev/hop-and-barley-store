@@ -3,6 +3,8 @@
 ## Read first
 
 - Read the relevant Notion ticket and architecture before state-changing work.
+- Read [`docs/engineering-workflow.md`](docs/engineering-workflow.md) before planning, implementation, integration or review; it defines the detailed delivery, evidence, verification and rollback lifecycle.
+- This `AGENTS.md` is the sole source of truth for the worker concurrency limit. Do not duplicate a numeric worker limit in the engineering workflow or its machine contract.
 - Implementation truth lives in repository code, tests, migrations and Git history. Notion owns intent, decisions, tickets and Agent Runs. GitHub owns PR, CI, review and merge evidence.
 - Before external writes, confirm scope, dependencies, acceptance criteria, risk, verification, rollback and current-thread authority.
 - One ticket owns one `codex/<ticket>-<slug>` branch and one pull request. Never mix vertical scopes.
@@ -19,7 +21,7 @@
 ## Cost-aware orchestration
 
 - The root orchestrator owns one vertical scope, integration, PR and final status. It does not maintain an idle agent pool.
-- Use at most three disjoint workers concurrently: one root orchestrator plus three spawned workers, for four total slots. Stop or reuse each worker immediately after its handoff; never leave completed agents waiting.
+- Use one root orchestrator plus at most three spawned workers concurrently, for four total slots. Stop or reuse each worker immediately after its handoff; never leave completed agents waiting.
 - `gpt-5.6-sol`: architecture, security-sensitive work, risky cross-cutting changes and independent exact-head closure review.
 - `gpt-5.6-terra`: ordinary feature implementation, medium-complexity fixes and integration work.
 - `gpt-5.6-luna`: bounded mechanical edits, fixtures, repetitive tests, inventories and documentation.
