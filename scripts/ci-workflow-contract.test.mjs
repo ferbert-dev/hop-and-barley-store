@@ -40,6 +40,7 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
   for (const command of [
     'pnpm install --frozen-lockfile --ignore-scripts',
     'pnpm clean',
+    'pnpm ci:contract',
     'pnpm generated:verify',
     'pnpm exec turbo run typecheck --force',
     'pnpm format:check',
@@ -66,9 +67,27 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
 });
 
 test('clean public database and web verification commands own their prerequisites', () => {
+  const rootPackage = JSON.parse(read('package.json'));
   const apiPackage = JSON.parse(read('apps/api/package.json'));
   const e2ePackage = JSON.parse(read('apps/e2e/package.json'));
   const webReadme = read('apps/web/README.md');
+
+  assert.match(
+    rootPackage.scripts['generated:verify'],
+    /^pnpm --filter @hop-and-barley\/auth-contract build && /,
+  );
+  for (const command of [
+    'test:catalog:postgres',
+    'test:a1:postgres',
+    'test:a1b:postgres',
+    'test:o0:postgres',
+  ]) {
+    assert.match(
+      rootPackage.scripts[command],
+      /^pnpm --filter @hop-and-barley\/auth-contract build && /,
+      `${command} must build its workspace runtime dependency`,
+    );
+  }
 
   assert.equal(
     apiPackage.scripts['db:seed'],
@@ -76,7 +95,7 @@ test('clean public database and web verification commands own their prerequisite
   );
   assert.equal(
     e2ePackage.scripts['test:e2e'],
-    'pnpm --filter @hop-and-barley/api-client build && playwright test',
+    'pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api-client build && playwright test',
   );
   assert.doesNotMatch(
     webReadme,
@@ -89,6 +108,18 @@ test('clean public database and web verification commands own their prerequisite
       ),
     );
   }
+});
+
+test('browser CI runs the behavioral disposable-settings contract', () => {
+  const rootPackage = JSON.parse(read('package.json'));
+  const workflow = read('.github/workflows/ci.yml');
+
+  assert.equal(
+    rootPackage.scripts['ci:contract'],
+    'node --test scripts/ci-workflow-contract.test.mjs scripts/configure-ci-browser-env.test.mjs',
+  );
+  assert.match(workflow, /pnpm ci:contract/);
+  assert.match(workflow, /node scripts\/configure-ci-browser-env\.mjs/);
 });
 
 test('the security override and Docker context privacy guards remain exact', () => {
