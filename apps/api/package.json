@@ -33,6 +33,7 @@
     "generate:openapi": "prisma generate && node --import tsx scripts/generate-openapi.ts"
   },
   "dependencies": {
+    "@hop-and-barley/auth-contract": "workspace:*",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "4.0.4",
     "@nestjs/core": "^11.0.1",

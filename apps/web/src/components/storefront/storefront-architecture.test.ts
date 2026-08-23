@@ -82,7 +82,7 @@ describe('storefront shell architecture', () => {
     });
     expect(turbo.tasks.dev.dependsOn).toContain('^build');
     expect(dockerfile).toMatch(
-      /--filter @hop-and-barley\/api-client build && pnpm --filter @hop-and-barley\/web build/,
+      /--filter @hop-and-barley\/auth-contract build && \\\s+pnpm --filter @hop-and-barley\/api-client build && \\\s+pnpm --filter @hop-and-barley\/web build/,
     );
   });
 });

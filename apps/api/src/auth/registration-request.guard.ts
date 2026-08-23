@@ -12,6 +12,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
+import { originIsAllowed } from '../config/origin-list';
 import {
   REGISTRATION_CACHE_CONTROL,
   REGISTRATION_UNAVAILABLE,
@@ -51,7 +52,10 @@ export class RegistrationRequestGuard implements CanActivate {
       throw new ServiceUnavailableException(REGISTRATION_UNAVAILABLE);
     }
     if (
-      request.get('origin') !== this.config.get<string>('REGISTRATION_ORIGIN')
+      !originIsAllowed(
+        this.config.getOrThrow<string>('REGISTRATION_ORIGIN'),
+        request.get('origin'),
+      )
     ) {
       this.reject('origin', requestId);
       throw new ForbiddenException({ status: 'forbidden' });

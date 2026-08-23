@@ -1,7 +1,7 @@
-import type { AuthCredentials } from './auth-validation';
+import type { AuthFieldName } from './auth-validation';
 
 export type AuthFormState = Readonly<{
-  errors?: Partial<Record<keyof AuthCredentials, string>>;
+  errors?: Partial<Record<AuthFieldName, string>>;
   status: 'accepted' | 'idle' | 'invalid' | 'unavailable';
 }>;
 

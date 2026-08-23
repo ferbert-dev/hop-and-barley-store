@@ -12,6 +12,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - Follow the root `AGENTS.md`, relevant ticket and architecture. Web tickets inherit its one-branch/PR, model-routing and agent-lifecycle rules.
 - Stack: Next.js 16 App Router, React 19 and Tailwind CSS 4. Read version-matched bundled Next docs and use Context7 for current external documentation.
+- Before any frontend implementation or UI change, read `docs/figma-design-navigation.md`, open the exact screen/node link recorded there, and reproduce the confirmed design faithfully. If a detail is unclear, verify it in Figma through an available browser session; if neither the document nor Figma confirms it, stop and ask the user one short, concrete question instead of inventing it. Keep user-confirmed additions explicitly separate from Figma-authored details.
 - Use `vercel-react-best-practices` only as a React/Next performance checklist; it does not select Vercel hosting.
 - Prefer Server Components. Add a client boundary only for browser-only state, events or APIs, and keep it as narrow as possible.
 - Browser code never accesses PostgreSQL or imports API source. Server-rendered code uses the generated `@hop-and-barley/api-client`; Docker API base is `http://api:3001/api/v1`.

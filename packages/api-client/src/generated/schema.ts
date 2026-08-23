@@ -358,11 +358,12 @@ export interface components {
         };
         RegisterDto: {
             /**
+             * Format: email
              * @description Email with an ASCII dot-atom local part and an IDNA-compatible domain.
              * @example brewer@example.com
              */
             email: string;
-            /** @description NFC password, 15–128 Unicode code points, at most 512 UTF-8 bytes. */
+            /** @description At least 12 total characters containing lowercase, uppercase, digit, and special characters. */
             password: string;
         };
         RegistrationAcceptedDto: {

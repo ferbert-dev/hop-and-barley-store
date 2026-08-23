@@ -92,6 +92,45 @@
   text-underline-offset: var(--hb-space-1);
 }
 
+.passwordRequirements,
+.requirementList {
+  display: grid;
+  gap: var(--hb-space-2);
+}
+
+.requirementList {
+  list-style: none;
+}
+
+.requirementMet {
+  color: var(--hb-color-success);
+}
+
+.requirementPending {
+  color: var(--hb-color-text-muted);
+}
+
+.separator {
+  align-items: center;
+  color: var(--hb-color-text-muted);
+  display: grid;
+  gap: var(--hb-space-3);
+  grid-template-columns: 1fr auto 1fr;
+}
+
+.separator::before,
+.separator::after {
+  border-top: 1px solid var(--hb-color-border);
+  content: '';
+}
+
+.googleNote {
+  color: var(--hb-color-text-muted);
+  font-size: var(--hb-font-size-sm);
+  margin: calc(var(--hb-space-4) * -1) 0 0;
+  text-align: center;
+}
+
 .feedback:focus,
 .errorSummary:focus {
   outline: 3px solid var(--hb-color-brand);

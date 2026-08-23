@@ -42,7 +42,7 @@ void detailRequest;
 const registrationRequest = configuredClient.POST('/api/v1/auth/register', {
   body: {
     email: 'brewer@example.com',
-    password: 'correct horse battery staple',
+    password: 'Abcdefghi1!x',
   },
 });
 void registrationRequest;

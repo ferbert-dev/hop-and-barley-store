@@ -1,39 +1,31 @@
-import {
-  loadCommonPasswordBlocklist,
-  normalizeRegistrationPassword,
-  PINNED_BLOCKLIST_SHA256,
-} from './password-policy';
+import { normalizeRegistrationPassword } from './password-policy';
 
 describe('registration password policy', () => {
-  it('ships the pinned, exact 10k SecLists snapshot', () => {
-    const blocklist = loadCommonPasswordBlocklist();
-
-    expect(blocklist.size).toBe(10_000);
-    expect(PINNED_BLOCKLIST_SHA256).toBe(
-      '4adb3f0afb4a10cf19ebe48d8c69a46f934bbc8d77c694c210564f9583e7f4ba',
-    );
-    expect(blocklist.has('password')).toBe(true);
-    expect(blocklist.has('123456789')).toBe(true);
+  it('accepts exactly 12 total characters when all categories are present', () => {
+    expect(normalizeRegistrationPassword('Abcdefghi1!x')).toBe('Abcdefghi1!x');
   });
 
-  it('returns the NFC form and measures Unicode code points', () => {
-    expect(normalizeRegistrationPassword('Cafe\u0301-Long-Passphrase')).toBe(
-      'Café-Long-Passphrase',
-    );
-    expect(normalizeRegistrationPassword('🫙'.repeat(15))).toBe(
-      '🫙'.repeat(15),
+  it('normalizes to NFC before applying the shared policy', () => {
+    expect(normalizeRegistrationPassword('Cafe\u0301Strong1!')).toBe(
+      'CaféStrong1!',
     );
   });
 
   it.each([
-    'short-password',
-    'a'.repeat(129),
-    `${'valid-long-password'}\n`,
-    'password',
-    'PASSWORD',
-  ])('rejects password-policy violation without echoing %p', (password) => {
+    ['fewer than 12 total characters', 'Abcdefg1!x'],
+    ['no lowercase letter', 'ABCDEFGHI1!X'],
+    ['no uppercase letter', 'abcdefghi1!x'],
+    ['no digit', 'Abcdefghij!x'],
+    ['no special character', 'Abcdefghi12x'],
+  ])('rejects %s without echoing the password', (_case, password) => {
     expect(() => normalizeRegistrationPassword(password)).toThrow(
       'Invalid registration input.',
     );
+  });
+
+  it('does not impose the former blocklist or maximum length rules', () => {
+    expect(normalizeRegistrationPassword('Password123!')).toBe('Password123!');
+    const longPassword = `A1!${'a'.repeat(200)}`;
+    expect(normalizeRegistrationPassword(longPassword)).toBe(longPassword);
   });
 });

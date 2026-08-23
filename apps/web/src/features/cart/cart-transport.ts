@@ -1,6 +1,7 @@
 'use client';
 
 import { createApiClient, type components } from '@hop-and-barley/api-client';
+import { resolveBrowserApiUrl } from '../../lib/browser-api-url';
 
 const DEFAULT_API_URL = 'http://localhost:3001';
 const CART_REQUEST_TIMEOUT_MS = 1_500;
@@ -24,13 +25,21 @@ export type CartTransport = Readonly<{
 export function createBrowserCartTransport(
   requestOrigin: () => string = () => window.location.origin,
   apiUrl = process.env.NEXT_PUBLIC_API_URL ?? DEFAULT_API_URL,
+  apiHostAliases = process.env.NEXT_PUBLIC_API_HOST_ALIASES ?? '',
 ): CartTransport {
-  const client = createApiClient(apiUrl, {
-    cache: 'no-store',
-    credentials: 'include',
-  });
+  const requestContext = () => {
+    const origin = requestOrigin();
+    const client = createApiClient(
+      resolveBrowserApiUrl(apiUrl, origin, apiHostAliases),
+      {
+        cache: 'no-store',
+        credentials: 'include',
+      },
+    );
+    return { client, origin };
+  };
 
-  const withCsrf = async () => {
+  const withCsrf = async (client: ReturnType<typeof createApiClient>) => {
     const { data, error, response } = await client.GET('/api/v1/cart/csrf', {
       signal: AbortSignal.timeout(CART_REQUEST_TIMEOUT_MS),
     });
@@ -42,21 +51,24 @@ export function createBrowserCartTransport(
     return data.csrfToken;
   };
 
-  const bootstrapHeaders = () => ({ Origin: requestOrigin() });
-  const mutationHeaders = (csrfToken: string) => ({
-    Origin: requestOrigin(),
+  const bootstrapHeaders = (origin: string) => ({ Origin: origin });
+  const mutationHeaders = (origin: string, csrfToken: string) => ({
+    Origin: origin,
     'X-CSRF-Token': csrfToken,
   });
 
   return {
     async add(productSlug, quantity) {
-      const csrfToken = await withCsrf();
+      const { client, origin } = requestContext();
+      const csrfToken = await withCsrf(client);
       const { data, error, response } = await client.POST(
         '/api/v1/cart/items',
         {
           body: { productSlug, quantity },
           params: {
-            header: csrfToken ? mutationHeaders(csrfToken) : bootstrapHeaders(),
+            header: csrfToken
+              ? mutationHeaders(origin, csrfToken)
+              : bootstrapHeaders(origin),
           },
           signal: AbortSignal.timeout(CART_REQUEST_TIMEOUT_MS),
         },
@@ -64,29 +76,32 @@ export function createBrowserCartTransport(
       return cartFromResponse(data, error, response);
     },
     async clear() {
-      const csrfToken = await requireCsrf(withCsrf);
+      const { client, origin } = requestContext();
+      const csrfToken = await requireCsrf(() => withCsrf(client));
       const { data, error, response } = await client.DELETE(
         '/api/v1/cart/items',
         {
-          params: { header: mutationHeaders(csrfToken) },
+          params: { header: mutationHeaders(origin, csrfToken) },
           signal: AbortSignal.timeout(CART_REQUEST_TIMEOUT_MS),
         },
       );
       return cartFromResponse(data, error, response);
     },
     async load() {
+      const { client } = requestContext();
       const { data, error, response } = await client.GET('/api/v1/cart', {
         signal: AbortSignal.timeout(CART_REQUEST_TIMEOUT_MS),
       });
       return cartFromResponse(data, error, response);
     },
     async remove(productSlug) {
-      const csrfToken = await requireCsrf(withCsrf);
+      const { client, origin } = requestContext();
+      const csrfToken = await requireCsrf(() => withCsrf(client));
       const { data, error, response } = await client.DELETE(
         '/api/v1/cart/items/{productSlug}',
         {
           params: {
-            header: mutationHeaders(csrfToken),
+            header: mutationHeaders(origin, csrfToken),
             path: { productSlug },
           },
           signal: AbortSignal.timeout(CART_REQUEST_TIMEOUT_MS),
@@ -95,13 +110,14 @@ export function createBrowserCartTransport(
       return cartFromResponse(data, error, response);
     },
     async update(productSlug, quantity) {
-      const csrfToken = await requireCsrf(withCsrf);
+      const { client, origin } = requestContext();
+      const csrfToken = await requireCsrf(() => withCsrf(client));
       const { data, error, response } = await client.PATCH(
         '/api/v1/cart/items/{productSlug}',
         {
           body: { quantity },
           params: {
-            header: mutationHeaders(csrfToken),
+            header: mutationHeaders(origin, csrfToken),
             path: { productSlug },
           },
           signal: AbortSignal.timeout(CART_REQUEST_TIMEOUT_MS),

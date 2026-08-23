@@ -32,6 +32,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@hop-and-barley/auth-contract':
+        specifier: workspace:*
+        version: link:../../packages/auth-contract
       '@nestjs/common':
         specifier: ^11.0.1
         version: 11.1.29(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2)
@@ -180,6 +183,9 @@ importers:
       '@hop-and-barley/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@hop-and-barley/auth-contract':
+        specifier: workspace:*
+        version: link:../../packages/auth-contract
       next:
         specifier: 16.3.1
         version: 16.3.1(@babel/core@7.29.7(supports-color@10.2.2))(@playwright/test@1.62.1)(@types/node@20.19.43)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -251,6 +257,16 @@ importers:
       rimraf:
         specifier: 6.1.3
         version: 6.1.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/auth-contract:
+    dependencies:
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -5614,6 +5630,7 @@ packages:
         integrity: sha512-DgZS62aPLXKlnxILS/AYCoRvHaZeXceIzlXPkkGGzJWSow1aEk0lbTlxUSlyjC8jcaKxAdOnTDz+o1JFSBsyjw==,
       }
     engines: { node: ^18.18.0 || ^20.9.0 || >=21.1.0 }
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -7739,7 +7756,7 @@ packages:
       {
         integrity: sha512-VijLXbi3UACN69I0JVXJsX4tjACjNoQDgv2gTF6sx2wWEi8tkSg2eX8p5gSIFi8z2+DL3oHmY6OyKce38SDolg==,
       }
-    engines: { node: ^18 || ^20 || >=21 }
+    engines: { node: ^18 || ^20 || >= 21 }
 
   node-emoji@1.11.0:
     resolution:
@@ -7754,18 +7771,18 @@ packages:
       }
     engines: { node: '>= 0.4' }
 
-  node-int64@0.4.0:
-    resolution:
-      {
-        integrity: sha512-O5lz91xSOeoXP6DulyHfllpq+Eg00MWitZIbtPfoSEvqIHdl5gfcY6hYzDWnj0qD5tz52PI08u9qUvSVeUBeHw==,
-      }
-
   node-gyp-build@4.8.4:
     resolution:
       {
         integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==,
       }
     hasBin: true
+
+  node-int64@0.4.0:
+    resolution:
+      {
+        integrity: sha512-O5lz91xSOeoXP6DulyHfllpq+Eg00MWitZIbtPfoSEvqIHdl5gfcY6hYzDWnj0qD5tz52PI08u9qUvSVeUBeHw==,
+      }
 
   node-releases@2.0.53:
     resolution:
@@ -11060,7 +11077,7 @@ snapshots:
 
   '@jest/pattern@30.4.0':
     dependencies:
-      '@types/node': 24.13.3
+      '@types/node': 26.2.0
       jest-regex-util: 30.4.0
 
   '@jest/reporters@30.4.1(supports-color@10.2.2)':
@@ -11147,7 +11164,7 @@ snapshots:
       '@jest/schemas': 30.4.1
       '@types/istanbul-lib-coverage': 2.0.6
       '@types/istanbul-reports': 3.0.4
-      '@types/node': 24.13.3
+      '@types/node': 26.2.0
       '@types/yargs': 17.0.35
       chalk: 4.1.2
 
@@ -14529,7 +14546,7 @@ snapshots:
   jest-haste-map@30.4.1:
     dependencies:
       '@jest/types': 30.4.1
-      '@types/node': 24.13.3
+      '@types/node': 26.2.0
       anymatch: 3.1.3
       fb-watchman: 2.0.2
       graceful-fs: 4.2.11
@@ -14679,7 +14696,7 @@ snapshots:
   jest-util@30.4.1:
     dependencies:
       '@jest/types': 30.4.1
-      '@types/node': 24.13.3
+      '@types/node': 26.2.0
       chalk: 4.1.2
       ci-info: 4.4.0
       graceful-fs: 4.2.11
@@ -14707,13 +14724,13 @@ snapshots:
 
   jest-worker@27.5.1:
     dependencies:
-      '@types/node': 24.13.3
+      '@types/node': 26.2.0
       merge-stream: 2.0.0
       supports-color: 8.1.1
 
   jest-worker@30.4.1:
     dependencies:
-      '@types/node': 24.13.3
+      '@types/node': 26.2.0
       '@ungap/structured-clone': 1.3.3
       jest-util: 30.4.1
       merge-stream: 2.0.0
@@ -15149,9 +15166,9 @@ snapshots:
       object.entries: 1.1.9
       semver: 6.3.1
 
-  node-int64@0.4.0: {}
-
   node-gyp-build@4.8.4: {}
+
+  node-int64@0.4.0: {}
 
   node-releases@2.0.53: {}
 

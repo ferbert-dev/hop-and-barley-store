@@ -10,6 +10,7 @@ import { PasswordHashExecutor } from './password/password-hash-executor';
 import { RegistrationRateLimiter } from './registration-rate-limiter';
 import { RegistrationRequestGuard } from './registration-request.guard';
 import { RegistrationService } from './registration.service';
+import { RegistrationZodPipe } from './dto/registration-zod.pipe';
 import { CsrfService } from './session/csrf.service';
 import { SessionAuthGuard } from './session/session-auth.guard';
 import { SessionService } from './session/session.service';
@@ -27,6 +28,7 @@ import { SessionService } from './session/session.service';
     RegistrationRateLimiter,
     RegistrationRequestGuard,
     RegistrationService,
+    RegistrationZodPipe,
     SessionService,
     { provide: APP_GUARD, useClass: SessionAuthGuard },
   ],

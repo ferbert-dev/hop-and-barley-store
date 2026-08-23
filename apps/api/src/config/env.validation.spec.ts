@@ -58,6 +58,48 @@ describe('auth environment validation', () => {
     ).toThrow(/AUTH_ORIGIN/);
   });
 
+  it('accepts exact dual-loopback allowlists only when CORS covers every flow', () => {
+    const dualOrigins = 'http://localhost:3000,http://127.0.0.1:3000';
+    expect(
+      validateEnvironment({
+        ...BASE,
+        AUTH_ORIGIN: dualOrigins,
+        CART_ORIGIN: dualOrigins,
+        CORS_ORIGINS: dualOrigins,
+        REGISTRATION_ORIGIN: dualOrigins,
+      }),
+    ).toMatchObject({
+      AUTH_ORIGIN: dualOrigins,
+      CART_ORIGIN: dualOrigins,
+      CORS_ORIGINS: dualOrigins,
+      REGISTRATION_ORIGIN: dualOrigins,
+    });
+    expect(() =>
+      validateEnvironment({
+        ...BASE,
+        AUTH_ORIGIN: dualOrigins,
+        CART_ORIGIN: dualOrigins,
+        CORS_ORIGINS: 'http://localhost:3000',
+        REGISTRATION_ORIGIN: dualOrigins,
+      }),
+    ).toThrow(/CORS_ORIGINS/);
+  });
+
+  it('rejects duplicate or non-exact origins in an allowlist', () => {
+    expect(() =>
+      validateEnvironment({
+        ...BASE,
+        AUTH_ORIGIN: 'http://localhost:3000,http://localhost:3000',
+      }),
+    ).toThrow(/AUTH_ORIGIN/);
+    expect(() =>
+      validateEnvironment({
+        ...BASE,
+        REGISTRATION_ORIGIN: 'http://localhost:3000/',
+      }),
+    ).toThrow(/REGISTRATION_ORIGIN/);
+  });
+
   it('requires a valid rotatable keyring only when sessions are enabled', () => {
     expect(
       validateEnvironment({ ...BASE, AUTH_CSRF_KEYRING: '' }),

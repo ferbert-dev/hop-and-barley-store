@@ -5,13 +5,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { AuthForm, type AuthFormAction } from './auth-form';
 
 describe('AuthForm', () => {
-  it('renders password-manager-friendly, labelled registration controls', () => {
+  it('renders the exact registration fields, visible requirements, and inert Google CTA', () => {
     render(<AuthForm action={vi.fn()} kind="register" />);
 
     expect(
       screen.getByRole('heading', { name: 'Create your account' }),
     ).toBeVisible();
-    expect(screen.getByLabelText('Email address')).toHaveAttribute(
+    expect(screen.getByLabelText('Email')).toHaveAttribute(
       'autocomplete',
       'email',
     );
@@ -19,12 +19,36 @@ describe('AuthForm', () => {
       'autocomplete',
       'new-password',
     );
-    expect(screen.getByLabelText('Password')).toHaveAccessibleDescription(
-      '15–128 characters. Use a unique passphrase.',
+    expect(screen.getByLabelText('Confirm Password')).toHaveAttribute(
+      'autocomplete',
+      'new-password',
     );
+    expect(screen.getAllByRole('listitem')).toHaveLength(5);
+    expect(screen.getByText('At least 12 characters total')).toBeVisible();
+    expect(screen.queryByLabelText(/Remember me/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Register' })).toBeEnabled();
     expect(
-      screen.getByRole('button', { name: 'Create account' }),
-    ).toBeEnabled();
+      screen.getByRole('button', { name: 'Continue with Google' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText('Google sign-in is not available in this MVP.'),
+    ).toBeVisible();
+  });
+
+  it('updates every password requirement while typing and reports mismatch', async () => {
+    const user = userEvent.setup();
+    render(<AuthForm action={vi.fn()} kind="register" />);
+
+    await user.type(screen.getByLabelText('Password'), 'Abcdefghi1!x');
+    for (const item of screen.getAllByRole('listitem')) {
+      expect(item).toHaveTextContent(/— met$/);
+    }
+
+    await user.type(screen.getByLabelText('Confirm Password'), 'Abcdefghi1!y');
+    expect(screen.getByText('Passwords do not match.')).toHaveAttribute(
+      'role',
+      'alert',
+    );
   });
 
   it('announces field-safe login validation returned by the action', async () => {
@@ -85,12 +109,10 @@ describe('AuthForm', () => {
       .mockResolvedValue({ status: 'accepted' });
     render(<AuthForm action={action} kind="register" />);
 
-    await user.type(screen.getByLabelText('Email address'), 'a@example.com');
-    await user.type(
-      screen.getByLabelText('Password'),
-      'correct horse battery staple',
-    );
-    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    await user.type(screen.getByLabelText('Email'), 'a@example.com');
+    await user.type(screen.getByLabelText('Password'), 'Abcdefghi1!x');
+    await user.type(screen.getByLabelText('Confirm Password'), 'Abcdefghi1!x');
+    await user.click(screen.getByRole('button', { name: 'Register' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent(
       'If the details can be accepted, your account is ready.',

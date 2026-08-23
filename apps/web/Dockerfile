@@ -9,6 +9,7 @@ WORKDIR /workspace
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/web/package.json apps/web/package.json
+COPY packages/auth-contract/package.json packages/auth-contract/package.json
 COPY packages/api-client/package.json packages/api-client/package.json
 COPY packages/eslint-config/package.json packages/eslint-config/package.json
 COPY packages/typescript-config/package.json packages/typescript-config/package.json
@@ -16,8 +17,12 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ARG NEXT_PUBLIC_API_HOST_ALIASES
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-RUN pnpm --filter @hop-and-barley/api-client build && pnpm --filter @hop-and-barley/web build
+ENV NEXT_PUBLIC_API_HOST_ALIASES=$NEXT_PUBLIC_API_HOST_ALIASES
+RUN pnpm --filter @hop-and-barley/auth-contract build && \
+  pnpm --filter @hop-and-barley/api-client build && \
+  pnpm --filter @hop-and-barley/web build
 
 EXPOSE 3000
 

@@ -21,19 +21,20 @@ test.describe('connected local authentication journey', () => {
   }) => {
     test.setTimeout(60_000);
     const email = `a1c-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
-    const password = 'correct horse battery staple';
+    const password = 'Abcdefghi1!x';
 
     await page.goto('/register');
-    await page.getByLabel('Email address').fill(email);
-    await page.getByLabel('Password').fill(password);
-    await page.getByRole('button', { name: 'Create account' }).click();
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password', { exact: true }).fill(password);
+    await page.getByLabel('Confirm Password').fill(password);
+    await page.getByRole('button', { name: 'Register' }).click();
     await expect(
       page.getByText('If the details can be accepted, your account is ready.'),
     ).toBeVisible();
 
     await page.getByRole('link', { name: 'Continue to sign in' }).click();
     await page.getByLabel('Email address').fill(email);
-    await page.getByLabel('Password').fill(password);
+    await page.getByLabel('Password', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole('link', { name: 'Account' })).toBeVisible();

@@ -24,6 +24,10 @@ describe('direct browser auth transport', () => {
     expect(request.signal.aborted).toBe(false);
     expect(request.headers.get('x-forwarded-for')).toBeNull();
     expect(request.headers.get('forwarded')).toBeNull();
+    await expect(request.clone().json()).resolves.toEqual({
+      email: 'brewer@example.com',
+      password: 'Abcdefghi1!x',
+    });
   });
 
   it('keeps failures generic', async () => {
@@ -46,6 +50,7 @@ describe('direct browser auth transport', () => {
 function credentials() {
   const form = new FormData();
   form.set('email', 'brewer@example.com');
-  form.set('password', 'correct horse battery staple');
+  form.set('password', 'Abcdefghi1!x');
+  form.set('confirmPassword', 'Abcdefghi1!x');
   return form;
 }

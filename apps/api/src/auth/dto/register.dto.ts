@@ -6,6 +6,7 @@ export class RegisterDto {
     description:
       'Email with an ASCII dot-atom local part and an IDNA-compatible domain.',
     example: 'brewer@example.com',
+    format: 'email',
     maxLength: 320,
     type: String,
   })
@@ -14,9 +15,8 @@ export class RegisterDto {
 
   @ApiProperty({
     description:
-      'NFC password, 15–128 Unicode code points, at most 512 UTF-8 bytes.',
-    maxLength: 128,
-    minLength: 15,
+      'At least 12 total characters containing lowercase, uppercase, digit, and special characters.',
+    minLength: 12,
     type: String,
     writeOnly: true,
   })

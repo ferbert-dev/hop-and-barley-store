@@ -65,14 +65,14 @@ describePostgres('A1 secure registration with PostgreSQL', () => {
       service.register(
         {
           email: 'Brew.Master@BÜCHER.example',
-          password: 'correct horse battery staple',
+          password: 'Abcdefghi1!x',
         },
         'a1-postgres-race-1',
       ),
       service.register(
         {
           email: 'BREW.MASTER@xn--bcher-kva.example',
-          password: 'another correct horse battery staple',
+          password: 'Abcdefghi1!y',
         },
         'a1-postgres-race-2',
       ),

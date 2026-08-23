@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
+import { originIsAllowed } from '../config/origin-list';
 import { CART_BOOTSTRAP_KEY } from './cart-bootstrap.decorator';
 import type { CartCookieMode } from './cart-cookie';
 import { readCartCookie } from './cart-cookie';
@@ -30,7 +31,10 @@ export class CartMutationGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<CartRequest>();
     if (
-      request.get('origin') !== this.config.getOrThrow<string>('CART_ORIGIN')
+      !originIsAllowed(
+        this.config.getOrThrow<string>('CART_ORIGIN'),
+        request.get('origin'),
+      )
     ) {
       throw new ForbiddenException(FORBIDDEN);
     }

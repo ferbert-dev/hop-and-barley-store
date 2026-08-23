@@ -9,6 +9,7 @@ WORKDIR /workspace
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json apps/api/package.json
+COPY packages/auth-contract/package.json packages/auth-contract/package.json
 COPY packages/api-client/package.json packages/api-client/package.json
 COPY packages/eslint-config/package.json packages/eslint-config/package.json
 COPY packages/typescript-config/package.json packages/typescript-config/package.json
@@ -16,6 +17,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 RUN DATABASE_URL=postgresql://build:build@localhost:5432/build \
+  pnpm --filter @hop-and-barley/auth-contract build && \
   pnpm --filter @hop-and-barley/api build
 
 EXPOSE 3001

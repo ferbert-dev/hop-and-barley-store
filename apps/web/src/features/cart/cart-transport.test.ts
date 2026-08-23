@@ -55,6 +55,23 @@ describe('generated-client cart browser transport', () => {
     expect(request.headers.get('cookie')).toBeNull();
   });
 
+  it('matches the API loopback hostname to the browser origin', async () => {
+    const fetch = vi.fn<(request: Request) => Promise<Response>>(async () =>
+      response(cart),
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    await createBrowserCartTransport(
+      () => 'http://127.0.0.1:3000',
+      'http://localhost:3001',
+      'localhost,127.0.0.1',
+    ).load();
+
+    expect((fetch.mock.calls[0]?.[0] as Request).url).toBe(
+      'http://127.0.0.1:3001/api/v1/cart',
+    );
+  });
+
   it('keeps CSRF ephemeral and forwards it only with an exact-origin update', async () => {
     const csrfToken = `v1.${'A'.repeat(43)}`;
     const fetch = vi

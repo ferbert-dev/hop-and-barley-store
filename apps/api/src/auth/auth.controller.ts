@@ -30,6 +30,7 @@ import { CsrfResponseDto } from './dto/csrf-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { LogoutResponseDto } from './dto/logout-response.dto';
 import { RegisterDto } from './dto/register.dto';
+import { RegistrationZodPipe } from './dto/registration-zod.pipe';
 import { RegistrationAcceptedDto } from './dto/registration-accepted.dto';
 import { LoginRequestGuard } from './login-request.guard';
 import { LoginService } from './login.service';
@@ -71,7 +72,7 @@ export class AuthController {
   @ApiTooManyRequestsResponse({ description: 'Registration unavailable' })
   @ApiServiceUnavailableResponse({ description: 'Registration unavailable' })
   register(
-    @Body() dto: RegisterDto,
+    @Body(RegistrationZodPipe) dto: RegisterDto,
     @Req() request: RegistrationRequest,
   ): Promise<RegistrationAcceptedDto> {
     return this.registration.register(dto, request.registrationRequestId);

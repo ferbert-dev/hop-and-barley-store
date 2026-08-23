@@ -218,8 +218,8 @@ describe('Platform API (e2e)', () => {
       .set('Origin', 'http://localhost:3000')
       .set('X-Request-Id', 'safe-request-1')
       .send({
-        email: 'Brew.Master@BÜCHER.example',
-        password: 'correct horse battery staple',
+        email: 'Brew.Master@example.com',
+        password: 'Abcdefghi1!x',
       })
       .expect(202);
 
@@ -244,8 +244,8 @@ describe('Platform API (e2e)', () => {
       .post('/api/v1/auth/register')
       .set('Origin', 'http://localhost:3000')
       .send({
-        email: 'BREW.MASTER@xn--bcher-kva.example',
-        password: 'another correct horse battery staple',
+        email: 'BREW.MASTER@example.com',
+        password: 'Abcdefghi1!y',
       })
       .expect(202);
 
@@ -263,7 +263,7 @@ describe('Platform API (e2e)', () => {
       .set('Origin', 'http://evil.example')
       .send({
         email: 'brew@example.com',
-        password: 'correct horse battery staple',
+        password: 'Abcdefghi1!x',
       })
       .expect(403);
     const invalidMediaType = await request(server)
@@ -458,11 +458,13 @@ describe('Platform API (e2e)', () => {
     expect(
       document.components.schemas.RegisterDto.properties?.password,
     ).toMatchObject({
-      maxLength: 128,
-      minLength: 15,
+      minLength: 12,
       type: 'string',
       writeOnly: true,
     });
+    expect(
+      document.components.schemas.RegisterDto.properties?.password,
+    ).not.toHaveProperty('maxLength');
     expect(
       document.components.schemas.RegistrationAcceptedDto.required,
     ).toEqual(['status']);

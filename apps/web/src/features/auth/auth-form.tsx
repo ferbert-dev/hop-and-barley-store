@@ -1,7 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState, useCallback, useEffect, useRef } from 'react';
+import {
+  useActionState,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+
+import {
+  evaluatePasswordRequirements,
+  PASSWORD_REQUIREMENTS,
+} from '@hop-and-barley/auth-contract';
 
 import { Button } from '../../components/ui/button';
 import { Field } from '../../components/ui/field';
@@ -39,8 +50,8 @@ const formCopy = {
     heading: 'Create your account',
     intro: 'Create a local password account. No social provider is required.',
     passwordAutocomplete: 'new-password',
-    pendingLabel: 'Creating account…',
-    submitLabel: 'Create account',
+    pendingLabel: 'Registering…',
+    submitLabel: 'Register',
   },
 } as const;
 
@@ -63,6 +74,14 @@ export function AuthForm({
   );
   const feedbackRef = useRef<HTMLDivElement>(null);
   const copy = formCopy[kind];
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const confirmationMismatch =
+    kind === 'register' &&
+    confirmPassword.length > 0 &&
+    password !== confirmPassword
+      ? 'Passwords do not match.'
+      : undefined;
 
   useEffect(() => {
     if (state.status !== 'idle') feedbackRef.current?.focus();
@@ -117,7 +136,7 @@ export function AuthForm({
             error={state.errors?.email}
             id={`${kind}-email`}
             inputMode="email"
-            label="Email address"
+            label={kind === 'register' ? 'Email' : 'Email address'}
             maxLength={320}
             name="email"
             required
@@ -126,18 +145,40 @@ export function AuthForm({
           <Field
             autoComplete={copy.passwordAutocomplete}
             description={
-              kind === 'register'
-                ? '15–128 characters. Use a unique passphrase.'
-                : undefined
+              kind === 'register' ? (
+                <PasswordRequirements password={password} />
+              ) : undefined
             }
             error={state.errors?.password}
             id={`${kind}-password`}
             label="Password"
-            maxLength={128}
             name="password"
+            {...(kind === 'register'
+              ? {
+                  onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
+                    setPassword(event.currentTarget.value),
+                  value: password,
+                }
+              : {})}
             required
             type="password"
           />
+          {kind === 'register' ? (
+            <Field
+              aria-invalid={Boolean(confirmationMismatch) || undefined}
+              autoComplete="new-password"
+              error={state.errors?.confirmPassword ?? confirmationMismatch}
+              id="register-confirm-password"
+              label="Confirm Password"
+              name="confirmPassword"
+              onChange={(event) =>
+                setConfirmPassword(event.currentTarget.value)
+              }
+              required
+              type="password"
+              value={confirmPassword}
+            />
+          ) : null}
           <Button
             pending={pending}
             pendingLabel={copy.pendingLabel}
@@ -145,6 +186,20 @@ export function AuthForm({
           >
             {copy.submitLabel}
           </Button>
+          <div className={styles.separator} aria-hidden="true">
+            <span>Or</span>
+          </div>
+          <Button
+            aria-describedby={`${kind}-google-note`}
+            disabled
+            type="button"
+            variant="secondary"
+          >
+            Continue with Google
+          </Button>
+          <p className={styles.googleNote} id={`${kind}-google-note`}>
+            Google sign-in is not available in this MVP.
+          </p>
         </fieldset>
       </form>
 
@@ -153,6 +208,35 @@ export function AuthForm({
         <Link href={copy.alternateHref}>{copy.alternateLabel}</Link>
       </p>
     </section>
+  );
+}
+
+function PasswordRequirements({ password }: Readonly<{ password: string }>) {
+  const state = evaluatePasswordRequirements(password);
+
+  return (
+    <span className={styles.passwordRequirements}>
+      <span>Password must include:</span>
+      <span aria-live="polite" className={styles.requirementList} role="list">
+        {PASSWORD_REQUIREMENTS.map((requirement) => (
+          <span
+            className={
+              state[requirement.key]
+                ? styles.requirementMet
+                : styles.requirementPending
+            }
+            key={requirement.key}
+            role="listitem"
+          >
+            <span aria-hidden="true">{state[requirement.key] ? '✓' : '○'}</span>{' '}
+            {requirement.label}
+            <span className="visually-hidden">
+              {state[requirement.key] ? ' — met' : ' — not met'}
+            </span>
+          </span>
+        ))}
+      </span>
+    </span>
   );
 }
 

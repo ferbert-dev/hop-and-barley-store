@@ -36,7 +36,7 @@ describe('RegistrationService', () => {
       service.register(
         {
           email: 'Brew.Master@Example.com',
-          password: 'correct horse battery staple',
+          password: 'Abcdefghi1!x',
         },
         'request-1',
       ),
@@ -66,7 +66,7 @@ describe('RegistrationService', () => {
     const service = new RegistrationService(prisma as never, hasher as never);
 
     const result = await service.register(
-      { email: 'BREW@example.com', password: 'correct horse battery staple' },
+      { email: 'BREW@example.com', password: 'Abcdefghi1!x' },
       'request-2',
     );
 
@@ -95,7 +95,7 @@ describe('RegistrationService', () => {
 
     await expect(
       service.register(
-        { email: 'BREW@example.com', password: 'correct horse battery staple' },
+        { email: 'BREW@example.com', password: 'Abcdefghi1!x' },
         'request-prisma-7',
       ),
     ).resolves.toEqual({ status: 'accepted' });
@@ -122,7 +122,7 @@ describe('RegistrationService', () => {
 
     await expect(
       service.register(
-        { email: 'BREW@example.com', password: 'correct horse battery staple' },
+        { email: 'BREW@example.com', password: 'Abcdefghi1!x' },
         'request-prisma-7-fields',
       ),
     ).resolves.toEqual({ status: 'accepted' });
@@ -142,7 +142,7 @@ describe('RegistrationService', () => {
 
     await expect(
       service.register(
-        { email: 'brew@example.com', password: 'correct horse battery staple' },
+        { email: 'brew@example.com', password: 'Abcdefghi1!x' },
         'request-3',
       ),
     ).rejects.toMatchObject({ status: 503 });

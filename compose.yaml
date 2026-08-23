@@ -1,21 +1,29 @@
-name: hop-and-barley
+name: ${COMPOSE_PROJECT_NAME:-hop-and-barley}
 
 x-api-environment: &api-environment
-  DATABASE_URL: postgresql://hopbarley:hopbarley@postgres:5432/hopbarley?schema=public
-  NODE_ENV: production
+  DATABASE_URL: ${API_DATABASE_URL:?Set API_DATABASE_URL in the root .env}
+  NODE_ENV: ${NODE_ENV:-production}
 
 services:
   postgres:
-    image: postgres:17.6-alpine
+    image: ${POSTGRES_IMAGE:-postgres:17.6-alpine}
+    command: ['postgres', '-p', '${POSTGRES_PORT:-5432}']
     environment:
-      POSTGRES_DB: hopbarley
-      POSTGRES_PASSWORD: hopbarley
-      POSTGRES_USER: hopbarley
+      POSTGRES_DB: ${POSTGRES_DB:-hopbarley}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_USER: ${POSTGRES_USER:-hopbarley}
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U hopbarley -d hopbarley']
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -p "$${POSTGRES_PORT}"',
+        ]
       interval: 3s
       timeout: 3s
       retries: 20
+    ports:
+      - '${POSTGRES_HOST_BIND:-127.0.0.1}:${POSTGRES_PORT:-5432}:${POSTGRES_PORT:-5432}'
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
@@ -41,59 +49,61 @@ services:
         condition: service_completed_successfully
     environment:
       <<: *api-environment
-      AUTH_COOKIE_MODE: local-http
-      AUTH_ORIGIN: http://localhost:3000
+      AUTH_COOKIE_MODE: ${AUTH_COOKIE_MODE:-local-http}
+      AUTH_ORIGIN: ${AUTH_ORIGIN:-http://localhost:3000}
       AUTH_SESSIONS_ENABLED: ${AUTH_SESSIONS_ENABLED:-false}
-      AUTH_CSRF_KEYRING: ${AUTH_CSRF_KEYRING:-}
-      CORS_ORIGINS: http://localhost:3000
-      CART_COOKIE_MODE: local-http
-      CART_ORIGIN: http://localhost:3000
-      CART_CSRF_KEYRING: ${CART_CSRF_KEYRING:-cart-local-v1:2222222222222222222222222222222222222222222222222222222222222222}
-      PORT: 3001
-      REGISTRATION_ENABLED: 'true'
-      REGISTRATION_ORIGIN: http://localhost:3000
+      AUTH_CSRF_KEYRING: ${AUTH_CSRF_KEYRING:?Set AUTH_CSRF_KEYRING in the root .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      CART_COOKIE_MODE: ${CART_COOKIE_MODE:-local-http}
+      CART_ORIGIN: ${CART_ORIGIN:-http://localhost:3000}
+      CART_CSRF_KEYRING: ${CART_CSRF_KEYRING:?Set CART_CSRF_KEYRING in the root .env}
+      PORT: ${API_PORT:-3001}
+      REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-true}
+      REGISTRATION_ORIGIN: ${REGISTRATION_ORIGIN:-http://localhost:3000}
     healthcheck:
       test:
         [
           'CMD',
           'node',
           '-e',
-          "fetch('http://127.0.0.1:3001/api/v1/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:'+process.env.PORT+'/api/v1/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
         ]
       interval: 5s
       timeout: 3s
       retries: 20
     ports:
-      - '3001:3001'
+      - '${API_HOST_BIND:-127.0.0.1}:${API_PORT:-3001}:${API_PORT:-3001}'
 
   web:
     build:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+        NEXT_PUBLIC_API_HOST_ALIASES: ${NEXT_PUBLIC_API_HOST_ALIASES:?Set NEXT_PUBLIC_API_HOST_ALIASES in the root .env}
       context: .
       dockerfile: apps/web/Dockerfile
     depends_on:
       api:
         condition: service_healthy
     environment:
-      API_INTERNAL_URL: http://api:3001/api/v1
-      NEXT_PUBLIC_API_URL: http://localhost:3001
-      HOSTNAME: 0.0.0.0
-      NODE_ENV: production
-      PORT: 3000
+      API_INTERNAL_URL: ${API_INTERNAL_URL:?Set API_INTERNAL_URL in the root .env}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?Set NEXT_PUBLIC_API_URL in the root .env}
+      NEXT_PUBLIC_API_HOST_ALIASES: ${NEXT_PUBLIC_API_HOST_ALIASES:?Set NEXT_PUBLIC_API_HOST_ALIASES in the root .env}
+      HOSTNAME: ${WEB_HOSTNAME:-0.0.0.0}
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${WEB_PORT:-3000}
     healthcheck:
       test:
         [
           'CMD',
           'node',
           '-e',
-          "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:'+process.env.PORT).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
         ]
       interval: 5s
       timeout: 3s
       retries: 20
     ports:
-      - '3000:3000'
+      - '${WEB_HOST_BIND:-127.0.0.1}:${WEB_PORT:-3000}:${WEB_PORT:-3000}'
 
 volumes:
   postgres-data:

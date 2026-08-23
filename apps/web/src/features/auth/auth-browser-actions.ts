@@ -2,6 +2,7 @@
 
 import { createApiClient } from '@hop-and-barley/api-client';
 
+import { resolveBrowserApiUrl } from '../../lib/browser-api-url';
 import type { AuthFormState } from './auth-state';
 import {
   safeReturnPath,
@@ -11,13 +12,14 @@ import {
 
 const PUBLIC_API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+const PUBLIC_API_HOST_ALIASES = process.env.NEXT_PUBLIC_API_HOST_ALIASES ?? '';
 const AUTH_REQUEST_TIMEOUT_MS = 1_500;
 
 export async function registerFromBrowser(
   _previous: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
-  const input = validateRegistrationInput(readCredentials(formData));
+  const input = validateRegistrationInput(readRegistrationInput(formData));
   if (!input.ok) return { errors: input.errors, status: 'invalid' };
   try {
     const { data, error, response } = await browserClient().POST(
@@ -68,10 +70,17 @@ export async function loginFromBrowser(
 }
 
 function browserClient() {
-  return createApiClient(PUBLIC_API_URL, {
-    cache: 'no-store',
-    credentials: 'include',
-  });
+  return createApiClient(
+    resolveBrowserApiUrl(
+      PUBLIC_API_URL,
+      window.location.origin,
+      PUBLIC_API_HOST_ALIASES,
+    ),
+    {
+      cache: 'no-store',
+      credentials: 'include',
+    },
+  );
 }
 
 function assertPrivate(response: Response) {
@@ -85,5 +94,12 @@ function readCredentials(formData: FormData) {
   return {
     email: String(formData.get('email') ?? ''),
     password: String(formData.get('password') ?? ''),
+  };
+}
+
+function readRegistrationInput(formData: FormData) {
+  return {
+    ...readCredentials(formData),
+    confirmPassword: String(formData.get('confirmPassword') ?? ''),
   };
 }

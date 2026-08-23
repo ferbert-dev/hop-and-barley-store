@@ -1,9 +1,15 @@
+import { registrationFormSchema } from '@hop-and-barley/auth-contract';
+
 export type AuthCredentials = Readonly<{
   email: string;
   password: string;
 }>;
 
-type AuthFieldErrors = Partial<Record<keyof AuthCredentials, string>>;
+export type RegistrationFormInput = AuthCredentials &
+  Readonly<{ confirmPassword: string }>;
+
+export type AuthFieldName = keyof RegistrationFormInput;
+type AuthFieldErrors = Partial<Record<AuthFieldName, string>>;
 
 export type AuthValidationResult =
   | Readonly<{ errors: AuthFieldErrors; ok: false }>
@@ -14,28 +20,30 @@ const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/u;
 const AUTH_ENTRY_PATHS = new Set(['/login', '/register']);
 
 export function validateRegistrationInput(
-  input: AuthCredentials,
+  input: RegistrationFormInput,
 ): AuthValidationResult {
   const email = input.email.trim();
-  const password = input.password;
+  const result = registrationFormSchema.safeParse({ ...input, email });
+  if (result.success) {
+    return {
+      ok: true,
+      value: { email: result.data.email, password: result.data.password },
+    };
+  }
+
   const errors: AuthFieldErrors = {};
-
-  if (!isValidEmailPresentation(email)) {
-    errors.email = 'Enter a valid email address.';
+  for (const issue of result.error.issues) {
+    const field = issue.path[0];
+    if (
+      (field === 'email' ||
+        field === 'password' ||
+        field === 'confirmPassword') &&
+      errors[field] === undefined
+    ) {
+      errors[field] = issue.message;
+    }
   }
-
-  const codePointLength = [...password].length;
-  if (codePointLength < 15 || codePointLength > 128) {
-    errors.password = 'Use between 15 and 128 characters.';
-  } else if (password !== password.normalize('NFC')) {
-    errors.password = 'Use a password in its normal composed form.';
-  } else if (new TextEncoder().encode(password).byteLength > 512) {
-    errors.password = 'Use a password no longer than 512 bytes.';
-  }
-
-  return Object.keys(errors).length > 0
-    ? { errors, ok: false }
-    : { ok: true, value: { email, password } };
+  return { errors, ok: false };
 }
 
 export function validateLoginInput(
