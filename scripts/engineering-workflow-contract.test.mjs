@@ -704,7 +704,7 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
     rootPackage.scripts?.['clean:artifacts'] !==
       'node scripts/clean-workspace-artifacts.mjs' ||
     rootPackage.scripts?.['generated:verify'] !==
-      'node scripts/verify-generated-stability.mjs'
+      'pnpm --filter @hop-and-barley/auth-contract build && node scripts/verify-generated-stability.mjs'
   ) {
     errors.push('executable clean/generated scripts drifted');
   }

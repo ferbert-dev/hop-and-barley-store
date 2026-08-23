@@ -40,6 +40,8 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Remove allowlisted generated artifacts
         run: pnpm clean
+      - name: Verify CI workflow contract
+        run: pnpm ci:contract
       - name: Verify generated API contract stability
         run: pnpm generated:verify
       - name: Typecheck from a clean output tree
@@ -106,12 +108,8 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Install the pinned Chromium runtime
         run: pnpm --filter @hop-and-barley/e2e exec playwright install --with-deps chromium
-      - name: Configure disposable authentication settings
-        run: >-
-          node -e 'const { randomBytes } = require("node:crypto");
-          const { appendFileSync } = require("node:fs");
-          appendFileSync(process.env.GITHUB_ENV,
-          `AUTH_CSRF_KEYRING=ci-v1:${randomBytes(32).toString("hex")}\nAUTH_SESSIONS_ENABLED=true\n`);'
+      - name: Configure disposable browser stack settings
+        run: node scripts/configure-ci-browser-env.mjs
       - name: Start the isolated full stack
         run: docker compose up -d --build --wait
       - name: Test the connected storefront
