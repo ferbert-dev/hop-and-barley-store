@@ -59,6 +59,12 @@
   gap: var(--hb-space-6);
 }
 
+.formActions {
+  display: grid;
+  gap: var(--hb-space-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .fieldset {
   border: 0;
   margin: 0;

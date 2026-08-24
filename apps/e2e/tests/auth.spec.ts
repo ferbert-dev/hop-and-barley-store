@@ -96,6 +96,31 @@ test.describe('connected local authentication journey', () => {
       ).toEqual([]);
     }
   });
+
+  test('shows the UI-only neutral forgot-password state without a recovery request', async ({
+    page,
+  }) => {
+    await page.goto('/forgot-password');
+    await expect(page.getByLabel('Email')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Cancel' })).toHaveAttribute(
+      'href',
+      '/login',
+    );
+
+    const nonGetRequests: string[] = [];
+    page.on('request', (request) => {
+      if (request.method() !== 'GET') nonGetRequests.push(request.url());
+    });
+
+    await page.getByLabel('Email').fill('unknown@example.com');
+    await page.getByRole('button', { name: 'Reset Password' }).click();
+
+    await expect(page.getByRole('status')).toContainText(
+      'If this email is registered, you will receive a password-reset link.',
+    );
+    await expect(page.getByLabel('Email')).toHaveCount(0);
+    expect(nonGetRequests).toEqual([]);
+  });
 });
 
 test.describe('authentication unavailable state', () => {

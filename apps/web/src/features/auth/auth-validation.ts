@@ -15,6 +15,10 @@ export type AuthValidationResult =
   | Readonly<{ errors: AuthFieldErrors; ok: false }>
   | Readonly<{ ok: true; value: AuthCredentials }>;
 
+export type RecoveryEmailValidationResult =
+  | Readonly<{ error: string; ok: false }>
+  | Readonly<{ ok: true; value: string }>;
+
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+$/u;
 const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/u;
 const AUTH_ENTRY_PATHS = new Set(['/login', '/register']);
@@ -66,6 +70,20 @@ export function validateLoginInput(
   return Object.keys(errors).length > 0
     ? { errors, ok: false }
     : { ok: true, value: { email, password } };
+}
+
+export function validateRecoveryEmail(
+  candidate: string,
+): RecoveryEmailValidationResult {
+  const email = candidate.trim();
+
+  if (email.length === 0) {
+    return { error: 'Enter your email address.', ok: false };
+  }
+  if (!isValidEmailPresentation(email)) {
+    return { error: 'Enter a valid email address.', ok: false };
+  }
+  return { ok: true, value: email };
 }
 
 export function safeReturnPath(candidate: string | undefined): string {

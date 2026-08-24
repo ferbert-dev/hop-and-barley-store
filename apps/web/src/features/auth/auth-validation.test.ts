@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   safeReturnPath,
   validateLoginInput,
+  validateRecoveryEmail,
   validateRegistrationInput,
 } from './auth-validation';
 
@@ -85,6 +86,20 @@ describe('auth presentation validation', () => {
         password: 'Enter your password.',
       },
       ok: false,
+    });
+  });
+
+  it.each([
+    ['', 'Enter your email address.'],
+    ['not-an-email', 'Enter a valid email address.'],
+  ])('rejects recovery email %j locally', (email, error) => {
+    expect(validateRecoveryEmail(email)).toEqual({ error, ok: false });
+  });
+
+  it('accepts and trims a well-formed recovery email', () => {
+    expect(validateRecoveryEmail(' brewer@example.com ')).toEqual({
+      ok: true,
+      value: 'brewer@example.com',
     });
   });
 });
