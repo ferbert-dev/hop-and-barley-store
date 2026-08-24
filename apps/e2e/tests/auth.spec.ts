@@ -24,6 +24,12 @@ test.describe('connected local authentication journey', () => {
     const password = 'Abcdefghi1!x';
 
     await page.goto('/register');
+    await expect(
+      page.getByRole('checkbox', { name: 'Remember me' }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('link', { name: 'Forgot password?' }),
+    ).toHaveCount(0);
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password', { exact: true }).fill(password);
     await page.getByLabel('Confirm Password').fill(password);
@@ -33,9 +39,14 @@ test.describe('connected local authentication journey', () => {
     ).toBeVisible();
 
     await page.getByRole('link', { name: 'Continue to sign in' }).click();
-    await page.getByLabel('Email address').fill(email);
+    const rememberMe = page.getByRole('checkbox', { name: 'Remember me' });
+    await expect(rememberMe).not.toBeChecked();
+    await expect(
+      page.getByRole('link', { name: 'Forgot password?' }),
+    ).toHaveAttribute('href', '/forgot-password');
+    await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password', { exact: true }).fill(password);
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.getByRole('button', { name: 'Sign In' }).click();
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole('link', { name: 'Account' })).toBeVisible();
 
@@ -106,9 +117,9 @@ test.describe('authentication unavailable state', () => {
     ]);
     await page.goto('/login');
     await expect(page.getByText('Account unavailable')).toBeVisible();
-    await page.getByLabel('Email address').fill('brewer@example.com');
+    await page.getByLabel('Email').fill('brewer@example.com');
     await page.getByLabel('Password').fill('correct horse battery staple');
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.getByRole('button', { name: 'Sign In' }).click();
     const authError = page
       .getByRole('alert')
       .filter({ hasText: 'Authentication is temporarily unavailable.' });
