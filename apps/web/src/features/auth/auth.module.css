@@ -98,6 +98,37 @@
   gap: var(--hb-space-2);
 }
 
+.loginOptions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hb-space-3) var(--hb-space-6);
+  justify-content: space-between;
+}
+
+.rememberMe,
+.forgotPassword {
+  align-items: center;
+  display: inline-flex;
+  font-weight: 600;
+  min-block-size: 2.75rem;
+}
+
+.rememberMe {
+  cursor: pointer;
+  gap: var(--hb-space-2);
+}
+
+.rememberMe input {
+  accent-color: var(--hb-color-brand);
+  block-size: 1.25rem;
+  inline-size: 1.25rem;
+}
+
+.forgotPassword {
+  text-underline-offset: var(--hb-space-1);
+}
+
 .requirementList {
   list-style: none;
 }

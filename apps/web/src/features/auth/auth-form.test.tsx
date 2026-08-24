@@ -26,6 +26,9 @@ describe('AuthForm', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(5);
     expect(screen.getByText('At least 12 characters total')).toBeVisible();
     expect(screen.queryByLabelText(/Remember me/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Forgot password?' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Register' })).toBeEnabled();
     expect(
       screen.getByRole('button', { name: 'Continue with Google' }),
@@ -33,6 +36,57 @@ describe('AuthForm', () => {
     expect(
       screen.getByText('Google sign-in is not available in this MVP.'),
     ).toBeVisible();
+  });
+
+  it('renders the Figma login controls and exposes the remember choice to the action', async () => {
+    const user = userEvent.setup();
+    const action = vi
+      .fn<AuthFormAction>()
+      .mockResolvedValue({ status: 'invalid' });
+    render(<AuthForm action={action} kind="login" />);
+
+    const rememberMe = screen.getByRole('checkbox', { name: 'Remember me' });
+
+    expect(screen.getByLabelText('Email')).toHaveAttribute(
+      'autocomplete',
+      'email',
+    );
+    expect(rememberMe).not.toBeChecked();
+    expect(
+      screen.getByRole('link', { name: 'Forgot password?' }),
+    ).toHaveAttribute('href', '/forgot-password');
+    expect(screen.getByRole('button', { name: 'Sign In' })).toBeEnabled();
+    expect(screen.getByText("Don't have an account?")).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Register' })).toHaveAttribute(
+      'href',
+      '/register',
+    );
+
+    await user.type(screen.getByLabelText('Email'), 'a@example.com');
+    await user.type(screen.getByLabelText('Password'), 'password-value');
+    await user.click(rememberMe);
+    await user.click(screen.getByRole('button', { name: 'Sign In' }));
+
+    const submittedForm = action.mock.calls[0]?.[1];
+    expect(submittedForm?.get('rememberMe')).toBe('true');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Invalid email or password.',
+    );
+  });
+
+  it('submits an explicit false remember choice when the checkbox is unchecked', async () => {
+    const user = userEvent.setup();
+    const action = vi
+      .fn<AuthFormAction>()
+      .mockResolvedValue({ status: 'invalid' });
+    render(<AuthForm action={action} kind="login" />);
+
+    await user.type(screen.getByLabelText('Email'), 'a@example.com');
+    await user.type(screen.getByLabelText('Password'), 'password-value');
+    await user.click(screen.getByRole('button', { name: 'Sign In' }));
+
+    const submittedForm = action.mock.calls[0]?.[1];
+    expect(submittedForm?.get('rememberMe')).toBe('false');
   });
 
   it('updates every password requirement while typing and reports mismatch', async () => {
@@ -62,9 +116,9 @@ describe('AuthForm', () => {
     });
     render(<AuthForm action={action} kind="login" />);
 
-    await user.type(screen.getByLabelText('Email address'), 'bad@example.com');
+    await user.type(screen.getByLabelText('Email'), 'bad@example.com');
     await user.type(screen.getByLabelText('Password'), 'submitted-value');
-    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    await user.click(screen.getByRole('button', { name: 'Sign In' }));
 
     expect(
       await screen.findByText('Enter a valid email address.'),
@@ -86,9 +140,9 @@ describe('AuthForm', () => {
     );
     render(<AuthForm action={action} kind="login" />);
 
-    await user.type(screen.getByLabelText('Email address'), 'a@example.com');
+    await user.type(screen.getByLabelText('Email'), 'a@example.com');
     await user.type(screen.getByLabelText('Password'), 'password-value');
-    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    await user.click(screen.getByRole('button', { name: 'Sign In' }));
 
     expect(screen.getByRole('button', { name: 'Signing in…' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Signing in…' })).toHaveAttribute(

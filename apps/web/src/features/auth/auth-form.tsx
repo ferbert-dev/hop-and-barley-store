@@ -35,13 +35,13 @@ type AuthFormProps = Readonly<{
 const formCopy = {
   login: {
     alternateHref: '/register',
-    alternateLabel: 'Create an account',
-    alternatePrompt: 'New to Hop & Barley?',
+    alternateLabel: 'Register',
+    alternatePrompt: "Don't have an account?",
     heading: 'Sign in to your account',
     intro: 'Use your email and password to continue securely.',
     passwordAutocomplete: 'current-password',
     pendingLabel: 'Signing in…',
-    submitLabel: 'Sign in',
+    submitLabel: 'Sign In',
   },
   register: {
     alternateHref: '/login',
@@ -76,6 +76,7 @@ export function AuthForm({
   const copy = formCopy[kind];
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const confirmationMismatch =
     kind === 'register' &&
     confirmPassword.length > 0 &&
@@ -136,7 +137,7 @@ export function AuthForm({
             error={state.errors?.email}
             id={`${kind}-email`}
             inputMode="email"
-            label={kind === 'register' ? 'Email' : 'Email address'}
+            label="Email"
             maxLength={320}
             name="email"
             required
@@ -178,6 +179,29 @@ export function AuthForm({
               type="password"
               value={confirmPassword}
             />
+          ) : null}
+          {kind === 'login' ? (
+            <div className={styles.loginOptions}>
+              <input
+                name="rememberMe"
+                type="hidden"
+                value={String(rememberMe)}
+              />
+              <label className={styles.rememberMe} htmlFor="login-remember-me">
+                <input
+                  checked={rememberMe}
+                  id="login-remember-me"
+                  onChange={(event) =>
+                    setRememberMe(event.currentTarget.checked)
+                  }
+                  type="checkbox"
+                />
+                <span>Remember me</span>
+              </label>
+              <Link className={styles.forgotPassword} href="/forgot-password">
+                Forgot password?
+              </Link>
+            </div>
           ) : null}
           <Button
             pending={pending}
@@ -249,6 +273,6 @@ function getGenericMessage(
   }
   if (state.status !== 'invalid' || state.errors) return null;
   return kind === 'login'
-    ? 'The email or password was not recognised.'
+    ? 'Invalid email or password.'
     : 'Check the form fields and try again.';
 }
