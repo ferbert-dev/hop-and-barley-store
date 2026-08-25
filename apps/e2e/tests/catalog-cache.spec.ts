@@ -59,7 +59,9 @@ test.describe('production catalog data cache', () => {
     runtime.failNext(recoverySearch);
 
     const failedPage = await openCatalog(browser, recoverySearch);
-    await expect(failedPage.getByText('API unavailable')).toBeVisible();
+    await expect(failedPage.getByRole('status').first()).toHaveText(
+      'API unavailable',
+    );
     await expect(
       failedPage.getByRole('heading', { name: 'Products unavailable' }),
     ).toBeVisible();
@@ -86,7 +88,7 @@ async function expectConnectedResponse(
   attempt: number,
 ) {
   const page = await openCatalog(browser, search);
-  await expect(page.getByText('API connected')).toBeVisible();
+  await expect(page.getByRole('status').first()).toHaveText('API connected');
   await expect(
     page.getByRole('link', { name: `${search} response ${attempt}` }),
   ).toBeVisible();

@@ -48,6 +48,36 @@ const updatedCart: Cart = {
 };
 
 describe('CartProvider', () => {
+  it('coalesces simultaneous initial-load requests from multiple consumers', async () => {
+    let resolveLoad: ((value: Cart) => void) | undefined;
+    const transport: CartTransport = {
+      add: vi.fn(async () => initialCart),
+      clear: vi.fn(async () => initialCart),
+      load: vi.fn(
+        () =>
+          new Promise<Cart>((resolve) => {
+            resolveLoad = resolve;
+          }),
+      ),
+      recheck: vi.fn(async () => initialCart),
+      remove: vi.fn(async () => initialCart),
+      update: vi.fn(async () => initialCart),
+    };
+    render(
+      <CartProvider transport={transport}>
+        <EnsureLoadedProbe label="header" />
+        <EnsureLoadedProbe label="product" />
+      </CartProvider>,
+    );
+
+    await waitFor(() => expect(transport.load).toHaveBeenCalledTimes(1));
+    resolveLoad?.(initialCart);
+
+    expect(await screen.findByText('header ready')).toBeVisible();
+    expect(screen.getByText('product ready')).toBeVisible();
+    expect(transport.load).toHaveBeenCalledTimes(1);
+  });
+
   it('loads once when a cart consumer requests canonical state', async () => {
     const transport: CartTransport = {
       add: vi.fn(async () => initialCart),
@@ -135,6 +165,37 @@ describe('CartProvider', () => {
     expect(screen.getByTestId('message')).toHaveTextContent('refreshed');
   });
 
+  it('rolls back a first add after the API rejects and reports the recovery', async () => {
+    const user = userEvent.setup();
+    const transport: CartTransport = {
+      add: vi.fn(async () => {
+        throw new Error('planned add failure');
+      }),
+      clear: vi.fn(async () => emptyCart),
+      load: vi
+        .fn()
+        .mockResolvedValueOnce(emptyCart)
+        .mockResolvedValueOnce(emptyCart),
+      recheck: vi.fn(async () => emptyCart),
+      remove: vi.fn(async () => emptyCart),
+      update: vi.fn(async () => emptyCart),
+    };
+    render(
+      <CartProvider transport={transport}>
+        <Probe />
+      </CartProvider>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Add' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('item-count')).toHaveTextContent('0'),
+    );
+    expect(transport.add).toHaveBeenCalledWith('citra-hops', 1);
+    expect(transport.load).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('message')).toHaveTextContent('refreshed');
+  });
+
   it('ignores an earlier refresh response when a newer request wins', async () => {
     const user = userEvent.setup();
     let resolveFirst: ((value: Cart) => void) | undefined;
@@ -177,24 +238,34 @@ describe('CartProvider', () => {
 
   it('recovers an unavailable cart through the explicit retry action', async () => {
     const user = userEvent.setup();
+    let resolveRetry: ((value: Cart) => void) | undefined;
     const transport: CartTransport = {
       add: vi.fn(async () => initialCart),
       clear: vi.fn(async () => initialCart),
       load: vi
         .fn()
         .mockRejectedValueOnce(new Error('offline'))
-        .mockResolvedValueOnce(initialCart),
+        .mockImplementationOnce(
+          () =>
+            new Promise<Cart>((resolve) => {
+              resolveRetry = resolve;
+            }),
+        ),
       recheck: vi.fn(async () => initialCart),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(async () => initialCart),
     };
     render(
       <CartProvider transport={transport}>
-        <Probe />
+        <RetryProbe />
       </CartProvider>,
     );
 
-    await user.click(await screen.findByRole('button', { name: 'Refresh' }));
+    await screen.findByText('unavailable');
+    await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    await waitFor(() => expect(transport.load).toHaveBeenCalledTimes(2));
+    resolveRetry?.(initialCart);
 
     await waitFor(() =>
       expect(screen.getByTestId('subtotal')).toHaveTextContent('599'),
@@ -349,6 +420,37 @@ describe('CartProvider', () => {
     await waitFor(() => expect(transport.update).toHaveBeenCalledTimes(2));
   });
 });
+
+function EnsureLoadedProbe({ label }: Readonly<{ label: string }>) {
+  const { ensureLoaded, state } = useCart();
+
+  useEffect(() => {
+    void ensureLoaded();
+  }, [ensureLoaded]);
+
+  return <output>{`${label} ${state.kind}`}</output>;
+}
+
+function RetryProbe() {
+  const { ensureLoaded, refresh, state } = useCart();
+
+  useEffect(() => {
+    void ensureLoaded();
+  }, [ensureLoaded]);
+
+  if (state.kind !== 'ready') {
+    return (
+      <>
+        <output>{state.kind}</output>
+        <button onClick={() => void refresh()} type="button">
+          Refresh
+        </button>
+      </>
+    );
+  }
+
+  return <output data-testid="subtotal">{state.cart.subtotalMinor}</output>;
+}
 
 function Probe() {
   const cart = useCart();

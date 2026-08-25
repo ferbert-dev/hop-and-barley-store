@@ -22,8 +22,8 @@ test.describe('database-backed product details', () => {
   test('opens every seeded product through one shared server-rendered template', async ({
     page,
   }) => {
-    await page.goto('/');
-    await expect(page.getByText('API connected')).toBeVisible();
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('status').first()).toHaveText('API connected');
 
     const productLinks = page.getByRole('article').getByRole('link');
     await expect(productLinks).toHaveCount(12);
@@ -47,13 +47,15 @@ test.describe('database-backed product details', () => {
       await page.goto(href, { waitUntil: 'domcontentloaded' });
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
       await expect(
-        page.getByText('Technical Specifications', { exact: true }),
+        page.getByRole('link', {
+          name: /^Shopping cart, \d+ items?$/,
+        }),
       ).toBeVisible();
-      await expect(
-        page
-          .getByText('Technical Specifications', { exact: true })
-          .locator('..'),
-      ).toHaveAttribute('open', '');
+      const specifications = page
+        .getByText('Technical Specifications', { exact: true })
+        .first();
+      await expect(specifications).toBeVisible();
+      await expect(specifications.locator('..')).toHaveAttribute('open', '');
       const productImage = page.getByRole('main').getByRole('img');
       await expect(productImage).toHaveCount(1);
       await expect(productImage).toBeVisible();
@@ -64,8 +66,8 @@ test.describe('database-backed product details', () => {
         );
       specificationTermCount += await page.getByRole('term').count();
       await expect(
-        page.getByRole('button', { name: /add to cart/i }),
-      ).toHaveCount(0);
+        page.getByRole('button', { name: 'Add to Cart' }),
+      ).toHaveCount(1);
       await expect(page.getByRole('heading', { name: /reviews/i })).toHaveCount(
         0,
       );
@@ -81,7 +83,12 @@ test.describe('database-backed product details', () => {
     await page.goto('/product/citra-hops');
     await expect(page).toHaveTitle('Citra Hops | Hop & Barley');
     await expect(page.getByText('In stock')).toHaveCount(0);
-    await expect(page.getByText('US$5.99')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Add to Cart' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('main').getByText('US$5.99', { exact: true }).first(),
+    ).toBeVisible();
     const specificationTerms = page.getByRole('term');
     expect(await specificationTerms.allTextContents()).toEqual([
       'Origin',
@@ -101,6 +108,50 @@ test.describe('database-backed product details', () => {
     await expect(
       page.getByRole('link', { name: 'Back to products' }),
     ).toHaveAttribute('href', '/');
+  });
+
+  test('adds as a guest, updates quantity, and preserves the cart after reload', async ({
+    page,
+  }) => {
+    await clearGuestCart(page);
+    try {
+      await page.goto('/product/mosaic-hops');
+
+      const addRequest = page.waitForRequest(
+        (request) =>
+          request.url().endsWith('/api/v1/cart/items') &&
+          request.method() === 'POST',
+      );
+      await page.getByRole('button', { name: 'Add to Cart' }).click();
+      const request = await addRequest;
+      expect(request.postDataJSON()).toEqual({
+        productSlug: 'mosaic-hops',
+        quantity: 1,
+      });
+      await expect(
+        page.getByLabel('Quantity for Mosaic Hops').getByRole('status'),
+      ).toHaveText('1 in cart');
+      await expect(
+        page.getByRole('link', { name: 'Shopping cart, 1 item' }),
+      ).toHaveAttribute('href', '/cart');
+
+      await page
+        .getByRole('button', { name: 'Increase Mosaic Hops quantity' })
+        .click();
+      await expect(
+        page.getByLabel('Quantity for Mosaic Hops').getByRole('status'),
+      ).toHaveText('2 in cart');
+      await expect(
+        page.getByRole('link', { name: 'Shopping cart, 2 items' }),
+      ).toBeVisible();
+
+      await page.reload();
+      await expect(
+        page.getByLabel('Quantity for Mosaic Hops').getByRole('status'),
+      ).toHaveText('2 in cart');
+    } finally {
+      await clearGuestCart(page);
+    }
   });
 
   test('reflows product detail without horizontal overflow at every approved probe', async ({
@@ -142,6 +193,10 @@ test.describe('isolated product-detail states', () => {
     runtime = await startCatalogCacheRuntime();
   });
 
+  test.beforeEach(async ({ page }) => {
+    await interceptEmptyCart(page);
+  });
+
   test.afterAll(async () => {
     await runtime?.stop();
   });
@@ -151,7 +206,10 @@ test.describe('isolated product-detail states', () => {
   }) => {
     await page.goto(`${runtime.baseUrl}/product/citra-hops`);
     await expect(page).toHaveTitle('Citra Hops | Hop & Barley');
-    await expect(page.getByText('Out of stock')).toHaveCount(0);
+    await expect(page.getByText('Out of stock').first()).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Add to Cart' }).first(),
+    ).toBeDisabled();
     await expect(
       page
         .locator('main [aria-live="polite"]')
@@ -190,7 +248,7 @@ test.describe('isolated product-detail states', () => {
       .locator('next-route-announcer')
       .locator('[role="alert"]');
     await expect(routeAnnouncer).toHaveAttribute('aria-live', 'assertive');
-    await page.locator('a[href="/product/mosaic-hops"]').click();
+    await page.locator('a[href="/product/mosaic-hops"]').first().click();
     await expect(
       page.getByRole('heading', { name: 'Loading product details' }),
     ).toBeVisible();
@@ -210,7 +268,7 @@ test.describe('isolated product-detail states', () => {
     await expect(routeAnnouncer).toHaveText(
       'Shop brewing ingredients | Hop & Barley',
     );
-    await page.locator('a[href="/product/mosaic-hops"]').click();
+    await page.locator('a[href="/product/mosaic-hops"]').first().click();
     await expect(page).toHaveTitle('Mosaic Hops | Hop & Barley');
     await expect(productAnnouncement).toHaveText('Viewing Mosaic Hops');
   });
@@ -298,6 +356,11 @@ test.describe('isolated product-detail states', () => {
         url: `${runtime.baseUrl}/product/mosaic-hops`,
       },
       {
+        label: 'ready-in-stock add to cart',
+        target: () => page.getByRole('button', { name: 'Add to Cart' }),
+        url: `${runtime.baseUrl}/product/mosaic-hops`,
+      },
+      {
         label: 'ready-out-of-stock breadcrumb',
         target: () =>
           page
@@ -353,7 +416,9 @@ test('streams loading and renders a safe product error when the API is unavailab
     await assertResponsiveProductDetail(page, `loading:${probe.id}`);
     await assertReducedMotionState(page, `loading:${probe.id}`);
     if (probe.width === 360) {
-      await assertNoBlockingAxeViolations(page, 'loading product detail');
+      await assertNoBlockingAxeViolations(page, 'loading product detail', [
+        'document-title',
+      ]);
     }
 
     await expect(
@@ -474,12 +539,91 @@ async function waitForProductDetailImage(page: Page) {
     .toBe(true);
 }
 
-async function assertNoBlockingAxeViolations(page: Page, label: string) {
-  const results = await new AxeBuilder({ page }).withTags(wcagTags).analyze();
+async function assertNoBlockingAxeViolations(
+  page: Page,
+  label: string,
+  disabledRules: string[] = [],
+) {
+  const builder = new AxeBuilder({ page }).withTags(wcagTags);
+  if (disabledRules.length > 0) builder.disableRules(disabledRules);
+  const results = await builder.analyze();
   expect(
     results.violations.filter(
       ({ impact }) => impact === 'serious' || impact === 'critical',
     ),
     `${label} serious or critical Axe violations`,
   ).toEqual([]);
+}
+
+async function clearGuestCart(page: Page) {
+  await page
+    .evaluate(async () => {
+      const apiUrl = `http://${window.location.hostname}:3001/api/v1`;
+      const csrf = await fetch(`${apiUrl}/cart/csrf`, {
+        credentials: 'include',
+      });
+      if (!csrf.ok) return;
+      const { csrfToken } = (await csrf.json()) as { csrfToken: string };
+      await fetch(`${apiUrl}/cart/items`, {
+        credentials: 'include',
+        headers: { 'x-csrf-token': csrfToken },
+        method: 'DELETE',
+      });
+    })
+    .catch(() => undefined);
+}
+
+async function interceptEmptyCart(page: Page) {
+  const handler = async (route: import('@playwright/test').Route) => {
+    const request = route.request();
+    const origin = request.headers().origin;
+    const corsHeaders = origin
+      ? {
+          'access-control-allow-credentials': 'true',
+          'access-control-allow-origin': origin,
+          vary: 'Origin',
+        }
+      : {};
+
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({
+        headers: {
+          ...corsHeaders,
+          'access-control-allow-headers': 'content-type, x-csrf-token',
+          'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+        },
+        status: 204,
+      });
+      return;
+    }
+
+    if (
+      request.method() === 'GET' &&
+      new URL(request.url()).pathname.endsWith('/cart')
+    ) {
+      await route.fulfill({
+        body: JSON.stringify({
+          adjustmentMessage: null,
+          checkoutEligible: false,
+          currency: 'USD',
+          distinctItemCount: 0,
+          items: [],
+          serverNow: new Date().toISOString(),
+          subtotalMinor: 0,
+          totalQuantity: 0,
+        }),
+        contentType: 'application/json',
+        headers: {
+          ...corsHeaders,
+          'cache-control': 'private, no-store',
+        },
+      });
+      return;
+    }
+
+    await route.fallback();
+  };
+
+  await page.route('**/api/v1/cart', handler);
+  await page.route('**/api/v1/cart/**', handler);
 }

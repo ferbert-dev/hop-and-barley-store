@@ -24,11 +24,11 @@ export function CartScreen({ initialState }: CartScreenProps) {
 
 function ConnectedCartScreen() {
   const cart = useCart();
-  const { refresh } = cart;
+  const { ensureLoaded } = cart;
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void ensureLoaded();
+  }, [ensureLoaded]);
 
   return <CartScreenContent {...cart} />;
 }

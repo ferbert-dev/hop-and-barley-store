@@ -139,7 +139,7 @@ test('loads shell assets and exposes the landmark structure', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
 
   await waitForShellAssets(page);
   await expect(
@@ -156,7 +156,7 @@ test('loads shell assets and exposes the landmark structure', async ({
 
 test('honours the reduced-motion contract', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
 
   const motion = await page.evaluate(() => ({
     htmlScrollBehavior: getComputedStyle(document.documentElement)
@@ -200,7 +200,7 @@ test('renders the configured API availability state without changing the shell',
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
 
   await expect(page.getByRole('status')).toHaveText(
     process.env.E2E_EXPECT_API_STATUS ?? 'API connected',

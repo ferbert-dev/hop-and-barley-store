@@ -309,6 +309,7 @@ test.describe('F3 cart reservations', () => {
     const remove = page.getByRole('button', {
       name: 'Remove Citra Hops from cart',
     });
+    await expect(remove).toBeEnabled();
     await focusWithKeyboard(page, remove);
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Citra Hops' })).toHaveCount(
@@ -561,7 +562,7 @@ async function expectReservationCountdown(page: Page) {
 async function seedCartLine(page: Page, productSlug: string) {
   await page.goto('/cart');
   const response = await page.evaluate(async (slug) => {
-    const apiUrl = 'http://localhost:3001/api/v1';
+    const apiUrl = `http://${window.location.hostname}:3001/api/v1`;
     const csrf = await fetch(`${apiUrl}/cart/csrf`, {
       credentials: 'include',
     });
@@ -646,7 +647,7 @@ async function assertReducedMotion(page: Page, label: string) {
 async function clearCart(page: Page) {
   await page
     .evaluate(async () => {
-      const apiUrl = 'http://localhost:3001/api/v1';
+      const apiUrl = `http://${window.location.hostname}:3001/api/v1`;
       const csrf = await fetch(`${apiUrl}/cart/csrf`, {
         credentials: 'include',
       });

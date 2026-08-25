@@ -19,9 +19,9 @@ test('renders the ready catalog and applies URL-owned filters', async ({
   page,
 }) => {
   test.skip(unavailable, 'requires the connected API');
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByText('API connected')).toBeVisible();
+  await expectApiStatus(page, 'API connected');
   await expect(
     page.getByRole('img', { name: 'Close-up hop cones and green leaves' }),
   ).toBeVisible();
@@ -40,7 +40,7 @@ test('renders the ready catalog and applies URL-owned filters', async ({
   await expect(page).toHaveTitle('Citra — Hop & Barley products');
   await expect(page.getByRole('article')).toHaveCount(1);
   await expect(page.getByRole('link', { name: 'Citra Hops' })).toBeVisible();
-  await expect(page.getByText('1 product found')).toBeVisible();
+  await expect(page.getByText('1 product found').first()).toBeVisible();
   await expect(
     page.getByRole('link', { name: 'Clear filters' }),
   ).toHaveAttribute('href', '/');
@@ -50,7 +50,9 @@ test('renders removable search keywords and preserves only approved discovery co
   page,
 }) => {
   test.skip(unavailable, 'requires the connected API');
-  await page.goto('/?search=citrus+hops&category=hops&page=2&limit=1');
+  await page.goto('/?search=citrus+hops&category=hops&page=2&limit=1', {
+    waitUntil: 'domcontentloaded',
+  });
 
   const keywords = page.getByRole('list', { name: 'Search keywords' });
   await expect(keywords).toBeVisible();
@@ -90,13 +92,11 @@ test('supports keyboard-only catalog filtering with Tab, Shift+Tab, and Enter', 
 }) => {
   test.skip(unavailable, 'requires the connected API');
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/?category=hops');
+  await page.goto('/?category=hops', { waitUntil: 'domcontentloaded' });
 
   const search = page.getByLabel('Search products');
   const category = page.getByRole('radio', { name: 'Hops' });
-  await expect(
-    page.getByRole('status').filter({ hasText: 'API connected' }),
-  ).toBeVisible();
+  await expectApiStatus(page, 'API connected');
   await expect(
     page.getByRole('search', { name: 'Filter products' }),
   ).toBeVisible();
@@ -188,7 +188,7 @@ test('keeps stable pagination and restores URL state with browser history', asyn
   page,
 }) => {
   test.skip(unavailable, 'requires the connected API');
-  await page.goto(stateUrls.filtered);
+  await page.goto(stateUrls.filtered, { waitUntil: 'domcontentloaded' });
 
   await expect(page.getByRole('link', { name: 'Mosaic Hops' })).toBeVisible();
   await page.getByRole('link', { name: 'Next' }).click();
@@ -200,10 +200,10 @@ test('keeps stable pagination and restores URL state with browser history', asyn
       .locator('[aria-current="page"]'),
   ).toHaveText('2');
 
-  await page.goBack();
+  await page.goBack({ waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(stateUrls.filtered);
   await expect(page.getByRole('link', { name: 'Mosaic Hops' })).toBeVisible();
-  await page.goForward();
+  await page.goForward({ waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('link', { name: 'Cascade Hops' })).toBeVisible();
 });
 
@@ -229,13 +229,15 @@ test('renders invalid and empty URLs with safe recovery controls', async ({
 }) => {
   test.skip(unavailable, 'requires the connected API');
 
-  await page.goto('/?search=hops&search=malts');
-  await expect(page.getByText('API not contacted')).toBeVisible();
+  await page.goto('/?search=hops&search=malts', {
+    waitUntil: 'domcontentloaded',
+  });
+  await expectApiStatus(page, 'API not contacted');
   await expect(
     page.getByRole('alert').filter({ hasText: 'Invalid catalog URL' }),
   ).toContainText('Catalog parameters must appear only once.');
 
-  await page.goto(stateUrls.empty);
+  await page.goto(stateUrls.empty, { waitUntil: 'domcontentloaded' });
   await expect(
     page.getByRole('heading', { name: 'No products match these filters' }),
   ).toBeVisible();
@@ -248,12 +250,10 @@ test('supports keyboard-only empty recovery with visible focus', async ({
 }) => {
   test.skip(unavailable, 'requires the connected API');
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto(stateUrls.empty);
+  await page.goto(stateUrls.empty, { waitUntil: 'domcontentloaded' });
 
   const clear = page.getByRole('link', { name: 'Clear filters' });
-  await expect(
-    page.getByRole('status').filter({ hasText: 'API connected' }),
-  ).toBeVisible();
+  await expectApiStatus(page, 'API connected');
   await expect(
     page.getByRole('search', { name: 'Filter products' }),
   ).toBeVisible();
@@ -274,7 +274,7 @@ test('supports keyboard-only empty recovery with visible focus', async ({
 
   await expect(page).toHaveURL(/\/$/);
   await expect(page).toHaveTitle('Shop brewing ingredients | Hop & Barley');
-  await expect(page.getByText('12 products found')).toBeVisible();
+  await expect(page.getByText('12 products found').first()).toBeVisible();
 });
 
 test('announces and titles ready, filtered, and empty catalog routes', async ({
@@ -301,14 +301,13 @@ test('announces and titles ready, filtered, and empty catalog routes', async ({
   ] as const;
 
   for (const state of states) {
-    await page.goto(state.url);
+    await page.goto(state.url, { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveTitle(state.title);
-    await expect(
-      page.getByRole('status').filter({ hasText: 'API connected' }),
-    ).toBeVisible();
+    await expectApiStatus(page, 'API connected');
     const announcement = page
       .locator('[aria-live="polite"]')
-      .filter({ hasText: state.announcement });
+      .filter({ hasText: state.announcement })
+      .first();
     await expect(announcement).toBeVisible();
   }
 });
@@ -322,7 +321,7 @@ test('keeps ready, filtered, and empty states responsive at every Q1 probe', asy
   for (const [state, url] of Object.entries(stateUrls)) {
     for (const probe of viewportProbes) {
       await page.setViewportSize({ width: probe.width, height: probe.height });
-      await page.goto(url);
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
       await assertResponsiveCatalog(page, `${state}:${probe.id}`);
 
       if (state === 'ready') {
@@ -342,13 +341,15 @@ test('keeps unavailable and loading states responsive at every Q1 probe', async 
 
   for (const probe of viewportProbes) {
     await page.setViewportSize({ width: probe.width, height: probe.height });
-    await page.goto(`/?search=offline-${probe.width}`);
+    await page.goto(`/?search=offline-${probe.width}`, {
+      waitUntil: 'domcontentloaded',
+    });
     await expect(
       page.getByRole('alert').filter({ hasText: 'Products unavailable' }),
     ).toBeVisible();
     await assertResponsiveCatalog(page, `error:${probe.id}`);
 
-    await page.goto('/?page=201');
+    await page.goto('/?page=201', { waitUntil: 'domcontentloaded' });
     await startLoadingNavigation(
       page,
       `/?search=loading-${probe.width}-${probe.id}`,
@@ -364,7 +365,7 @@ test('announces and titles loading and error catalog routes', async ({
   const search = 'Loading route announcement';
   const targetHref = `/?search=${encodeURIComponent(search)}`;
 
-  await page.goto('/?page=201');
+  await page.goto('/?page=201', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveTitle('Invalid catalog URL | Hop & Barley');
   await startLoadingNavigation(page, targetHref);
   const loading = page
@@ -388,12 +389,10 @@ test('supports keyboard-only error retry with visible focus', async ({
   test.skip(!unavailable, 'requires the unavailable API phase');
   const retryHref = '/?search=keyboard-error-retry';
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto(retryHref);
+  await page.goto(retryHref, { waitUntil: 'domcontentloaded' });
 
   const retry = page.getByRole('link', { name: 'Try again' });
-  await expect(
-    page.getByRole('status').filter({ hasText: 'API unavailable' }),
-  ).toBeVisible();
+  await expectApiStatus(page, 'API unavailable');
   await expect(
     page.getByRole('alert').filter({ hasText: 'Products unavailable' }),
   ).toBeVisible();
@@ -418,7 +417,7 @@ test('supports keyboard-only error retry with visible focus', async ({
   await page.keyboard.press('Tab');
   await expect(retry).toBeFocused();
 
-  const navigation = page.waitForNavigation();
+  const navigation = page.waitForNavigation({ waitUntil: 'domcontentloaded' });
   await page.keyboard.press('Enter');
   await navigation;
   await expect(page).toHaveURL(retryHref);
@@ -436,7 +435,7 @@ test('has no serious or critical catalog accessibility violations', async ({
 
   for (const url of urls) {
     await page.setViewportSize({ width: 360, height: 800 });
-    await page.goto(url);
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
     await assertNoBlockingAxeViolations(page, url);
   }
 });
@@ -446,7 +445,7 @@ test('has no serious or critical Axe violations in the loading state', async ({
 }) => {
   test.skip(!unavailable, 'requires the unavailable API phase');
   await page.setViewportSize({ width: 360, height: 800 });
-  await page.goto('/?page=201');
+  await page.goto('/?page=201', { waitUntil: 'domcontentloaded' });
   await startLoadingNavigation(page, '/?search=loading-axe-state');
   await assertNoBlockingAxeViolations(page, 'loading');
 });
@@ -458,7 +457,7 @@ test('honours reduced motion in ready, filtered, empty, loading, and error state
 
   if (unavailable) {
     const loadingSearch = 'reduced-motion-loading';
-    await page.goto('/?page=201');
+    await page.goto('/?page=201', { waitUntil: 'domcontentloaded' });
     await startLoadingNavigation(
       page,
       `/?search=${encodeURIComponent(loadingSearch)}`,
@@ -472,10 +471,10 @@ test('honours reduced motion in ready, filtered, empty, loading, and error state
     await assertReducedMotionState(page, 'loading');
 
     const errorSearch = 'reduced-motion-error';
-    await page.goto(`/?search=${encodeURIComponent(errorSearch)}`);
-    await expect(
-      page.getByRole('status').filter({ hasText: 'API unavailable' }),
-    ).toBeVisible();
+    await page.goto(`/?search=${encodeURIComponent(errorSearch)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await expectApiStatus(page, 'API unavailable');
     await expect(
       page.getByRole('alert').filter({ hasText: 'Products unavailable' }),
     ).toBeVisible();
@@ -485,28 +484,22 @@ test('honours reduced motion in ready, filtered, empty, loading, and error state
     return;
   }
 
-  await page.goto(stateUrls.ready);
-  await expect(
-    page.getByRole('status').filter({ hasText: 'API connected' }),
-  ).toBeVisible();
-  await expect(page.getByText('12 products found')).toBeVisible();
+  await page.goto(stateUrls.ready, { waitUntil: 'domcontentloaded' });
+  await expectApiStatus(page, 'API connected');
+  await expect(page.getByText('12 products found').first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Search' })).toBeVisible();
   await expect(page).toHaveTitle('Shop brewing ingredients | Hop & Barley');
   await assertReducedMotionState(page, 'ready');
 
-  await page.goto(stateUrls.filtered);
-  await expect(
-    page.getByRole('status').filter({ hasText: 'API connected' }),
-  ).toBeVisible();
+  await page.goto(stateUrls.filtered, { waitUntil: 'domcontentloaded' });
+  await expectApiStatus(page, 'API connected');
   await expect(page.getByRole('link', { name: 'Mosaic Hops' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Next' })).toBeVisible();
   await expect(page).toHaveTitle('Hops — Hop & Barley products');
   await assertReducedMotionState(page, 'filtered');
 
-  await page.goto(stateUrls.empty);
-  await expect(
-    page.getByRole('status').filter({ hasText: 'API connected' }),
-  ).toBeVisible();
+  await page.goto(stateUrls.empty, { waitUntil: 'domcontentloaded' });
+  await expectApiStatus(page, 'API connected');
   await expect(
     page.getByRole('heading', { name: 'No products match these filters' }),
   ).toBeVisible();
@@ -526,6 +519,12 @@ async function startLoadingNavigation(page: Page, targetHref: string) {
   await expect(
     page.getByRole('heading', { name: 'Loading products' }),
   ).toBeVisible({ timeout: 750 });
+}
+
+async function expectApiStatus(page: Page, status: string) {
+  await expect(
+    page.getByRole('status').filter({ hasText: status }).first(),
+  ).toHaveText(status);
 }
 
 async function assertResponsiveCatalog(page: Page, label: string) {

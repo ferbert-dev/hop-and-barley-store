@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Price } from '../../components/ui/price';
 import { productAssetsBySlug } from '../../design-system/assets';
 import type { ProductDetailProduct } from '../../lib/product-detail';
+import { ProductCartControl } from './product-cart-control';
 import styles from './product-detail.module.css';
 
 export function ProductDetail({ product }: { product: ProductDetailProduct }) {
@@ -62,6 +63,11 @@ export function ProductDetail({ product }: { product: ProductDetailProduct }) {
               <p key={`${String(index)}:${paragraph}`}>{paragraph}</p>
             ))}
           </div>
+          <ProductCartControl
+            availability={product.availability}
+            productName={product.name}
+            productSlug={product.slug}
+          />
         </div>
       </div>
 
