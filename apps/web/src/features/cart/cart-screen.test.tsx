@@ -1,15 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CartProvider, type CartState } from './cart-context';
 import { CartScreen } from './cart-screen';
-import type { CartTransport } from './cart-transport';
+import type { Cart, CartTransport } from './cart-transport';
 
-const push = vi.fn();
-
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('next/image', () => ({
   default: ({ alt, ...props }: ComponentProps<'img'>) => (
     // eslint-disable-next-line @next/next/no-img-element
@@ -17,14 +14,14 @@ vi.mock('next/image', () => ({
   ),
 }));
 
-const cart = {
+const cart: Cart = {
   adjustmentMessage: null,
   checkoutEligible: true,
-  currency: 'USD' as const,
+  currency: 'USD',
   distinctItemCount: 1,
   items: [
     {
-      availability: 'available' as const,
+      availability: 'available',
       currentUnitPriceMinor: 599,
       imagePath: '/assets/products/citra-hops.webp',
       lineTotalMinor: 599,
@@ -34,7 +31,7 @@ const cart = {
       productSlug: 'citra-hops',
       quantity: 1,
       reservationExpiresAt: '2026-08-25T12:15:00.000Z',
-      reservationStatus: 'active' as const,
+      reservationStatus: 'active',
     },
   ],
   serverNow: '2026-08-25T12:00:00.000Z',
@@ -62,7 +59,7 @@ const routeStates: readonly (readonly [string, CartState])[] = [
   ['ready', { cart, kind: 'ready' }],
 ];
 
-beforeEach(() => push.mockReset());
+afterEach(() => vi.useRealTimers());
 
 describe('CartScreen', () => {
   it.each(routeStates)(
@@ -71,75 +68,154 @@ describe('CartScreen', () => {
       render(<CartScreen initialState={initialState} />);
 
       expect(
-        screen.getAllByRole('heading', { level: 1, name: 'Shopping cart' }),
+        screen.getAllByRole('heading', { level: 1, name: 'Shopping Cart' }),
       ).toHaveLength(1);
     },
   );
 
-  it('renders the accessible loading state before the canonical cart arrives', () => {
-    render(<CartScreen initialState={{ kind: 'loading' }} />);
-
-    expect(screen.getByRole('status')).toBeVisible();
-    expect(
-      screen.getByRole('heading', { name: 'Loading your cart' }),
-    ).toBeVisible();
-  });
-
-  it('requires contact and shipping details before the bounded checkout handoff', async () => {
-    const user = userEvent.setup();
-    render(
-      <CartScreen
-        initialState={{
-          cart,
-          kind: 'ready',
-        }}
-      />,
-    );
-
-    await user.click(
-      screen.getByRole('button', { name: 'Continue to checkout' }),
-    );
-
-    expect(screen.getByText('Enter your full name.')).toBeVisible();
-    expect(push).not.toHaveBeenCalled();
-  });
-
-  it('navigates to the bounded checkout route without serialising contact details', async () => {
-    const user = userEvent.setup();
+  it('uses the confirmed cart labels and keeps checkout as a bounded handoff', () => {
     render(<CartScreen initialState={{ cart, kind: 'ready' }} />);
 
-    await user.type(screen.getByLabelText('Full name'), 'Ada Brewer');
-    await user.type(screen.getByLabelText('Phone number'), '+34 600 123 456');
-    await user.type(screen.getByLabelText('City'), 'Madrid');
-    await user.type(
-      screen.getByLabelText('Shipping address'),
-      'Calle de la Malta 12',
-    );
-    await user.click(
-      screen.getByRole('button', { name: 'Continue to checkout' }),
-    );
-
-    expect(push).toHaveBeenCalledWith('/checkout');
-    expect(JSON.stringify(push.mock.calls)).not.toContain('Ada Brewer');
-    expect(JSON.stringify(push.mock.calls)).not.toContain('Calle de la Malta');
+    expect(screen.getByText('1 in cart')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Clear cart' })).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Remove Citra Hops from cart' }),
+    ).toHaveTextContent('Remove');
+    expect(
+      screen.getByRole('link', { name: 'Proceed to Checkout' }),
+    ).toHaveAttribute('href', '/checkout');
+    expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Shipping address')).not.toBeInTheDocument();
   });
 
-  it('withholds a changing line total until the cart API returns a canonical response', async () => {
-    const user = userEvent.setup();
-    let resolveUpdate: ((value: typeof cart) => void) | undefined;
-    const transport: CartTransport = {
-      add: vi.fn(async () => cart),
-      clear: vi.fn(async () => cart),
-      load: vi.fn(async () => cart),
-      recheck: vi.fn(async () => cart),
-      remove: vi.fn(async () => cart),
-      update: vi.fn(
-        () =>
-          new Promise<typeof cart>((resolve) => {
-            resolveUpdate = resolve;
-          }),
-      ),
+  it('derives the reservation countdown from server time despite a skewed client clock', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('1999-01-01T00:00:00.000Z'));
+    render(<CartScreen initialState={{ cart, kind: 'ready' }} />);
+
+    expect(screen.getByRole('timer')).toHaveTextContent(
+      'Reservations expire in 15:00',
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(screen.getByRole('timer')).toHaveTextContent(
+      'Reservations expire in 14:59',
+    );
+  });
+
+  it('retains canonically expired lines without falsely claiming zero stock', () => {
+    const expiredCart: Cart = {
+      ...cart,
+      checkoutEligible: false,
+      items: [
+        {
+          ...cart.items[0],
+          availability: 'unavailable',
+          reservationExpiresAt: '2026-08-25T12:00:00.000Z',
+          reservationStatus: 'expired',
+        },
+      ],
     };
+    render(<CartScreen initialState={{ cart: expiredCart, kind: 'ready' }} />);
+
+    expect(screen.getByText('Citra Hops')).toBeVisible();
+    expect(
+      screen.getByText(
+        'Reservations expired. Recheck availability before checkout.',
+      ),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('link', { name: 'Proceed to Checkout' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Out of stock')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Remove unavailable items before checkout.'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Recheck availability before checkout.'),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Decrease Citra Hops quantity' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Increase Citra Hops quantity' }),
+    ).toBeDisabled();
+  });
+
+  it('keeps an out-of-stock line after recheck, announces the adjustment, and blocks checkout', async () => {
+    const user = userEvent.setup();
+    const expiredCart: Cart = {
+      ...cart,
+      checkoutEligible: false,
+      items: [
+        {
+          ...cart.items[0],
+          availability: 'unavailable',
+          reservationStatus: 'expired',
+        },
+      ],
+    };
+    const recheckedCart: Cart = {
+      ...expiredCart,
+      adjustmentMessage: 'Citra Hops is no longer available.',
+      items: [
+        {
+          ...expiredCart.items[0],
+          availability: 'unavailable',
+          currentUnitPriceMinor: null,
+          lineTotalMinor: null,
+          reservationExpiresAt: null,
+          reservationStatus: 'unreserved',
+        },
+      ],
+      serverNow: '2026-08-25T12:01:00.000Z',
+      subtotalMinor: 0,
+    };
+    const recheck = vi.fn(async () => recheckedCart);
+    const transport = createTransport(expiredCart, { recheck });
+    render(
+      <CartProvider transport={transport}>
+        <CartScreen />
+      </CartProvider>,
+    );
+
+    await screen.findByRole('button', { name: 'Recheck availability' });
+    await user.click(
+      screen.getByRole('button', { name: 'Recheck availability' }),
+    );
+
+    expect(recheck).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Out of stock')).toBeVisible();
+    expect(
+      screen.getByText('Citra Hops is no longer available.'),
+    ).toBeVisible();
+    expect(
+      screen.getByText('Remove unavailable items before checkout.'),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('link', { name: 'Proceed to Checkout' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Citra Hops')).toBeVisible();
+  });
+
+  it('withholds changing totals until the cart API returns a canonical response', async () => {
+    const user = userEvent.setup();
+    let resolveUpdate: ((value: Cart) => void) | undefined;
+    const updatedCart: Cart = {
+      ...cart,
+      items: [{ ...cart.items[0], lineTotalMinor: 1198, quantity: 2 }],
+      subtotalMinor: 1198,
+      totalQuantity: 2,
+    };
+    const transport = createTransport(cart, {
+      update: () =>
+        new Promise<Cart>((resolve) => {
+          resolveUpdate = resolve;
+        }),
+    });
     render(
       <CartProvider transport={transport}>
         <CartScreen />
@@ -154,6 +230,30 @@ describe('CartScreen', () => {
     expect(
       screen.getByText('Line total updating from the store…'),
     ).toBeVisible();
-    resolveUpdate?.({ ...cart, subtotalMinor: 1198, totalQuantity: 2 });
+    expect(screen.getAllByText('Updating from the store…')).toHaveLength(1);
+
+    await act(async () => {
+      resolveUpdate?.(updatedCart);
+    });
+
+    expect(screen.getByText('2 in cart')).toBeVisible();
+    expect(
+      screen.queryByText('Updating from the store…'),
+    ).not.toBeInTheDocument();
   });
 });
+
+function createTransport(
+  loadedCart: Cart,
+  overrides: Partial<CartTransport> = {},
+): CartTransport {
+  return {
+    add: vi.fn(async () => loadedCart),
+    clear: vi.fn(async () => loadedCart),
+    load: vi.fn(async () => loadedCart),
+    recheck: vi.fn(async () => loadedCart),
+    remove: vi.fn(async () => loadedCart),
+    update: vi.fn(async () => loadedCart),
+    ...overrides,
+  };
+}
