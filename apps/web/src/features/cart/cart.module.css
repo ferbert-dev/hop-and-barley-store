@@ -14,8 +14,7 @@
 }
 
 .heading h1,
-.stateTitle,
-.form h2 {
+.stateTitle {
   font-size: clamp(2.5rem, 8vw, 5rem);
   margin-bottom: 0;
 }
@@ -24,11 +23,28 @@
   margin-bottom: var(--hb-space-8);
 }
 
-.message {
-  background: var(--hb-color-brand-soft);
+.message,
+.reservationCountdown,
+.reservationNotice {
   border-radius: var(--hb-radius-md);
   margin-bottom: var(--hb-space-6);
   padding: var(--hb-space-3) var(--hb-space-4);
+}
+
+.message,
+.reservationCountdown {
+  background: var(--hb-color-brand-soft);
+}
+
+.reservationNotice {
+  background: var(--hb-color-surface-muted);
+  border: 1px solid var(--hb-color-border-strong);
+  display: grid;
+  gap: var(--hb-space-3);
+}
+
+.reservationNotice p {
+  margin: 0;
 }
 
 .layout {
@@ -65,22 +81,21 @@
   gap: var(--hb-space-3);
 }
 
-.lineContent h2,
-.summary h2 {
+.lineContent h2 {
   font-size: var(--hb-font-size-xl);
   margin-bottom: var(--hb-space-1);
 }
 
 .qualifier,
-.availability,
-.unitPrice,
-.formIntro {
+.unitPrice {
   color: var(--hb-color-text-muted);
   margin-bottom: 0;
 }
 
-.availability[data-availability='unavailable'] {
+.availability,
+.reservationLineStatus {
   color: var(--hb-color-danger);
+  margin: var(--hb-space-2) 0 0;
 }
 
 .linePrices {
@@ -98,7 +113,7 @@
   align-items: center;
   display: inline-grid;
   gap: var(--hb-space-2);
-  grid-template-columns: 2.75rem minmax(2.75rem, auto) 2.75rem;
+  grid-template-columns: 2.75rem minmax(4.5rem, auto) 2.75rem;
 }
 
 .quantity output {
@@ -107,8 +122,14 @@
   text-align: center;
 }
 
-.summary,
-.form {
+.remove {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--hb-space-2);
+  justify-content: center;
+}
+
+.summary {
   background: var(--hb-color-surface);
   border: 1px solid var(--hb-color-border);
   border-radius: var(--hb-radius-lg);
@@ -117,8 +138,6 @@
 }
 
 .summary dl {
-  display: grid;
-  gap: var(--hb-space-3);
   margin: 0;
 }
 
@@ -146,63 +165,9 @@
   margin: var(--hb-space-4) 0 0;
 }
 
-.form {
-  display: grid;
-  gap: var(--hb-space-6);
-  margin-top: var(--hb-space-8);
-  max-width: var(--hb-layout-reading);
-}
-
-.form h2 {
-  font-size: clamp(2rem, 6vw, 3rem);
-  margin: 0 0 var(--hb-space-3);
-}
-
-.fields {
-  display: grid;
-  gap: var(--hb-space-4);
-}
-
-.field {
-  display: grid;
-  gap: var(--hb-space-2);
-  font-weight: 600;
-}
-
-.field input,
-.field textarea {
-  background: var(--hb-color-surface);
-  border: 1px solid var(--hb-color-border-strong);
-  border-radius: var(--hb-radius-md);
-  color: var(--hb-color-ink);
-  font: inherit;
-  padding: var(--hb-space-2) var(--hb-space-3);
+.checkout {
+  margin-top: var(--hb-space-4);
   width: 100%;
-}
-
-.field input {
-  min-block-size: 2.75rem;
-}
-
-.field textarea {
-  resize: vertical;
-}
-
-.field input:focus-visible,
-.field textarea:focus-visible {
-  outline: 3px solid var(--hb-color-brand);
-  outline-offset: 2px;
-}
-
-.field input[aria-invalid='true'],
-.field textarea[aria-invalid='true'] {
-  border-color: var(--hb-color-danger);
-}
-
-.field [role='alert'] {
-  color: var(--hb-color-danger);
-  font-size: var(--hb-font-size-sm);
-  font-weight: 400;
 }
 
 @media (min-width: 48rem) {

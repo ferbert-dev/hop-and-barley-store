@@ -1,7 +1,6 @@
 'use client';
 
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { Button } from '../../components/ui/button';
@@ -13,19 +12,13 @@ import {
   LoadingState,
 } from '../../components/ui/status';
 import { useCart, type CartContextValue, type CartState } from './cart-context';
-import {
-  validateCartContact,
-  type CartContactErrors,
-  type CartContactInput,
-} from './cart-validation';
+import type { Cart } from './cart-transport';
 import styles from './cart.module.css';
 
 type CartScreenProps = Readonly<{ initialState?: CartState }>;
 
 export function CartScreen({ initialState }: CartScreenProps) {
-  if (initialState) {
-    return <CartScreenContent state={initialState} />;
-  }
+  if (initialState) return <CartScreenContent state={initialState} />;
   return <ConnectedCartScreen />;
 }
 
@@ -45,6 +38,7 @@ type CartScreenContentProps = Pick<
   | 'clear'
   | 'items'
   | 'pending'
+  | 'recheck'
   | 'refresh'
   | 'remove'
   | 'state'
@@ -56,74 +50,131 @@ function CartScreenContent({
   clear,
   items,
   pending,
+  recheck,
   refresh,
   remove,
   state,
   totalsAreRefreshing = false,
   update,
 }: Partial<CartScreenContentProps> & Pick<CartScreenContentProps, 'state'>) {
-  if (state.kind === 'loading') {
-    return (
-      <section aria-labelledby="cart-title" className={styles.page}>
-        <h1 className={styles.stateTitle} id="cart-title">
-          Shopping cart
-        </h1>
-        <LoadingState title="Loading your cart">
-          Checking the latest cart details.
-        </LoadingState>
-      </section>
-    );
-  }
+  if (state.kind === 'loading') return <CartLoadingState />;
   if (state.kind === 'unavailable') {
-    return (
-      <section aria-labelledby="cart-title" className={styles.page}>
-        <h1 className={styles.stateTitle} id="cart-title">
-          Shopping cart
-        </h1>
-        <ErrorState
-          action={
-            refresh ? (
-              <Button
-                onClick={() => void refresh()}
-                type="button"
-                variant="secondary"
-              >
-                Try again
-              </Button>
-            ) : undefined
-          }
-          title="Your cart is unavailable"
-        >
-          The store could not load your private cart safely. Try again shortly.
-        </ErrorState>
-      </section>
-    );
+    return <CartUnavailableState refresh={refresh} />;
   }
 
   const cartItems = items ?? state.cart.items;
   if (cartItems.length === 0 && !totalsAreRefreshing) {
-    return (
-      <section aria-labelledby="cart-title" className={styles.page}>
-        <h1 className={styles.stateTitle} id="cart-title">
-          Shopping cart
-        </h1>
-        <EmptyState
-          action={<Button href="/">Continue shopping</Button>}
-          title="Your cart is empty"
-        >
-          Add brewing ingredients to see them here.
-        </EmptyState>
-      </section>
-    );
+    return <CartEmptyState />;
   }
+
+  return (
+    <CartContents
+      cart={state.cart}
+      cartItems={cartItems}
+      clear={clear}
+      key={state.cart.serverNow}
+      message={state.message}
+      pending={pending}
+      recheck={recheck}
+      remove={remove}
+      totalsAreRefreshing={totalsAreRefreshing}
+      update={update}
+    />
+  );
+}
+
+function CartLoadingState() {
+  return (
+    <section aria-labelledby="cart-title" className={styles.page}>
+      <h1 className={styles.stateTitle} id="cart-title">
+        Shopping Cart
+      </h1>
+      <LoadingState title="Loading your cart">
+        Checking the latest cart details.
+      </LoadingState>
+    </section>
+  );
+}
+
+function CartUnavailableState({
+  refresh,
+}: Readonly<{ refresh?: CartContextValue['refresh'] }>) {
+  return (
+    <section aria-labelledby="cart-title" className={styles.page}>
+      <h1 className={styles.stateTitle} id="cart-title">
+        Shopping Cart
+      </h1>
+      <ErrorState
+        action={
+          refresh ? (
+            <Button
+              onClick={() => void refresh()}
+              type="button"
+              variant="secondary"
+            >
+              Try again
+            </Button>
+          ) : undefined
+        }
+        title="Your cart is unavailable"
+      >
+        The store could not load your private cart safely. Try again shortly.
+      </ErrorState>
+    </section>
+  );
+}
+
+function CartEmptyState() {
+  return (
+    <section aria-labelledby="cart-title" className={styles.page}>
+      <h1 className={styles.stateTitle} id="cart-title">
+        Shopping Cart
+      </h1>
+      <EmptyState
+        action={<Button href="/">Continue shopping</Button>}
+        title="Your cart is empty"
+      >
+        Add brewing ingredients to see them here.
+      </EmptyState>
+    </section>
+  );
+}
+
+function CartContents({
+  cart,
+  cartItems,
+  clear,
+  message,
+  pending,
+  recheck,
+  remove,
+  totalsAreRefreshing,
+  update,
+}: Readonly<{
+  cart: Cart;
+  cartItems: Cart['items'];
+  clear?: CartContextValue['clear'];
+  message?: string;
+  pending?: CartContextValue['pending'];
+  recheck?: CartContextValue['recheck'];
+  remove?: CartContextValue['remove'];
+  totalsAreRefreshing: boolean;
+  update?: CartContextValue['update'];
+}>) {
+  const reservation = useReservationClock(cart);
+  const hasUnavailableItem = cartItems.some(
+    (item) => item.availability === 'unavailable',
+  );
+  const checkoutEligible =
+    cart.checkoutEligible &&
+    !hasUnavailableItem &&
+    !reservation.hasExpired &&
+    !totalsAreRefreshing;
 
   return (
     <section aria-labelledby="cart-title" className={styles.page}>
       <div className={styles.heading}>
-        <div>
-          <p className="eyebrow">Your selection</p>
-          <h1 id="cart-title">Shopping cart</h1>
-        </div>
+        <h1 id="cart-title">Shopping Cart</h1>
         <Button
           disabled={pending !== null}
           onClick={() => void clear?.()}
@@ -136,11 +187,18 @@ function CartScreenContent({
         </Button>
       </div>
 
-      {state.message ? (
+      {message ? (
         <p className={styles.message} role="status">
-          {state.message}
+          {message}
         </p>
       ) : null}
+
+      <ReservationStatus
+        hasExpired={reservation.hasExpired}
+        pending={pending}
+        recheck={recheck}
+        remainingSeconds={reservation.remainingSeconds}
+      />
 
       <div className={styles.layout}>
         <div className={styles.lines} aria-label="Cart items">
@@ -149,6 +207,13 @@ function CartScreenContent({
               pending,
               item.productSlug,
             );
+            const itemReservationExpired =
+              item.reservationStatus === 'expired' ||
+              (item.reservationStatus === 'active' &&
+                item.reservationExpiresAt !== null &&
+                Date.parse(item.reservationExpiresAt) <=
+                  reservation.serverTime);
+
             return (
               <Card className={styles.line} key={item.productSlug}>
                 <Image
@@ -163,14 +228,16 @@ function CartScreenContent({
                   <div>
                     <h2>{item.name}</h2>
                     <p className={styles.qualifier}>{item.priceQualifier}</p>
-                    <p
-                      className={styles.availability}
-                      data-availability={item.availability}
-                    >
-                      {item.availability === 'available'
-                        ? 'Available'
-                        : 'Currently unavailable'}
-                    </p>
+                    {item.availability === 'unavailable' ? (
+                      <p className={styles.availability} role="status">
+                        Out of stock
+                      </p>
+                    ) : null}
+                    {itemReservationExpired ? (
+                      <p className={styles.reservationLineStatus} role="status">
+                        Reservation expired
+                      </p>
+                    ) : null}
                   </div>
                   <div className={styles.linePrices}>
                     {itemIsPending ? (
@@ -181,17 +248,17 @@ function CartScreenContent({
                       <span>Price currently unavailable</span>
                     ) : (
                       <Price
-                        currency={state.cart.currency}
+                        currency={cart.currency}
                         minorUnits={item.lineTotalMinor}
                       />
                     )}
                     {item.currentUnitPriceMinor === null ? null : (
                       <span className={styles.unitPrice}>
                         <Price
-                          currency={state.cart.currency}
+                          currency={cart.currency}
                           minorUnits={item.currentUnitPriceMinor}
                         />{' '}
-                        each
+                        {item.priceQualifier}
                       </span>
                     )}
                   </div>
@@ -204,7 +271,8 @@ function CartScreenContent({
                         aria-label={`Decrease ${item.name} quantity`}
                         disabled={
                           pending !== null ||
-                          item.availability === 'unavailable'
+                          item.availability === 'unavailable' ||
+                          itemReservationExpired
                         }
                         onClick={() =>
                           void (item.quantity === 1
@@ -216,12 +284,15 @@ function CartScreenContent({
                       >
                         −
                       </Button>
-                      <output aria-live="polite">{item.quantity}</output>
+                      <output aria-live="polite">
+                        {item.quantity} in cart
+                      </output>
                       <Button
                         aria-label={`Increase ${item.name} quantity`}
                         disabled={
                           pending !== null ||
                           item.availability === 'unavailable' ||
+                          itemReservationExpired ||
                           item.quantity >= 99
                         }
                         onClick={() =>
@@ -234,14 +305,17 @@ function CartScreenContent({
                       </Button>
                     </div>
                     <Button
+                      aria-label={`Remove ${item.name} from cart`}
+                      className={styles.remove}
                       disabled={pending !== null}
                       onClick={() => void remove?.(item.productSlug)}
                       pending={pending?.kind === 'remove' && itemIsPending}
-                      pendingLabel="Removing…"
+                      pendingLabel={`Removing ${item.name}…`}
                       type="button"
                       variant="danger"
                     >
-                      Remove {item.name}
+                      <span aria-hidden="true">X</span>
+                      <span>Remove</span>
                     </Button>
                   </div>
                 </div>
@@ -250,19 +324,8 @@ function CartScreenContent({
           })}
         </div>
 
-        <aside aria-labelledby="cart-summary-title" className={styles.summary}>
-          <h2 id="cart-summary-title">Cart summary</h2>
+        <aside aria-label="Cart summary" className={styles.summary}>
           <dl>
-            <div>
-              <dt>Items</dt>
-              <dd>
-                {totalsAreRefreshing ? (
-                  <span aria-live="polite">Updating from the store…</span>
-                ) : (
-                  state.cart.totalQuantity
-                )}
-              </dd>
-            </div>
             <div className={styles.total}>
               <dt>Total</dt>
               <dd>
@@ -270,129 +333,136 @@ function CartScreenContent({
                   <span aria-live="polite">Updating from the store…</span>
                 ) : (
                   <Price
-                    currency={state.cart.currency}
-                    minorUnits={state.cart.subtotalMinor}
+                    currency={cart.currency}
+                    minorUnits={cart.subtotalMinor}
                   />
                 )}
               </dd>
             </div>
           </dl>
-          {!totalsAreRefreshing && !state.cart.checkoutEligible ? (
+          {!totalsAreRefreshing && !checkoutEligible ? (
             <p className={styles.ineligible} role="status">
-              Your cart needs an available item before checkout.
+              {hasUnavailableItem
+                ? 'Remove unavailable items before checkout.'
+                : reservation.hasExpired
+                  ? 'Recheck availability before checkout.'
+                  : 'Your cart is not ready for checkout.'}
             </p>
+          ) : null}
+          {checkoutEligible ? (
+            <Button className={styles.checkout} href="/checkout">
+              Proceed to Checkout
+            </Button>
           ) : null}
         </aside>
       </div>
-
-      {!totalsAreRefreshing && state.cart.checkoutEligible ? (
-        <CartContactForm />
-      ) : null}
     </section>
   );
 }
 
-function CartContactForm() {
-  const router = useRouter();
-  const [errors, setErrors] = useState<CartContactErrors>({});
-
-  const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const result = validateCartContact(readContactInput(form));
-    if (!result.ok) {
-      setErrors(result.errors);
-      return;
-    }
-    setErrors({});
-    router.push('/checkout');
-  };
-
-  return (
-    <form className={styles.form} noValidate onSubmit={onSubmit}>
-      <div>
-        <p className="eyebrow">Required for checkout</p>
-        <h2>Contact and shipping details</h2>
-        <p className={styles.formIntro}>
-          Confirm these details before continuing to the checkout step.
-        </p>
-      </div>
-      <div className={styles.fields}>
-        <ContactField
-          error={errors.fullName}
-          label="Full name"
-          name="fullName"
-        />
-        <ContactField
-          error={errors.phone}
-          label="Phone number"
-          name="phone"
-          type="tel"
-        />
-        <ContactField error={errors.city} label="City" name="city" />
-        <label className={styles.field} htmlFor="shippingAddress">
-          <span>Shipping address</span>
-          <textarea
-            aria-errormessage={
-              errors.shippingAddress ? 'shippingAddress-error' : undefined
-            }
-            aria-invalid={Boolean(errors.shippingAddress) || undefined}
-            id="shippingAddress"
-            maxLength={320}
-            name="shippingAddress"
-            rows={3}
-          />
-          {errors.shippingAddress ? (
-            <span id="shippingAddress-error" role="alert">
-              {errors.shippingAddress}
-            </span>
-          ) : null}
-        </label>
-      </div>
-      <Button type="submit">Continue to checkout</Button>
-    </form>
-  );
-}
-
-function ContactField({
-  error,
-  label,
-  name,
-  type = 'text',
+function ReservationStatus({
+  hasExpired,
+  pending,
+  recheck,
+  remainingSeconds,
 }: Readonly<{
-  error?: string;
-  label: string;
-  name: keyof CartContactInput;
-  type?: 'tel' | 'text';
+  hasExpired: boolean;
+  pending?: CartContextValue['pending'];
+  recheck?: CartContextValue['recheck'];
+  remainingSeconds: number | null;
 }>) {
-  const id = name;
+  if (hasExpired) {
+    return (
+      <div className={styles.reservationNotice}>
+        <p role="status">
+          Reservations expired. Recheck availability before checkout.
+        </p>
+        {recheck ? (
+          <Button
+            disabled={pending !== null}
+            onClick={() => void recheck()}
+            pending={pending?.kind === 'recheck'}
+            pendingLabel="Checking availability…"
+            type="button"
+            variant="secondary"
+          >
+            Recheck availability
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (remainingSeconds === null) return null;
+
   return (
-    <label className={styles.field} htmlFor={id}>
-      <span>{label}</span>
-      <input
-        aria-errormessage={error ? `${id}-error` : undefined}
-        aria-invalid={Boolean(error) || undefined}
-        id={id}
-        maxLength={name === 'phone' ? 32 : 120}
-        name={name}
-        type={type}
-      />
-      {error ? (
-        <span id={`${id}-error`} role="alert">
-          {error}
-        </span>
-      ) : null}
-    </label>
+    <p className={styles.reservationCountdown} role="timer">
+      Reservations expire in {formatCountdown(remainingSeconds)}
+    </p>
   );
 }
 
-function readContactInput(form: FormData): CartContactInput {
+function useReservationClock(cart: Cart) {
+  const earliestActiveExpiry = getEarliestActiveExpiry(cart.items);
+  const [elapsedSinceResponse, setElapsedSinceResponse] = useState(0);
+
+  useEffect(() => {
+    if (earliestActiveExpiry === null) return;
+
+    const responseReceivedAt = Date.now();
+    const remainingAtResponse = Math.max(
+      0,
+      earliestActiveExpiry - Date.parse(cart.serverNow),
+    );
+    if (remainingAtResponse === 0) return;
+
+    const timer = window.setInterval(() => {
+      const elapsed = Date.now() - responseReceivedAt;
+      setElapsedSinceResponse(Math.min(elapsed, remainingAtResponse));
+      if (elapsed >= remainingAtResponse) window.clearInterval(timer);
+    }, 1_000);
+
+    return () => window.clearInterval(timer);
+  }, [cart.serverNow, earliestActiveExpiry]);
+
+  const serverNow = Date.parse(cart.serverNow);
+  const serverTime = serverNow + elapsedSinceResponse;
+  const activeReservationHasExpired =
+    earliestActiveExpiry !== null && earliestActiveExpiry <= serverTime;
+
   return {
-    city: String(form.get('city') ?? ''),
-    fullName: String(form.get('fullName') ?? ''),
-    phone: String(form.get('phone') ?? ''),
-    shippingAddress: String(form.get('shippingAddress') ?? ''),
+    hasExpired:
+      activeReservationHasExpired ||
+      cart.items.some((item) => item.reservationStatus === 'expired'),
+    remainingSeconds:
+      earliestActiveExpiry === null
+        ? null
+        : Math.max(0, Math.ceil((earliestActiveExpiry - serverTime) / 1_000)),
+    serverTime,
   };
+}
+
+function getEarliestActiveExpiry(items: Cart['items']): number | null {
+  let earliestExpiry: number | null = null;
+  for (const item of items) {
+    if (
+      item.reservationStatus !== 'active' ||
+      item.reservationExpiresAt === null
+    ) {
+      continue;
+    }
+    const expiry = Date.parse(item.reservationExpiresAt);
+    if (earliestExpiry === null || expiry < earliestExpiry) {
+      earliestExpiry = expiry;
+    }
+  }
+  return earliestExpiry;
+}
+
+function formatCountdown(remainingSeconds: number) {
+  const minutes = Math.floor(remainingSeconds / 60);
+  const seconds = remainingSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 function isPendingForProduct(
