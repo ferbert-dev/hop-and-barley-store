@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -47,6 +47,8 @@ function pagedResult(
           categories: [
             { name: 'Hops', slug: 'hops' },
             { name: 'Malts', slug: 'malts' },
+            { name: 'Yeast', slug: 'yeast' },
+            { name: 'Adjuncts', slug: 'adjuncts' },
           ],
         },
         filters: {
@@ -75,12 +77,17 @@ describe('catalog discovery screen', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent('API connected');
     expect(
+      screen.getByRole('img', {
+        name: 'Close-up hop cones and green leaves',
+      }),
+    ).toHaveAttribute('src', '/assets/backgrounds/hops-field-hero.webp');
+    expect(
       screen.getByRole('search', { name: 'Filter products' }),
     ).toHaveAttribute('action', '/');
-    expect(screen.getByLabelText('Category')).toHaveDisplayValue(
-      'All categories',
-    );
-    expect(screen.getByRole('option', { name: 'Hops' })).toBeVisible();
+    expect(
+      screen.getByRole('radiogroup', { name: 'Product Type' }),
+    ).toBeVisible();
+    expect(screen.getByRole('radio', { name: 'Hops' })).not.toBeChecked();
     expect(screen.getByRole('link', { name: 'Cascade Hops' })).toHaveAttribute(
       'href',
       '/product/cascade-hops',
@@ -89,7 +96,6 @@ describe('catalog discovery screen', () => {
       'src',
       '/assets/products/cascade-hops.webp',
     );
-    expect(screen.getByText('In stock')).toBeVisible();
     expect(screen.getByText('per 100g')).toBeVisible();
   });
 
@@ -110,7 +116,13 @@ describe('catalog discovery screen', () => {
     );
 
     expect(screen.getByLabelText('Search products')).toHaveValue('citrus hops');
-    expect(screen.getByLabelText('Category')).toHaveValue('hops');
+    expect(screen.getByRole('radio', { name: 'Hops' })).toBeChecked();
+    expect(
+      screen.getByRole('link', { name: 'Clear product type' }),
+    ).toHaveAttribute(
+      'href',
+      '/?search=citrus+hops&minPriceMinor=400&maxPriceMinor=900&sort=price-desc&limit=24',
+    );
     expect(screen.getByText('1 product found')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Clear filters' })).toHaveAttribute(
       'href',
@@ -118,13 +130,94 @@ describe('catalog discovery screen', () => {
     );
   });
 
-  it('represents every valid URL limit even when it is not a suggested value', () => {
+  it('keeps URL-only price and page-size state out of the primary controls', () => {
     render(
-      <CatalogScreen query={{ ...query, limit: 1 }} result={pagedResult()} />,
+      <CatalogScreen
+        query={{
+          ...query,
+          limit: 1,
+          maxPriceMinor: 900,
+          minPriceMinor: 400,
+        }}
+        result={pagedResult({
+          meta: {
+            ...extractPaged(pagedResult()).meta,
+            filters: {
+              category: null,
+              maxPriceMinor: 900,
+              minPriceMinor: 400,
+              search: null,
+            },
+            limit: 1,
+          },
+        })}
+      />,
     );
 
-    expect(screen.getByLabelText('Products per page')).toHaveValue('1');
-    expect(screen.getByRole('option', { name: '1' })).toBeVisible();
+    expect(screen.queryByLabelText('Minimum price')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Maximum price')).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Products per page'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('1 product found')).toBeVisible();
+  });
+
+  it('renders normalized keyword chips and one truthful product-type radio', () => {
+    render(
+      <CatalogScreen
+        query={{
+          ...query,
+          category: 'malts',
+          page: 3,
+          search: 'citrus hops',
+        }}
+        result={pagedResult()}
+      />,
+    );
+
+    const keywords = screen.getByRole('list', { name: 'Search keywords' });
+    expect(within(keywords).getByText('citrus')).toBeVisible();
+    expect(within(keywords).getByText('hops')).toBeVisible();
+    expect(
+      within(keywords).getByRole('link', { name: 'Remove keyword citrus' }),
+    ).toHaveAttribute('href', '/?search=hops&category=malts');
+    expect(
+      within(keywords).getByRole('link', { name: 'Remove keyword hops' }),
+    ).toHaveAttribute('href', '/?search=citrus&category=malts');
+
+    expect(screen.getAllByRole('radio')).toHaveLength(4);
+    expect(screen.getByRole('radio', { name: 'Malt' })).toBeChecked();
+    expect(
+      screen.getByRole('link', { name: 'Clear product type' }),
+    ).toHaveAttribute('href', '/?search=citrus+hops');
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.getByRole('radio', { name: 'Hops' })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Yeast' })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Adjuncts' })).not.toBeChecked();
+  });
+
+  it('exposes only the current name and price sort contract', () => {
+    render(<CatalogScreen query={query} result={pagedResult()} />);
+
+    const sort = screen.getByLabelText('Sort by');
+    expect(
+      within(sort).getByRole('option', { name: 'Name: A to Z' }),
+    ).toBeVisible();
+    expect(
+      within(sort).getByRole('option', { name: 'Name: Z to A' }),
+    ).toBeVisible();
+    expect(
+      within(sort).getByRole('option', { name: 'Price: low to high' }),
+    ).toBeVisible();
+    expect(
+      within(sort).getByRole('option', { name: 'Price: high to low' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('option', { name: 'New' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('option', { name: 'Rating' }),
+    ).not.toBeInTheDocument();
   });
 
   it('distinguishes no matches from an out-of-range page', () => {
@@ -205,7 +298,6 @@ describe('catalog discovery screen', () => {
     expect(
       screen.getByText(/filtering and paging are temporarily unavailable/i),
     ).toBeVisible();
-    expect(screen.getByText('Availability unavailable')).toBeVisible();
   });
 
   it('renders the safe API-unavailable state with a retry link', () => {

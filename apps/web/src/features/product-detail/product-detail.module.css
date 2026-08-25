@@ -51,12 +51,6 @@
   min-width: 0;
 }
 
-.badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--hb-space-2);
-}
-
 .title {
   font-family: var(--hb-font-serif);
   font-size: clamp(2rem, 6vw, 3.25rem);
@@ -116,8 +110,10 @@
   padding: var(--hb-space-6);
 }
 
-.specs h2 {
+.specs summary {
+  cursor: pointer;
   font-size: var(--hb-font-size-xl);
+  font-weight: 700;
   line-height: var(--hb-line-height-tight);
   margin-bottom: var(--hb-space-6);
 }

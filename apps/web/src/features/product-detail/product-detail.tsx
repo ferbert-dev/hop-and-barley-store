@@ -1,7 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { Badge } from '../../components/ui/badge';
 import { Price } from '../../components/ui/price';
 import { productAssetsBySlug } from '../../design-system/assets';
 import type { ProductDetailProduct } from '../../lib/product-detail';
@@ -46,16 +45,6 @@ export function ProductDetail({ product }: { product: ProductDetailProduct }) {
         </div>
 
         <div className={styles.summary}>
-          <div className={styles.badges}>
-            <Badge tone="neutral">{product.category.name}</Badge>
-            <Badge
-              tone={product.availability === 'in-stock' ? 'success' : 'warning'}
-            >
-              {product.availability === 'in-stock'
-                ? 'In stock'
-                : 'Out of stock'}
-            </Badge>
-          </div>
           <div>
             <h1 className={styles.title}>{product.name}</h1>
             <p className={styles.teaser}>{product.teaser}</p>
@@ -76,11 +65,8 @@ export function ProductDetail({ product }: { product: ProductDetailProduct }) {
         </div>
       </div>
 
-      <section
-        aria-labelledby="product-specifications"
-        className={styles.specs}
-      >
-        <h2 id="product-specifications">Technical specifications</h2>
+      <details className={styles.specs} open>
+        <summary>Technical Specifications</summary>
         <dl className={styles.specList}>
           {product.specifications.map(({ label, value }, index) => (
             <div className={styles.specRow} key={`${String(index)}:${label}`}>
@@ -99,7 +85,7 @@ export function ProductDetail({ product }: { product: ProductDetailProduct }) {
             </div>
           ))}
         </dl>
-      </section>
+      </details>
     </article>
   );
 }

@@ -80,6 +80,8 @@ describe('catalog URL query contract', () => {
     ['signed integer', { minPriceMinor: '+1' }],
     ['decimal integer', { limit: '12.0' }],
     ['unsupported sort', { sort: 'created-desc' }],
+    ['unsupported Figma New sort', { sort: 'new' }],
+    ['unsupported Figma Rating sort', { sort: 'rating' }],
     ['page overflow', { page: '201' }],
     ['limit overflow', { limit: '49' }],
     ['inverted price range', { minPriceMinor: '500', maxPriceMinor: '499' }],

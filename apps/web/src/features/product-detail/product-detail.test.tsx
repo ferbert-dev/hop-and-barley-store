@@ -41,10 +41,8 @@ describe('ProductDetail', () => {
     render(<ProductDetail product={product} />);
 
     expect(screen.getByRole('heading', { name: 'Citra Hops' })).toBeVisible();
-    expect(screen.getByText('Hops')).toBeVisible();
     expect(screen.getByText('US$5.99')).toBeVisible();
     expect(screen.getByText('per 100g')).toBeVisible();
-    expect(screen.getByText('In stock')).toBeVisible();
     expect(screen.getByText('Viewing Citra Hops')).toHaveAttribute(
       'aria-live',
       'polite',
@@ -69,19 +67,24 @@ describe('ProductDetail', () => {
     expect(terms.map((term) => term.textContent)).toEqual(['Origin', 'Uses']);
     expect(screen.getByText('Late additions')).toBeVisible();
     expect(screen.getByText('Dry hopping')).toBeVisible();
+    const specifications = screen.getByText('Technical Specifications', {
+      exact: true,
+    });
+    expect(specifications).toBeVisible();
+    expect(specifications.parentElement).toHaveAttribute('open', '');
     expect(screen.queryByRole('button', { name: /add to cart/i })).toBeNull();
     expect(screen.queryByRole('heading', { name: /reviews/i })).toBeNull();
   });
 
-  it('renders public availability without exposing exact stock', () => {
+  it('does not expose exact stock details on the product page', () => {
     const { rerender } = render(<ProductDetail product={product} />);
-    expect(screen.getByText('In stock')).toBeVisible();
     expect(screen.queryByText(/100 in stock/i)).toBeNull();
+    expect(screen.queryByText('In stock')).toBeNull();
 
     rerender(
       <ProductDetail product={{ ...product, availability: 'out-of-stock' }} />,
     );
-    expect(screen.getByText('Out of stock')).toBeVisible();
+    expect(screen.queryByText('Out of stock')).toBeNull();
     expect(screen.getByText('Viewing Citra Hops')).toHaveAttribute(
       'aria-live',
       'polite',

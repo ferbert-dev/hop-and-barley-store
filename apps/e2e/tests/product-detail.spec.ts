@@ -47,8 +47,13 @@ test.describe('database-backed product details', () => {
       await page.goto(href, { waitUntil: 'domcontentloaded' });
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
       await expect(
-        page.getByRole('heading', { name: 'Technical specifications' }),
+        page.getByText('Technical Specifications', { exact: true }),
       ).toBeVisible();
+      await expect(
+        page
+          .getByText('Technical Specifications', { exact: true })
+          .locator('..'),
+      ).toHaveAttribute('open', '');
       const productImage = page.getByRole('main').getByRole('img');
       await expect(productImage).toHaveCount(1);
       await expect(productImage).toBeVisible();
@@ -70,12 +75,12 @@ test.describe('database-backed product details', () => {
     expect(specificationTermCount).toBe(95);
   });
 
-  test('renders metadata, ordered specifications, not-found and accessible in-stock UI', async ({
+  test('renders metadata, ordered specifications, not-found and accessible product UI', async ({
     page,
   }) => {
     await page.goto('/product/citra-hops');
     await expect(page).toHaveTitle('Citra Hops | Hop & Barley');
-    await expect(page.getByText('In stock')).toBeVisible();
+    await expect(page.getByText('In stock')).toHaveCount(0);
     await expect(page.getByText('US$5.99')).toBeVisible();
     const specificationTerms = page.getByRole('term');
     expect(await specificationTerms.allTextContents()).toEqual([
@@ -105,7 +110,9 @@ test.describe('database-backed product details', () => {
 
     for (const { height, id, width } of viewportProbes) {
       await page.setViewportSize({ height, width });
-      await page.goto('/product/citra-hops');
+      await page.goto('/product/citra-hops', {
+        waitUntil: 'domcontentloaded',
+      });
       await expect(
         page.getByRole('heading', { name: 'Citra Hops' }),
       ).toBeVisible();
@@ -139,12 +146,12 @@ test.describe('isolated product-detail states', () => {
     await runtime?.stop();
   });
 
-  test('renders public out-of-stock, not-found and safe API-error states', async ({
+  test('renders product, not-found and safe API-error states', async ({
     page,
   }) => {
     await page.goto(`${runtime.baseUrl}/product/citra-hops`);
     await expect(page).toHaveTitle('Citra Hops | Hop & Barley');
-    await expect(page.getByText('Out of stock')).toBeVisible();
+    await expect(page.getByText('Out of stock')).toHaveCount(0);
     await expect(
       page
         .locator('main [aria-live="polite"]')
