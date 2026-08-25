@@ -81,7 +81,12 @@ export function CartProvider({
     // A refresh requested while a mutation is in flight waits until the
     // mutation settles, so a pre-mutation read cannot win the response race.
     await pendingMutation.current;
-    await loadCanonical(true);
+    const request = loadCanonical(true);
+    initialLoad.current = request;
+    void request.finally(() => {
+      if (initialLoad.current === request) initialLoad.current = null;
+    });
+    await request;
   }, [loadCanonical]);
 
   const ensureLoaded = useCallback(() => {

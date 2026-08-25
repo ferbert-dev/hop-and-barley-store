@@ -238,24 +238,34 @@ describe('CartProvider', () => {
 
   it('recovers an unavailable cart through the explicit retry action', async () => {
     const user = userEvent.setup();
+    let resolveRetry: ((value: Cart) => void) | undefined;
     const transport: CartTransport = {
       add: vi.fn(async () => initialCart),
       clear: vi.fn(async () => initialCart),
       load: vi
         .fn()
         .mockRejectedValueOnce(new Error('offline'))
-        .mockResolvedValueOnce(initialCart),
+        .mockImplementationOnce(
+          () =>
+            new Promise<Cart>((resolve) => {
+              resolveRetry = resolve;
+            }),
+        ),
       recheck: vi.fn(async () => initialCart),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(async () => initialCart),
     };
     render(
       <CartProvider transport={transport}>
-        <Probe />
+        <RetryProbe />
       </CartProvider>,
     );
 
-    await user.click(await screen.findByRole('button', { name: 'Refresh' }));
+    await screen.findByText('unavailable');
+    await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    await waitFor(() => expect(transport.load).toHaveBeenCalledTimes(2));
+    resolveRetry?.(initialCart);
 
     await waitFor(() =>
       expect(screen.getByTestId('subtotal')).toHaveTextContent('599'),
@@ -419,6 +429,27 @@ function EnsureLoadedProbe({ label }: Readonly<{ label: string }>) {
   }, [ensureLoaded]);
 
   return <output>{`${label} ${state.kind}`}</output>;
+}
+
+function RetryProbe() {
+  const { ensureLoaded, refresh, state } = useCart();
+
+  useEffect(() => {
+    void ensureLoaded();
+  }, [ensureLoaded]);
+
+  if (state.kind !== 'ready') {
+    return (
+      <>
+        <output>{state.kind}</output>
+        <button onClick={() => void refresh()} type="button">
+          Refresh
+        </button>
+      </>
+    );
+  }
+
+  return <output data-testid="subtotal">{state.cart.subtotalMinor}</output>;
 }
 
 function Probe() {
