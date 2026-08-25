@@ -205,6 +205,21 @@ main {
   width: 28px;
 }
 
+.storefront-nav__cart-count {
+  align-items: center;
+  background: var(--hb-color-brand);
+  border-radius: var(--hb-radius-pill);
+  color: var(--hb-color-text-inverse);
+  display: inline-flex;
+  font-size: var(--hb-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  justify-content: center;
+  min-block-size: 1.5rem;
+  min-inline-size: 1.5rem;
+  padding-inline: var(--hb-space-1);
+}
+
 .storefront-nav__session {
   align-items: center;
   color: var(--hb-color-text-muted);

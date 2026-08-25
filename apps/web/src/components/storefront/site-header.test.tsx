@@ -1,18 +1,39 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CartProvider, useCart } from '../../features/cart/cart-context';
+import type { Cart, CartTransport } from '../../features/cart/cart-transport';
 import { SiteHeaderClient } from './site-header';
 
 const logoutAction = vi.fn();
 
-function SiteHeader() {
+const emptyCart: Cart = {
+  adjustmentMessage: null,
+  checkoutEligible: false,
+  currency: 'USD',
+  distinctItemCount: 0,
+  items: [],
+  serverNow: '2026-08-25T10:00:00.000Z',
+  subtotalMinor: 0,
+  totalQuantity: 0,
+};
+
+function SiteHeader({
+  sessionState = { kind: 'anonymous' },
+  transport = createTransport(emptyCart),
+}: Readonly<{
+  sessionState?: ComponentProps<typeof SiteHeaderClient>['sessionState'];
+  transport?: CartTransport;
+}>) {
   return (
-    <SiteHeaderClient
-      logoutAction={logoutAction}
-      sessionState={{ kind: 'anonymous' }}
-    />
+    <CartProvider transport={transport}>
+      <SiteHeaderClient
+        logoutAction={logoutAction}
+        sessionState={sessionState}
+      />
+    </CartProvider>
   );
 }
 
@@ -80,14 +101,14 @@ describe('SiteHeader', () => {
       name: 'Storefront',
     });
     const products = screen.getByRole('link', { name: 'Products' });
-    const cart = screen.getByRole('link', { name: 'Shopping cart' });
+    const cart = screen.getByRole('link', { name: /^Shopping cart/ });
 
     expect(navigation).toContainElement(products);
     expect(navigation).toContainElement(cart);
-    expect(screen.getByRole('link', { name: currentLabel })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
+    const current = screen.getByRole('link', {
+      name: currentLabel === 'Shopping cart' ? /^Shopping cart/ : currentLabel,
+    });
+    expect(current).toHaveAttribute('aria-current', 'page');
   });
 
   it('exposes an inline disclosure and preserves native Tab order', async () => {
@@ -179,12 +200,7 @@ describe('SiteHeader', () => {
   });
 
   it('shows account and logout only for a Nest-verified session', () => {
-    render(
-      <SiteHeaderClient
-        logoutAction={logoutAction}
-        sessionState={{ kind: 'authenticated' }}
-      />,
-    );
+    render(<SiteHeader sessionState={{ kind: 'authenticated' }} />);
 
     expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute(
       'href',
@@ -197,12 +213,7 @@ describe('SiteHeader', () => {
   });
 
   it('exposes authentication unavailability instead of rendering anonymous actions', () => {
-    render(
-      <SiteHeaderClient
-        logoutAction={logoutAction}
-        sessionState={{ kind: 'unavailable' }}
-      />,
-    );
+    render(<SiteHeader sessionState={{ kind: 'unavailable' }} />);
 
     expect(screen.getByText('Account unavailable')).toHaveAttribute(
       'aria-live',
@@ -212,4 +223,77 @@ describe('SiteHeader', () => {
       screen.queryByRole('link', { name: 'Sign in' }),
     ).not.toBeInTheDocument();
   });
+
+  it('updates the cart count and its accessible name without reload', async () => {
+    const user = userEvent.setup();
+    const addedCart: Cart = {
+      ...emptyCart,
+      checkoutEligible: true,
+      distinctItemCount: 1,
+      items: [
+        {
+          availability: 'available',
+          currentUnitPriceMinor: 599,
+          imagePath: '/assets/products/citra-hops.webp',
+          lineTotalMinor: 599,
+          name: 'Citra Hops',
+          priceQualifier: 'per 100g',
+          productId: '10000000-0000-4000-8000-000000000001',
+          productSlug: 'citra-hops',
+          quantity: 1,
+          reservationExpiresAt: '2026-08-25T10:15:00.000Z',
+          reservationStatus: 'active',
+        },
+      ],
+      subtotalMinor: 599,
+      totalQuantity: 1,
+    };
+    const transport = createTransport(emptyCart, {
+      add: vi.fn(async () => addedCart),
+    });
+    render(
+      <CartProvider transport={transport}>
+        <SiteHeaderClient
+          logoutAction={logoutAction}
+          sessionState={{ kind: 'anonymous' }}
+        />
+        <CartAddProbe />
+      </CartProvider>,
+    );
+
+    await expectCartName('Shopping cart, 0 items');
+    await user.click(screen.getByRole('button', { name: 'Add fixture item' }));
+    await expectCartName('Shopping cart, 1 item');
+    expect(
+      screen.getByRole('link', { name: /^Shopping cart/ }),
+    ).toHaveAttribute('href', '/cart');
+  });
 });
+
+function CartAddProbe() {
+  const { add } = useCart();
+  return (
+    <button onClick={() => void add('citra-hops', 1)} type="button">
+      Add fixture item
+    </button>
+  );
+}
+
+async function expectCartName(name: string) {
+  await waitFor(() => expect(screen.getByRole('link', { name })).toBeVisible());
+}
+
+function createTransport(
+  loadedCart: Cart,
+  overrides: Partial<CartTransport> = {},
+): CartTransport {
+  return {
+    add: vi.fn(async () => loadedCart),
+    clear: vi.fn(async () => loadedCart),
+    load: vi.fn(async () => loadedCart),
+    recheck: vi.fn(async () => loadedCart),
+    remove: vi.fn(async () => loadedCart),
+    update: vi.fn(async () => loadedCart),
+    ...overrides,
+  };
+}

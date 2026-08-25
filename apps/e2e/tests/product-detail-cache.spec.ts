@@ -28,7 +28,7 @@ test.describe('production product-detail data cache', () => {
     expect(response.status).toBe(200);
     expect(html).toContain('Citra Hops');
     expect(html).toContain('Technical Specifications');
-    expect(html).not.toContain('Add to Cart');
+    expect(html).toContain('Add to Cart');
     expect(html).not.toContain('Latest reviews');
     expect(html).not.toContain('stockQuantity');
     expect(runtime.productUpstreamAttempts('citra-hops')).toBe(1);

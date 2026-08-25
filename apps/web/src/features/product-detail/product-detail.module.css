@@ -102,6 +102,46 @@
   max-width: var(--hb-layout-reading);
 }
 
+.cartControl {
+  display: grid;
+  gap: var(--hb-space-3);
+  justify-items: start;
+}
+
+.cartAvailability,
+.cartMessage,
+.cartReservationStatus {
+  margin: 0;
+}
+
+.cartAvailability,
+.cartReservationStatus {
+  color: var(--hb-color-danger);
+}
+
+.cartMessage {
+  background: var(--hb-color-brand-soft);
+  border-radius: var(--hb-radius-md);
+  padding: var(--hb-space-3) var(--hb-space-4);
+}
+
+.cartQuantity {
+  align-items: center;
+  display: inline-grid;
+  gap: var(--hb-space-2);
+  grid-template-columns: 2.75rem minmax(4.5rem, auto) 2.75rem;
+}
+
+.cartQuantity output {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: center;
+}
+
+.cartError {
+  max-width: var(--hb-layout-reading);
+}
+
 .specs {
   background: var(--hb-color-surface);
   border: 1px solid var(--hb-color-border);

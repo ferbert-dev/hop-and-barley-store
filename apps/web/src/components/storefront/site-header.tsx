@@ -8,6 +8,7 @@ import { useActionState, useEffect, useRef, useState } from 'react';
 import { assets } from '../../design-system/assets';
 import type { AuthFormAction } from '../../features/auth/auth-form';
 import { INITIAL_AUTH_FORM_STATE } from '../../features/auth/auth-state';
+import { useCart } from '../../features/cart/cart-context';
 import { Button } from '../ui/button';
 
 const WIDE_VIEWPORT_QUERY = '(min-width: 64rem)';
@@ -43,7 +44,14 @@ function SiteHeaderDisclosure({
   sessionState,
 }: SiteHeaderDisclosureProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { ensureLoaded, items, state: cartState } = useCart();
   const triggerRef = useRef<HTMLButtonElement>(null);
+
+  const cartQuantity = items.reduce((total, item) => total + item.quantity, 0);
+
+  useEffect(() => {
+    void ensureLoaded();
+  }, [ensureLoaded]);
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
@@ -130,6 +138,13 @@ function SiteHeaderDisclosure({
                 className="storefront-nav__cart"
                 href="/cart"
                 prefetch={false}
+                aria-label={
+                  cartState.kind === 'ready'
+                    ? `Shopping cart, ${String(cartQuantity)} ${
+                        cartQuantity === 1 ? 'item' : 'items'
+                      }`
+                    : 'Shopping cart'
+                }
                 aria-current={pathname === '/cart' ? 'page' : undefined}
                 onClick={closeMenu}
               >
@@ -141,6 +156,14 @@ function SiteHeaderDisclosure({
                   sizes={assets.cartIcon.sizes}
                 />
                 <span>Shopping cart</span>
+                {cartState.kind === 'ready' ? (
+                  <span
+                    aria-hidden="true"
+                    className="storefront-nav__cart-count"
+                  >
+                    {cartQuantity}
+                  </span>
+                ) : null}
               </Link>
             </li>
             {sessionState.kind === 'authenticated' ? (

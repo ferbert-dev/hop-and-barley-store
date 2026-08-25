@@ -35,6 +35,7 @@ export type CartPendingOperation =
 export type CartContextValue = Readonly<{
   add(productSlug: string, quantity: number): Promise<void>;
   clear(): Promise<void>;
+  ensureLoaded(): Promise<void>;
   items: Cart['items'];
   pending: CartPendingOperation | null;
   recheck(): Promise<void>;
@@ -56,6 +57,7 @@ export function CartProvider({
   const [state, setState] = useState<CartState>({ kind: 'loading' });
   const [pending, setPending] = useState<CartPendingOperation | null>(null);
   const responseId = useRef(0);
+  const initialLoad = useRef<Promise<void> | null>(null);
   const pendingRef = useRef<CartPendingOperation | null>(null);
   const pendingMutation = useRef<Promise<void> | null>(null);
 
@@ -81,6 +83,20 @@ export function CartProvider({
     await pendingMutation.current;
     await loadCanonical(true);
   }, [loadCanonical]);
+
+  const ensureLoaded = useCallback(() => {
+    if (state.kind !== 'loading') return Promise.resolve();
+
+    if (!initialLoad.current) {
+      const request = loadCanonical(false);
+      initialLoad.current = request;
+      void request.finally(() => {
+        if (initialLoad.current === request) initialLoad.current = null;
+      });
+    }
+
+    return initialLoad.current;
+  }, [loadCanonical, state.kind]);
 
   const mutate = useCallback(
     async (nextPending: CartPendingOperation, action: () => Promise<Cart>) => {
@@ -129,6 +145,7 @@ export function CartProvider({
       add: (productSlug, quantity) =>
         mutate({ kind: 'add' }, () => transport.add(productSlug, quantity)),
       clear: () => mutate({ kind: 'clear' }, () => transport.clear()),
+      ensureLoaded,
       items: projectItems(state, pending),
       pending,
       recheck: () => mutate({ kind: 'recheck' }, () => transport.recheck()),
@@ -144,7 +161,7 @@ export function CartProvider({
           transport.update(productSlug, quantity),
         ),
     }),
-    [mutate, pending, refresh, state, transport],
+    [ensureLoaded, mutate, pending, refresh, state, transport],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
