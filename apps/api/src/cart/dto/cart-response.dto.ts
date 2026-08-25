@@ -37,6 +37,19 @@ export class CartItemDto {
 
   @ApiProperty({ enum: ['available', 'unavailable'], type: String })
   availability!: 'available' | 'unavailable';
+
+  @ApiProperty({
+    enum: ['active', 'expired', 'unreserved'],
+    type: String,
+  })
+  reservationStatus!: 'active' | 'expired' | 'unreserved';
+
+  @ApiProperty({
+    format: 'date-time',
+    nullable: true,
+    type: String,
+  })
+  reservationExpiresAt!: string | null;
 }
 
 export class CartDto {
@@ -57,6 +70,12 @@ export class CartDto {
 
   @ApiProperty({ type: Boolean })
   checkoutEligible!: boolean;
+
+  @ApiProperty({ format: 'date-time', type: String })
+  serverNow!: string;
+
+  @ApiProperty({ nullable: true, type: String })
+  adjustmentMessage!: string | null;
 }
 
 export class CartCsrfResponseDto {

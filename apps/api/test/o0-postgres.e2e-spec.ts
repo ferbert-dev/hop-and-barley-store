@@ -31,6 +31,7 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
   });
 
   beforeEach(async () => {
+    await prisma.cartReservation.deleteMany();
     await prisma.cartItem.deleteMany();
     await prisma.cart.deleteMany();
     await prisma.product.deleteMany({

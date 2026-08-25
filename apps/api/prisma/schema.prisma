@@ -18,6 +18,13 @@ enum UserStatus {
   DISABLED
 }
 
+enum CartReservationStatus {
+  ACTIVE
+  EXPIRED
+  RELEASED
+  CONSUMED
+}
+
 model User {
   id                 String              @id(map: "User_pkey") @default(uuid()) @db.Uuid
   email              String              @db.VarChar(320)
@@ -73,23 +80,24 @@ model Category {
 }
 
 model Product {
-  id             String   @id(map: "Product_pkey") @default(uuid()) @db.Uuid
-  name           String
-  slug           String   @unique(map: "Product_slug_key")
-  teaser         String
-  description    String
-  priceMinor     Int
-  priceQualifier String   @db.VarChar(64)
-  currency       String   @default("USD") @db.VarChar(3)
-  stockQuantity  Int      @default(0)
-  isActive       Boolean  @default(true)
-  imagePath      String   @db.VarChar(255)
-  specifications Json     @db.JsonB
-  categoryId     String   @db.Uuid
-  category       Category @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Product_categoryId_fkey")
-  cartItems      CartItem[]
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id               String            @id(map: "Product_pkey") @default(uuid()) @db.Uuid
+  name             String
+  slug             String            @unique(map: "Product_slug_key")
+  teaser           String
+  description      String
+  priceMinor       Int
+  priceQualifier   String            @db.VarChar(64)
+  currency         String            @default("USD") @db.VarChar(3)
+  stockQuantity    Int               @default(0)
+  isActive         Boolean           @default(true)
+  imagePath        String            @db.VarChar(255)
+  specifications   Json              @db.JsonB
+  categoryId       String            @db.Uuid
+  category         Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Product_categoryId_fkey")
+  cartItems        CartItem[]
+  cartReservations CartReservation[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@index([categoryId, isActive], map: "Product_categoryId_isActive_idx")
   @@index([isActive, priceMinor], map: "Product_isActive_priceMinor_idx")
@@ -97,27 +105,54 @@ model Product {
 }
 
 model Cart {
-  id          String     @id(map: "Cart_pkey") @default(uuid()) @db.Uuid
-  tokenDigest Bytes      @unique(map: "Cart_tokenDigest_key")
-  expiresAt   DateTime
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  items       CartItem[]
+  id           String            @id(map: "Cart_pkey") @default(uuid()) @db.Uuid
+  tokenDigest  Bytes             @unique(map: "Cart_tokenDigest_key")
+  expiresAt    DateTime
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  items        CartItem[]
+  reservations CartReservation[]
 
   @@index([expiresAt], map: "Cart_expiresAt_idx")
 }
 
 model CartItem {
-  id        String   @id(map: "CartItem_pkey") @default(uuid()) @db.Uuid
-  cartId    String   @db.Uuid
-  productId String   @db.Uuid
-  quantity  Int      @db.SmallInt
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "CartItem_cartId_fkey")
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "CartItem_productId_fkey")
+  id                   String            @id(map: "CartItem_pkey") @default(uuid()) @db.Uuid
+  cartId               String            @db.Uuid
+  productId            String            @db.Uuid
+  currentReservationId String?           @unique(map: "CartItem_currentReservationId_key") @db.Uuid
+  quantity             Int               @db.SmallInt
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  cart                 Cart              @relation(fields: [cartId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "CartItem_cartId_fkey")
+  product              Product           @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "CartItem_productId_fkey")
+  currentReservation   CartReservation?  @relation("CartItemCurrentReservation", fields: [currentReservationId], references: [id], onDelete: SetNull, onUpdate: Cascade, map: "CartItem_currentReservationId_fkey")
+  reservations         CartReservation[] @relation("CartItemReservationHistory")
 
   @@unique([cartId, productId], map: "CartItem_cartId_productId_key")
   @@index([cartId], map: "CartItem_cartId_idx")
   @@index([productId], map: "CartItem_productId_idx")
+}
+
+model CartReservation {
+  id         String                @id(map: "CartReservation_pkey") @default(uuid()) @db.Uuid
+  cartId     String                @db.Uuid
+  cartItemId String?               @db.Uuid
+  productId  String                @db.Uuid
+  quantity   Int                   @db.SmallInt
+  status     CartReservationStatus @default(ACTIVE)
+  reservedAt DateTime
+  expiresAt  DateTime
+  releasedAt DateTime?
+  consumedAt DateTime?
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+  cart       Cart                  @relation(fields: [cartId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "CartReservation_cartId_fkey")
+  cartItem   CartItem?             @relation("CartItemReservationHistory", fields: [cartItemId], references: [id], onDelete: SetNull, onUpdate: Cascade, map: "CartReservation_cartItemId_fkey")
+  currentFor CartItem?             @relation("CartItemCurrentReservation")
+  product    Product               @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "CartReservation_productId_fkey")
+
+  @@index([cartId, status, expiresAt], map: "CartReservation_cartId_status_expiresAt_idx")
+  @@index([cartItemId, reservedAt], map: "CartReservation_cartItemId_reservedAt_idx")
+  @@index([productId, status, expiresAt], map: "CartReservation_productId_status_expiresAt_idx")
 }

@@ -31,6 +31,7 @@ import {
 import type { Response } from 'express';
 import { Public } from '../auth/public.decorator';
 import { AllowCartBootstrap } from './cart-bootstrap.decorator';
+import { CartBodylessMutation } from './cart-bodyless-mutation.decorator';
 import { CartCapabilityGuard } from './cart-capability.guard';
 import type { CartCookieMode } from './cart-cookie';
 import { createCartCookie, readCartCookie } from './cart-cookie';
@@ -86,6 +87,34 @@ export class CartController {
   })
   csrfToken(@Req() request: CartRequest): CartCsrfResponseDto {
     return { csrfToken: this.csrf.issue(requireActiveCart(request).rawToken) };
+  }
+
+  @Post('recheck')
+  @HttpCode(200)
+  @CartBodylessMutation()
+  @UseGuards(CartMutationGuard)
+  @ApiCookieAuth('cartCookie')
+  @ApiOperation({
+    description:
+      'Rechecks every retained line in one server-authoritative operation. Positive availability is clamped and reserved; zero-stock lines remain in the cart unreserved.',
+    summary: 'Recheck and reserve all current cart lines',
+  })
+  @ApiHeader({ name: 'Origin', required: true, schema: { type: 'string' } })
+  @ApiHeader({
+    name: 'X-CSRF-Token',
+    required: true,
+    schema: {
+      pattern: '^[A-Za-z0-9_-]{1,16}\\.[A-Za-z0-9_-]{43}$',
+      type: 'string',
+    },
+  })
+  @ApiOkResponse({ type: CartDto })
+  @ApiUnauthorizedResponse({
+    description: 'Presented cart capability is not valid',
+  })
+  @ApiForbiddenResponse({ description: 'Origin or CSRF is not valid' })
+  recheck(@Req() request: CartRequest): Promise<CartDto> {
+    return this.carts.recheck(requireActiveCart(request));
   }
 
   @Post('items')

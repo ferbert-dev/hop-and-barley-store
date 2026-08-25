@@ -18,6 +18,7 @@ export type CartTransport = Readonly<{
   add(productSlug: string, quantity: number): Promise<Cart>;
   clear(): Promise<Cart>;
   load(): Promise<Cart>;
+  recheck(): Promise<Cart>;
   remove(productSlug: string): Promise<Cart>;
   update(productSlug: string, quantity: number): Promise<Cart>;
 }>;
@@ -94,6 +95,18 @@ export function createBrowserCartTransport(
       });
       return cartFromResponse(data, error, response);
     },
+    async recheck() {
+      const { client, origin } = requestContext();
+      const csrfToken = await requireCsrf(() => withCsrf(client));
+      const { data, error, response } = await client.POST(
+        '/api/v1/cart/recheck',
+        {
+          params: { header: mutationHeaders(origin, csrfToken) },
+          signal: AbortSignal.timeout(CART_REQUEST_TIMEOUT_MS),
+        },
+      );
+      return cartFromResponse(data, error, response);
+    },
     async remove(productSlug) {
       const { client, origin } = requestContext();
       const csrfToken = await requireCsrf(() => withCsrf(client));
@@ -135,7 +148,7 @@ async function requireCsrf(loadCsrf: () => Promise<string | null>) {
 }
 
 function cartFromResponse(
-  data: Cart | undefined,
+  data: unknown,
   error: unknown,
   response: Response,
 ): Cart {
@@ -162,7 +175,9 @@ function isCart(value: unknown): value is Cart {
   if (
     !isRecord(value) ||
     value.currency !== 'USD' ||
-    !Array.isArray(value.items)
+    !Array.isArray(value.items) ||
+    !isDateTime(value.serverNow) ||
+    !isNullableString(value.adjustmentMessage)
   ) {
     return false;
   }
@@ -194,8 +209,15 @@ function isCartItem(value: unknown) {
     value.quantity <= 99 &&
     isNullableNonNegativeSafeInteger(value.currentUnitPriceMinor) &&
     isNullableNonNegativeSafeInteger(value.lineTotalMinor) &&
-    (value.availability === 'available' || value.availability === 'unavailable')
+    (value.availability === 'available' ||
+      value.availability === 'unavailable') &&
+    isReservation(value.reservationStatus, value.reservationExpiresAt)
   );
+}
+
+function isReservation(status: unknown, expiresAt: unknown) {
+  if (status === 'unreserved') return expiresAt === null;
+  return (status === 'active' || status === 'expired') && isDateTime(expiresAt);
 }
 
 function isPositiveSafeInteger(value: unknown): value is number {
@@ -210,6 +232,27 @@ function isNullableNonNegativeSafeInteger(
   value: unknown,
 ): value is number | null {
   return value === null || isNonNegativeSafeInteger(value);
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string';
+}
+
+function isDateTime(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/u.exec(
+      value,
+    );
+  if (!match || Number.isNaN(Date.parse(value))) return false;
+
+  const [year, month, day] = match.slice(1, 4).map(Number);
+  const calendarDate = new Date(Date.UTC(year, month - 1, day));
+  return (
+    calendarDate.getUTCFullYear() === year &&
+    calendarDate.getUTCMonth() === month - 1 &&
+    calendarDate.getUTCDate() === day
+  );
 }
 
 function isCsrfToken(

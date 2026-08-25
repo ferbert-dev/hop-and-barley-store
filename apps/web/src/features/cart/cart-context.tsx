@@ -24,6 +24,7 @@ export type CartState =
 export type CartPendingOperation =
   | Readonly<{ kind: 'add' }>
   | Readonly<{ kind: 'clear' }>
+  | Readonly<{ kind: 'recheck' }>
   | Readonly<{ kind: 'remove'; productSlug: string }>
   | Readonly<{
       kind: 'update';
@@ -36,6 +37,7 @@ export type CartContextValue = Readonly<{
   clear(): Promise<void>;
   items: Cart['items'];
   pending: CartPendingOperation | null;
+  recheck(): Promise<void>;
   refresh(): Promise<void>;
   remove(productSlug: string): Promise<void>;
   state: CartState;
@@ -64,7 +66,7 @@ export function CartProvider({
       try {
         const cart = await transport.load();
         if (responseId.current === requestId) {
-          setState({ cart, kind: 'ready' });
+          setState(readyState(cart));
         }
       } catch {
         if (responseId.current === requestId) setState({ kind: 'unavailable' });
@@ -91,18 +93,18 @@ export function CartProvider({
         try {
           const cart = await action();
           if (responseId.current === requestId) {
-            setState({ cart, kind: 'ready' });
+            setState(readyState(cart));
           }
         } catch {
           try {
             const cart = await transport.load();
             if (responseId.current === requestId) {
-              setState({
-                cart,
-                kind: 'ready',
-                message:
+              setState(
+                readyState(
+                  cart,
                   'Your cart was refreshed after the change could not be completed.',
-              });
+                ),
+              );
             }
           } catch {
             if (responseId.current === requestId)
@@ -129,6 +131,7 @@ export function CartProvider({
       clear: () => mutate({ kind: 'clear' }, () => transport.clear()),
       items: projectItems(state, pending),
       pending,
+      recheck: () => mutate({ kind: 'recheck' }, () => transport.recheck()),
       refresh,
       remove: (productSlug) =>
         mutate({ kind: 'remove', productSlug }, () =>
@@ -147,12 +150,22 @@ export function CartProvider({
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
+function readyState(cart: Cart, fallbackMessage?: string): CartState {
+  return {
+    cart,
+    kind: 'ready',
+    message: cart.adjustmentMessage ?? fallbackMessage,
+  };
+}
+
 function projectItems(
   state: CartState,
   pending: CartPendingOperation | null,
 ): Cart['items'] {
   if (state.kind !== 'ready') return [];
-  if (!pending || pending.kind === 'add') return state.cart.items;
+  if (!pending || pending.kind === 'add' || pending.kind === 'recheck') {
+    return state.cart.items;
+  }
   if (pending.kind === 'clear') return [];
   if (pending.kind === 'remove') {
     return state.cart.items.filter(

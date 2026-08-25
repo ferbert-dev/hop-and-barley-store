@@ -20,6 +20,7 @@ const activeCart: ActiveCartCapability = {
   rawToken,
 };
 const cart: CartDto = {
+  adjustmentMessage: null,
   checkoutEligible: true,
   currency: 'USD',
   distinctItemCount: 1,
@@ -34,8 +35,11 @@ const cart: CartDto = {
       productId: '20000000-0000-4000-8000-000000000002',
       productSlug: 'cascade-hops',
       quantity: 2,
+      reservationExpiresAt: '2026-08-25T12:15:00.000Z',
+      reservationStatus: 'active',
     },
   ],
+  serverNow: '2026-08-25T12:00:00.000Z',
   subtotalMinor: 1398,
   totalQuantity: 2,
 };
@@ -48,10 +52,12 @@ describe('Cart API security contract (e2e)', () => {
       Promise.resolve(candidate === rawToken ? activeCart : null),
     ),
     clear: jest.fn().mockResolvedValue({
+      adjustmentMessage: null,
       checkoutEligible: false,
       currency: 'USD',
       distinctItemCount: 0,
       items: [],
+      serverNow: '2026-08-25T12:00:00.000Z',
       subtotalMinor: 0,
       totalQuantity: 0,
     }),
@@ -61,14 +67,17 @@ describe('Cart API security contract (e2e)', () => {
       rawToken,
     }),
     empty: jest.fn().mockReturnValue({
+      adjustmentMessage: null,
       checkoutEligible: false,
       currency: 'USD',
       distinctItemCount: 0,
       items: [],
+      serverNow: '2026-08-25T12:00:00.000Z',
       subtotalMinor: 0,
       totalQuantity: 0,
     }),
     getCart: jest.fn().mockResolvedValue(cart),
+    recheck: jest.fn().mockResolvedValue(cart),
     remove: jest.fn().mockResolvedValue(cart),
     update: jest.fn().mockResolvedValue(cart),
   };
@@ -180,6 +189,12 @@ describe('Cart API security contract (e2e)', () => {
       .set('Content-Type', 'text/plain')
       .send('no')
       .expect(415);
+    await request(server)
+      .patch('/api/v1/cart/items/cascade-hops')
+      .set('Origin', 'http://localhost:3000')
+      .set('Content-Type', 'text/plain')
+      .send('no')
+      .expect(415);
     for (const body of [
       { productSlug: 'cascade-hops', quantity: 0 },
       { productSlug: 'cascade-hops', quantity: 100 },
@@ -217,6 +232,11 @@ describe('Cart API security contract (e2e)', () => {
     const csrf = app.get(CartCsrfService).issue(rawToken);
 
     await request(server)
+      .post('/api/v1/cart/recheck')
+      .set('Cookie', cookie)
+      .set('Origin', 'http://localhost:3000')
+      .expect(403);
+    await request(server)
       .post('/api/v1/cart/items')
       .set('Cookie', cookie)
       .set('Origin', 'http://localhost:3000')
@@ -230,6 +250,33 @@ describe('Cart API security contract (e2e)', () => {
       .send({ productSlug: 'cascade-hops', quantity: 1 })
       .expect(403);
 
+    await request(server)
+      .post('/api/v1/cart/recheck')
+      .set('Cookie', cookie)
+      .set('Origin', 'http://localhost:3000')
+      .set('X-CSRF-Token', csrf)
+      .expect(200);
+    await request(server)
+      .post('/api/v1/cart/recheck')
+      .set('Cookie', cookie)
+      .set('Origin', 'http://evil.example')
+      .set('X-CSRF-Token', csrf)
+      .expect(403);
+    await request(server)
+      .post('/api/v1/cart/recheck')
+      .set('Cookie', cookie)
+      .set('Origin', 'http://localhost:3000')
+      .set('X-CSRF-Token', csrf)
+      .send({})
+      .expect(415);
+    await request(server)
+      .post('/api/v1/cart/recheck')
+      .set('Cookie', cookie)
+      .set('Origin', 'http://localhost:3000')
+      .set('X-CSRF-Token', csrf)
+      .set('Content-Type', 'text/plain')
+      .send('unexpected')
+      .expect(415);
     await request(server)
       .post('/api/v1/cart/items')
       .set('Cookie', cookie)
@@ -258,6 +305,7 @@ describe('Cart API security contract (e2e)', () => {
       .expect(200);
 
     expect(carts.add).toHaveBeenCalled();
+    expect(carts.recheck).toHaveBeenCalled();
     expect(carts.update).toHaveBeenCalled();
     expect(carts.remove).toHaveBeenCalled();
     expect(carts.clear).toHaveBeenCalled();
@@ -274,6 +322,7 @@ describe('Cart API security contract (e2e)', () => {
       expect.arrayContaining([
         '/api/v1/cart',
         '/api/v1/cart/csrf',
+        '/api/v1/cart/recheck',
         '/api/v1/cart/items',
         '/api/v1/cart/items/{productSlug}',
       ]),
@@ -282,6 +331,40 @@ describe('Cart API security contract (e2e)', () => {
     expect(document.paths['/api/v1/cart/csrf']?.get?.security).toEqual([
       { cartCookie: [] },
     ]);
+    expect(document.paths['/api/v1/cart/recheck']?.post?.security).toEqual([
+      { cartCookie: [] },
+    ]);
+    const cartSchema = document.components?.schemas?.CartDto;
+    const cartItemSchema = document.components?.schemas?.CartItemDto;
+    expect(cartSchema).toMatchObject({
+      properties: {
+        adjustmentMessage: { nullable: true, type: 'string' },
+        serverNow: { format: 'date-time', type: 'string' },
+      },
+    });
+    expect(
+      cartSchema && 'required' in cartSchema ? cartSchema.required : undefined,
+    ).toEqual(expect.arrayContaining(['adjustmentMessage', 'serverNow']));
+    expect(cartItemSchema).toMatchObject({
+      properties: {
+        reservationExpiresAt: {
+          format: 'date-time',
+          nullable: true,
+          type: 'string',
+        },
+        reservationStatus: {
+          enum: ['active', 'expired', 'unreserved'],
+          type: 'string',
+        },
+      },
+    });
+    expect(
+      cartItemSchema && 'required' in cartItemSchema
+        ? cartItemSchema.required
+        : undefined,
+    ).toEqual(
+      expect.arrayContaining(['reservationExpiresAt', 'reservationStatus']),
+    );
     expect(
       document.paths['/api/v1/cart/items']?.post?.parameters?.map(
         (parameter) => ('name' in parameter ? parameter.name : undefined),

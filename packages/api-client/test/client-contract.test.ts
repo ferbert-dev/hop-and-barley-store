@@ -112,6 +112,14 @@ const cartClear = configuredClient.DELETE('/api/v1/cart/items', {
     },
   },
 });
+const cartRecheck = configuredClient.POST('/api/v1/cart/recheck', {
+  params: {
+    header: {
+      Origin: 'http://localhost:3000',
+      'X-CSRF-Token': `cart-v1.${'A'.repeat(43)}`,
+    },
+  },
+});
 void cartRequest;
 void cartCsrfRequest;
 void firstCartAdd;
@@ -119,8 +127,10 @@ void existingCartAdd;
 void cartPatch;
 void cartDelete;
 void cartClear;
+void cartRecheck;
 
 const safeCart: components['schemas']['CartDto'] = {
+  adjustmentMessage: null,
   checkoutEligible: true,
   currency: 'USD',
   distinctItemCount: 1,
@@ -135,8 +145,11 @@ const safeCart: components['schemas']['CartDto'] = {
       productId: '20000000-0000-4000-8000-000000000002',
       productSlug: 'cascade-hops',
       quantity: 2,
+      reservationExpiresAt: '2026-08-25T12:15:00.000Z',
+      reservationStatus: 'active',
     },
   ],
+  serverNow: '2026-08-25T12:00:00.000Z',
   subtotalMinor: 1398,
   totalQuantity: 2,
 };

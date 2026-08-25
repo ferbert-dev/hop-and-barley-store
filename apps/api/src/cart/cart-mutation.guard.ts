@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { originIsAllowed } from '../config/origin-list';
 import { CART_BOOTSTRAP_KEY } from './cart-bootstrap.decorator';
+import { CART_BODYLESS_MUTATION_KEY } from './cart-bodyless-mutation.decorator';
 import type { CartCookieMode } from './cart-cookie';
 import { readCartCookie } from './cart-cookie';
 import { CartCsrfService } from './cart-csrf.service';
@@ -39,8 +40,13 @@ export class CartMutationGuard implements CanActivate {
       throw new ForbiddenException(FORBIDDEN);
     }
     if (
-      ['PATCH', 'POST'].includes(request.method.toUpperCase()) &&
-      !request.is('application/json')
+      this.hasUnsupportedMutationBody(
+        request,
+        this.reflector.getAllAndOverride<boolean>(CART_BODYLESS_MUTATION_KEY, [
+          context.getHandler(),
+          context.getClass(),
+        ]),
+      )
     ) {
       throw new UnsupportedMediaTypeException({
         status: 'unsupported-media-type',
@@ -69,5 +75,18 @@ export class CartMutationGuard implements CanActivate {
     }
     request.activeCart = active;
     return true;
+  }
+
+  private hasUnsupportedMutationBody(
+    request: CartRequest,
+    bodylessAllowed: boolean | undefined,
+  ): boolean {
+    if (!['PATCH', 'POST'].includes(request.method.toUpperCase())) return false;
+    if (!bodylessAllowed) return !request.is('application/json');
+    const contentLength = request.get('content-length');
+    return (
+      request.get('transfer-encoding') !== undefined ||
+      (contentLength !== undefined && contentLength !== '0')
+    );
   }
 }

@@ -7,6 +7,7 @@ import { CartProvider, useCart } from './cart-context';
 import type { Cart, CartTransport } from './cart-transport';
 
 const initialCart: Cart = {
+  adjustmentMessage: null,
   checkoutEligible: true,
   currency: 'USD' as const,
   distinctItemCount: 1,
@@ -21,8 +22,11 @@ const initialCart: Cart = {
       productId: '10000000-0000-4000-8000-000000000001',
       productSlug: 'citra-hops',
       quantity: 1,
+      reservationExpiresAt: '2026-08-25T10:15:00.000Z',
+      reservationStatus: 'active',
     },
   ],
+  serverNow: '2026-08-25T10:00:00.000Z',
   subtotalMinor: 599,
   totalQuantity: 1,
 };
@@ -49,6 +53,7 @@ describe('CartProvider', () => {
       add: vi.fn(async () => initialCart),
       clear: vi.fn(async () => initialCart),
       load: vi.fn(async () => initialCart),
+      recheck: vi.fn(async () => initialCart),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(async () => initialCart),
     };
@@ -69,6 +74,7 @@ describe('CartProvider', () => {
       add: vi.fn(async () => initialCart),
       clear: vi.fn(async () => initialCart),
       load: vi.fn().mockResolvedValue(initialCart),
+      recheck: vi.fn(async () => initialCart),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(
         () =>
@@ -108,6 +114,7 @@ describe('CartProvider', () => {
         .fn()
         .mockResolvedValueOnce(initialCart)
         .mockResolvedValueOnce(canonical),
+      recheck: vi.fn(async () => initialCart),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(async () => {
         throw new Error('planned failure');
@@ -149,6 +156,7 @@ describe('CartProvider', () => {
               resolveSecond = resolve;
             }),
         ),
+      recheck: vi.fn(async () => initialCart),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(async () => initialCart),
     };
@@ -176,6 +184,7 @@ describe('CartProvider', () => {
         .fn()
         .mockRejectedValueOnce(new Error('offline'))
         .mockResolvedValueOnce(initialCart),
+      recheck: vi.fn(async () => initialCart),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(async () => initialCart),
     };
@@ -191,6 +200,50 @@ describe('CartProvider', () => {
       expect(screen.getByTestId('subtotal')).toHaveTextContent('599'),
     );
     expect(transport.load).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps recheck server-authoritative and exposes its canonical adjustment message', async () => {
+    const user = userEvent.setup();
+    let resolveRecheck: ((value: Cart) => void) | undefined;
+    const recheckedCart: Cart = {
+      ...initialCart,
+      adjustmentMessage: 'Citra Hops quantity was adjusted to available stock.',
+      items: [{ ...initialCart.items[0], quantity: 1 }],
+    };
+    const transport: CartTransport = {
+      add: vi.fn(async () => initialCart),
+      clear: vi.fn(async () => initialCart),
+      load: vi.fn(async () => initialCart),
+      recheck: vi.fn(
+        () =>
+          new Promise<Cart>((resolve) => {
+            resolveRecheck = resolve;
+          }),
+      ),
+      remove: vi.fn(async () => initialCart),
+      update: vi.fn(async () => initialCart),
+    };
+    render(
+      <CartProvider transport={transport}>
+        <Probe />
+      </CartProvider>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Recheck' }));
+
+    expect(screen.getByTestId('pending')).toHaveTextContent('recheck');
+    expect(screen.getByTestId('totals')).toHaveTextContent('refreshing');
+    expect(screen.getByTestId('quantity')).toHaveTextContent('1');
+
+    resolveRecheck?.(recheckedCart);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('message')).toHaveTextContent(
+        'adjusted to available stock',
+      ),
+    );
+    expect(transport.recheck).toHaveBeenCalledTimes(1);
+    expect(transport.load).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -226,6 +279,7 @@ describe('CartProvider', () => {
         add: vi.fn(async () => (method === 'add' ? expectedCart : initial)),
         clear: vi.fn(async () => (method === 'clear' ? expectedCart : initial)),
         load: vi.fn(async () => initial),
+        recheck: vi.fn(async () => initial),
         remove: vi.fn(async () =>
           method === 'remove' ? expectedCart : initial,
         ),
@@ -261,6 +315,7 @@ describe('CartProvider', () => {
         .fn()
         .mockResolvedValueOnce(initialCart)
         .mockResolvedValueOnce(updatedCart),
+      recheck: vi.fn(async () => initialCart),
       remove: vi.fn(async () => initialCart),
       update: vi
         .fn()
@@ -322,8 +377,12 @@ function Probe() {
       <output data-testid="subtotal">{cart.state.cart.subtotalMinor}</output>
       <output data-testid="item-count">{cart.items.length}</output>
       <output data-testid="message">{cart.state.message ?? ''}</output>
+      <output data-testid="pending">{cart.pending?.kind ?? ''}</output>
       <button onClick={() => void cart.refresh()} type="button">
         Refresh
+      </button>
+      <button onClick={() => void cart.recheck()} type="button">
+        Recheck
       </button>
       <button onClick={() => void cart.add('citra-hops', 1)} type="button">
         Add

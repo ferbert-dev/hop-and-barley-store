@@ -1,4 +1,3 @@
-import { UnprocessableEntityException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import type { ActiveCartCapability } from './cart-request';
 import { CartService } from './cart.service';
@@ -7,121 +6,247 @@ jest.mock('../database/prisma.service', () => ({
   PrismaService: class PrismaService {},
 }));
 
+const cartId = '30000000-0000-4000-8000-000000000001';
+const itemId = '40000000-0000-4000-8000-000000000001';
+const productId = '20000000-0000-4000-8000-000000000002';
+const reservationId = '50000000-0000-4000-8000-000000000001';
+const now = new Date('2026-08-25T12:00:00.000Z');
+const expiresAt = new Date('2026-08-25T12:15:00.000Z');
+
 const capability: ActiveCartCapability = {
-  cartId: '30000000-0000-4000-8000-000000000001',
+  cartId,
   expiresAt: new Date('2026-09-21T00:00:00.000Z'),
   rawToken: 'A'.repeat(43),
 };
 
-const storedCart = (stockQuantity = 10, priceMinor = 699) => ({
-  items: [
-    {
-      product: {
-        currency: 'USD',
-        id: '20000000-0000-4000-8000-000000000002',
-        imagePath: '/assets/products/cascade-hops.webp',
-        isActive: true,
-        name: 'Cascade Hops',
-        priceMinor,
-        priceQualifier: 'per pound',
-        slug: 'cascade-hops',
-        stockQuantity,
-      },
-      quantity: 2,
-    },
-  ],
-});
-
-describe('CartService server-owned invariants', () => {
-  it('validates active USD stock before first-cart persistence and stores only a digest', async () => {
-    const transaction = transactionMock();
-    transaction.product.findFirst.mockResolvedValue({
-      id: '20000000-0000-4000-8000-000000000002',
-      stockQuantity: 10,
+describe('CartService reservation invariants', () => {
+  it('returns server time and canonical empty reservation response fields', () => {
+    expect(new CartService({} as PrismaService).empty(now)).toEqual({
+      adjustmentMessage: null,
+      checkoutEligible: false,
+      currency: 'USD',
+      distinctItemCount: 0,
+      items: [],
+      serverNow: '2026-08-25T12:00:00.000Z',
+      subtotalMinor: 0,
+      totalQuantity: 0,
     });
-    let persisted:
-      { tokenDigest: Uint8Array; [key: string]: unknown } | undefined;
-    transaction.cart.create.mockImplementation(
-      (args: { data: { tokenDigest: Uint8Array; [key: string]: unknown } }) => {
-        persisted = args.data;
-        return Promise.resolve({ id: capability.cartId });
+  });
+
+  it('uses the exact expiry boundary and never leaks reservation identity', async () => {
+    const prisma = {
+      cart: {
+        findFirst: jest.fn().mockResolvedValue(
+          storedCart(2, {
+            expiresAt,
+            quantity: 2,
+            status: 'ACTIVE',
+          }),
+        ),
       },
+    } as unknown as PrismaService;
+    const service = new CartService(prisma);
+
+    const active = await service.getCart(
+      capability,
+      new Date('2026-08-25T12:14:59.999Z'),
     );
-    transaction.cart.findUniqueOrThrow.mockResolvedValue(storedCart());
+    const expired = await service.getCart(capability, expiresAt);
+
+    expect(active.items[0]).toMatchObject({
+      availability: 'available',
+      reservationExpiresAt: expiresAt.toISOString(),
+      reservationStatus: 'active',
+    });
+    expect(expired.items[0]).toMatchObject({
+      availability: 'unavailable',
+      reservationExpiresAt: expiresAt.toISOString(),
+      reservationStatus: 'expired',
+    });
+    expect(JSON.stringify(expired)).not.toMatch(
+      /cartId|reservationId|token|digest|stockQuantity/i,
+    );
+  });
+
+  it('creates a first-line reservation for exactly 15 minutes from the supplied server clock', async () => {
+    const transaction = transactionMock();
+    transaction.product.findUnique.mockResolvedValue({ id: productId });
+    transaction.product.findUniqueOrThrow.mockResolvedValue(product());
+    transaction.$queryRaw.mockResolvedValue([{ id: productId }]);
+    transaction.cartReservation.findMany.mockResolvedValue([]);
+    transaction.cart.create.mockResolvedValue({ id: cartId });
+    transaction.cartItem.create.mockResolvedValue({ id: itemId });
+    transaction.cartReservation.create.mockResolvedValue({
+      id: reservationId,
+    });
+    transaction.cart.findUniqueOrThrow.mockResolvedValue(
+      storedCart(2, { expiresAt, quantity: 2, status: 'ACTIVE' }),
+    );
     const service = new CartService(prismaMock(transaction));
 
     const created = await service.createAndAdd(
       { productSlug: 'cascade-hops', quantity: 2 },
-      new Date('2026-08-22T00:00:00.000Z'),
+      now,
     );
 
-    expect(transaction.product.findFirst).toHaveBeenCalledWith({
-      select: { id: true, stockQuantity: true },
-      where: {
-        currency: 'USD',
-        isActive: true,
-        slug: 'cascade-hops',
-        stockQuantity: { gte: 2 },
+    expect(transaction.cartReservation.create).toHaveBeenCalledWith({
+      data: {
+        cartId,
+        cartItemId: itemId,
+        expiresAt,
+        productId,
+        quantity: 2,
+        reservedAt: now,
+        status: 'ACTIVE',
       },
+      select: { id: true },
     });
-    expect(persisted).toBeDefined();
-    if (!persisted) throw new Error('Expected persisted cart data');
-    expect(persisted.tokenDigest).toBeInstanceOf(Uint8Array);
-    expect(persisted.tokenDigest).toHaveLength(32);
-    expect(JSON.stringify(persisted)).not.toContain(created.rawToken);
-    expect(created.cart.subtotalMinor).toBe(1398);
+    expect(transaction.cartItem.update).toHaveBeenCalledWith({
+      data: { currentReservationId: reservationId },
+      where: { id: itemId },
+    });
+    expect(created.cart.serverNow).toBe(now.toISOString());
+    expect(created.cart.items[0].reservationStatus).toBe('active');
   });
 
-  it('does not create a cart for inactive, non-USD or insufficient-stock products', async () => {
+  it('decreases the held quantity without changing the reservation clock', async () => {
     const transaction = transactionMock();
-    transaction.product.findFirst.mockResolvedValue(null);
+    transaction.$queryRaw
+      .mockResolvedValueOnce([{ expiresAt: capability.expiresAt, id: cartId }])
+      .mockResolvedValueOnce([{ id: productId }]);
+    transaction.cartItem.findFirst.mockResolvedValue({ id: itemId, productId });
+    transaction.cartItem.findUniqueOrThrow.mockResolvedValue({
+      currentReservation: {
+        expiresAt,
+        id: reservationId,
+        quantity: 4,
+        status: 'ACTIVE',
+      },
+      id: itemId,
+      product: product(),
+      quantity: 4,
+    });
+    transaction.cart.findUniqueOrThrow.mockResolvedValue(
+      storedCart(2, { expiresAt, quantity: 2, status: 'ACTIVE' }),
+    );
     const service = new CartService(prismaMock(transaction));
 
-    await expect(
-      service.createAndAdd({ productSlug: 'not-available', quantity: 2 }),
-    ).rejects.toBeInstanceOf(UnprocessableEntityException);
-    expect(transaction.cart.create).not.toHaveBeenCalled();
+    const cart = await service.update(
+      capability,
+      'cascade-hops',
+      { quantity: 2 },
+      now,
+    );
+
+    expect(transaction.cartReservation.update).toHaveBeenCalledWith({
+      data: { quantity: 2 },
+      where: { id: reservationId },
+    });
+    expect(transaction.cartReservation.create).not.toHaveBeenCalled();
+    expect(cart.items[0].reservationExpiresAt).toBe(expiresAt.toISOString());
   });
 
-  it('enforces the 50-distinct-line limit inside the locked transaction', async () => {
+  it('renews only an increased line with a fresh identity and exact new expiry', async () => {
     const transaction = transactionMock();
-    transaction.$queryRaw.mockResolvedValue([{ id: capability.cartId }]);
-    transaction.product.findFirst.mockResolvedValue({
-      id: '20000000-0000-4000-8000-000000000003',
-      stockQuantity: 10,
-    });
-    transaction.cartItem.findUnique.mockResolvedValue(null);
-    transaction.cartItem.count.mockResolvedValue(50);
-    const service = new CartService(prismaMock(transaction));
-
-    await expect(
-      service.add(capability, { productSlug: 'citra-hops', quantity: 1 }),
-    ).rejects.toBeInstanceOf(UnprocessableEntityException);
-    expect(transaction.cartItem.create).not.toHaveBeenCalled();
-  });
-
-  it('recomputes current price, totals and checkout eligibility without exact stock', async () => {
-    const prisma = {
-      cart: { findFirst: jest.fn().mockResolvedValue(storedCart(1, 725)) },
-    } as unknown as PrismaService;
-    const result = await new CartService(prisma).getCart(capability);
-
-    expect(result).toMatchObject({
-      checkoutEligible: false,
-      currency: 'USD',
-      distinctItemCount: 1,
-      subtotalMinor: 1450,
-      totalQuantity: 2,
-    });
-    expect(result.items[0]).toMatchObject({
-      availability: 'unavailable',
-      currentUnitPriceMinor: 725,
-      lineTotalMinor: 1450,
+    transaction.$queryRaw
+      .mockResolvedValueOnce([{ expiresAt: capability.expiresAt, id: cartId }])
+      .mockResolvedValueOnce([{ id: productId }]);
+    transaction.cartItem.findFirst.mockResolvedValue({ id: itemId, productId });
+    transaction.cartItem.findUniqueOrThrow.mockResolvedValue({
+      currentReservation: {
+        expiresAt,
+        id: reservationId,
+        quantity: 2,
+        status: 'ACTIVE',
+      },
+      id: itemId,
+      product: product(),
       quantity: 2,
     });
-    expect(JSON.stringify(result)).not.toMatch(/stock|cartId|token|digest/i);
+    transaction.cartReservation.findMany.mockResolvedValue([]);
+    transaction.cartReservation.create.mockResolvedValue({
+      id: '50000000-0000-4000-8000-000000000002',
+    });
+    const renewedAt = new Date('2026-08-25T12:05:00.000Z');
+    const renewedExpiry = new Date('2026-08-25T12:20:00.000Z');
+    transaction.cart.findUniqueOrThrow.mockResolvedValue(
+      storedCart(4, {
+        expiresAt: renewedExpiry,
+        quantity: 4,
+        status: 'ACTIVE',
+      }),
+    );
+    const service = new CartService(prismaMock(transaction));
+
+    const cart = await service.update(
+      capability,
+      'cascade-hops',
+      { quantity: 4 },
+      renewedAt,
+    );
+
+    expect(transaction.cartReservation.updateMany).toHaveBeenLastCalledWith({
+      data: { releasedAt: renewedAt, status: 'RELEASED' },
+      where: {
+        cartId,
+        cartItemId: { in: [itemId] },
+        status: 'ACTIVE',
+      },
+    });
+    expect(transaction.cartReservation.create).toHaveBeenCalledWith({
+      data: {
+        cartId,
+        cartItemId: itemId,
+        expiresAt: renewedExpiry,
+        productId,
+        quantity: 4,
+        reservedAt: renewedAt,
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+    });
+    expect(cart.items[0].reservationExpiresAt).toBe(
+      renewedExpiry.toISOString(),
+    );
   });
 });
+
+function product() {
+  return {
+    currency: 'USD',
+    id: productId,
+    isActive: true,
+    stockQuantity: 10,
+  };
+}
+
+function storedCart(
+  quantity: number,
+  currentReservation: {
+    expiresAt: Date;
+    quantity: number;
+    status: 'ACTIVE' | 'CONSUMED' | 'EXPIRED' | 'RELEASED';
+  } | null,
+) {
+  return {
+    items: [
+      {
+        currentReservation,
+        product: {
+          currency: 'USD',
+          id: productId,
+          imagePath: '/assets/products/cascade-hops.webp',
+          isActive: true,
+          name: 'Cascade Hops',
+          priceMinor: 699,
+          priceQualifier: 'per pound',
+          slug: 'cascade-hops',
+        },
+        quantity,
+      },
+    ],
+  };
+}
 
 function prismaMock(transaction: ReturnType<typeof transactionMock>) {
   return {
@@ -142,8 +267,26 @@ function transactionMock() {
     cartItem: {
       count: jest.fn(),
       create: jest.fn(),
+      delete: jest.fn(),
+      deleteMany: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
     },
-    product: { findFirst: jest.fn() },
+    cartReservation: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    product: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      updateMany: jest.fn(),
+    },
   };
 }

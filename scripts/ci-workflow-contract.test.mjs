@@ -50,6 +50,7 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
     'pnpm test:a1:postgres',
     'pnpm test:a1b:postgres',
     'pnpm test:o0:postgres',
+    'pnpm test:o1b:postgres',
     'pnpm test:a1b:argon2:alpine',
     'docker compose up -d --build --wait',
     'docker compose rm --force api',
@@ -81,6 +82,7 @@ test('clean public database and web verification commands own their prerequisite
     'test:a1:postgres',
     'test:a1b:postgres',
     'test:o0:postgres',
+    'test:o1b:postgres',
   ]) {
     assert.match(
       rootPackage.scripts[command],
