@@ -6,6 +6,7 @@ container_name="hop-barley-o1b-postgres-${$}"
 database_user='hopbarley_o1b'
 database_password='hopbarley_o1b_fixture'
 migration_path="$repo_root/apps/api/prisma/migrations/20260825090000_add_cart_reservations/migration.sql"
+recovery_path="$repo_root/apps/api/prisma/migrations/20260825090000_add_cart_reservations/RECOVERY.md"
 
 cleanup() {
   docker stop "$container_name" >/dev/null 2>&1 || true
@@ -64,6 +65,65 @@ create_legacy_cart_line() {
     " >/dev/null
 }
 
+read_recovery_transition() {
+  awk '
+    /<!-- O1B_COMPATIBILITY_TRANSITION_BEGIN -->/ { capture = 1; next }
+    /<!-- O1B_COMPATIBILITY_TRANSITION_END -->/ { capture = 0; exit }
+    capture && /^```/ { next }
+    capture { print }
+  ' "$recovery_path"
+}
+
+run_recovery_transition() {
+  local database_name=$1
+  local recovery_sql
+  recovery_sql=$(read_recovery_transition)
+  test -n "$recovery_sql"
+  printf '%s\n' "$recovery_sql" | docker exec --interactive "$container_name" psql \
+    --set ON_ERROR_STOP=1 --username "$database_user" --dbname "$database_name" \
+    >/dev/null
+}
+
+create_recovery_fixtures() {
+  local database_name=$1
+  docker exec "$container_name" psql --set ON_ERROR_STOP=1 \
+    --username "$database_user" --dbname "$database_name" \
+    --command "
+      INSERT INTO \"Cart\" (\"id\", \"tokenDigest\", \"expiresAt\", \"updatedAt\")
+      VALUES
+        ('30000000-0000-4000-8000-000000000001', decode(repeat('cd', 32), 'hex'), CURRENT_TIMESTAMP + interval '30 days', CURRENT_TIMESTAMP),
+        ('30000000-0000-4000-8000-000000000002', decode(repeat('ef', 32), 'hex'), CURRENT_TIMESTAMP + interval '30 days', CURRENT_TIMESTAMP);
+
+      INSERT INTO \"CartItem\" (\"id\", \"cartId\", \"productId\", \"quantity\", \"updatedAt\")
+      VALUES
+        ('40000000-0000-4000-8000-000000000001', '30000000-0000-4000-8000-000000000001', (SELECT \"id\" FROM \"Product\" WHERE \"slug\" = 'cascade-hops'), 2, CURRENT_TIMESTAMP),
+        ('40000000-0000-4000-8000-000000000002', '30000000-0000-4000-8000-000000000002', (SELECT \"id\" FROM \"Product\" WHERE \"slug\" = 'cascade-hops'), 3, CURRENT_TIMESTAMP),
+        ('40000000-0000-4000-8000-000000000003', '30000000-0000-4000-8000-000000000002', (SELECT \"id\" FROM \"Product\" WHERE \"slug\" = 'centennial-hops'), 4, CURRENT_TIMESTAMP);
+
+      INSERT INTO \"CartReservation\" (
+        \"id\", \"cartId\", \"cartItemId\", \"productId\", \"quantity\",
+        \"status\", \"reservedAt\", \"expiresAt\", \"updatedAt\"
+      )
+      VALUES
+        ('50000000-0000-4000-8000-000000000001', '30000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000001', (SELECT \"id\" FROM \"Product\" WHERE \"slug\" = 'cascade-hops'), 2, 'ACTIVE', CURRENT_TIMESTAMP - interval '1 minute', CURRENT_TIMESTAMP + interval '14 minutes', CURRENT_TIMESTAMP),
+        ('50000000-0000-4000-8000-000000000002', '30000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000002', (SELECT \"id\" FROM \"Product\" WHERE \"slug\" = 'cascade-hops'), 3, 'ACTIVE', CURRENT_TIMESTAMP - interval '1 minute', CURRENT_TIMESTAMP + interval '14 minutes', CURRENT_TIMESTAMP),
+        ('50000000-0000-4000-8000-000000000003', '30000000-0000-4000-8000-000000000002', '40000000-0000-4000-8000-000000000003', (SELECT \"id\" FROM \"Product\" WHERE \"slug\" = 'centennial-hops'), 4, 'ACTIVE', CURRENT_TIMESTAMP - interval '20 minutes', CURRENT_TIMESTAMP - interval '5 minutes', CURRENT_TIMESTAMP);
+
+      UPDATE \"CartItem\"
+      SET \"currentReservationId\" = CASE \"id\"
+        WHEN '40000000-0000-4000-8000-000000000001' THEN '50000000-0000-4000-8000-000000000001'::uuid
+        WHEN '40000000-0000-4000-8000-000000000002' THEN '50000000-0000-4000-8000-000000000002'::uuid
+        WHEN '40000000-0000-4000-8000-000000000003' THEN '50000000-0000-4000-8000-000000000003'::uuid
+      END,
+      \"updatedAt\" = CURRENT_TIMESTAMP
+      WHERE \"id\" IN (
+        '40000000-0000-4000-8000-000000000001',
+        '40000000-0000-4000-8000-000000000002',
+        '40000000-0000-4000-8000-000000000003'
+      );
+    " >/dev/null
+}
+
 docker exec "$container_name" createdb -U "$database_user" atomic_o1b
 apply_prior_migrations atomic_o1b
 DATABASE_URL=$(database_url atomic_o1b) pnpm --dir "$repo_root" --filter @hop-and-barley/api db:seed
@@ -106,6 +166,106 @@ upgrade_shape=$(docker exec "$container_name" psql --tuples-only --no-align \
       (SELECT count(*) FROM \"CartReservation\");
   ")
 test "$upgrade_shape" = '1|1|0'
+
+create_recovery_fixtures upgrade_o1b
+recovery_shape_before=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname upgrade_o1b \
+  --command "
+    SELECT
+      (SELECT count(*) FROM \"Cart\"),
+      (SELECT count(*) FROM \"CartItem\"),
+      (SELECT count(*) FROM \"Product\"),
+      (SELECT sum(\"stockQuantity\") FROM \"Product\"),
+      (SELECT count(*) FROM \"CartReservation\");
+  ")
+if docker exec "$container_name" psql --set ON_ERROR_STOP=1 \
+  --username "$database_user" --dbname upgrade_o1b \
+  --command "DELETE FROM \"CartItem\" WHERE \"id\" = '40000000-0000-4000-8000-000000000001';" \
+  >/dev/null 2>&1; then
+  echo 'Expected the pre-O1B remove shape to fail before the recovery transition' >&2
+  exit 1
+fi
+pre_transition_shape=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname upgrade_o1b \
+  --command "
+    SELECT
+      (SELECT count(*) FROM \"CartItem\" WHERE \"id\" = '40000000-0000-4000-8000-000000000001'),
+      (SELECT count(*) FROM \"CartReservation\" WHERE \"status\" = 'ACTIVE'),
+      (SELECT count(*) FROM \"CartItem\" WHERE \"currentReservationId\" IS NOT NULL);
+  ")
+test "$pre_transition_shape" = '1|3|3'
+
+run_recovery_transition upgrade_o1b
+recovery_shape_after=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname upgrade_o1b \
+  --command "
+    SELECT
+      (SELECT count(*) FROM \"Cart\"),
+      (SELECT count(*) FROM \"CartItem\"),
+      (SELECT count(*) FROM \"Product\"),
+      (SELECT sum(\"stockQuantity\") FROM \"Product\"),
+      (SELECT count(*) FROM \"CartReservation\");
+  ")
+test "$recovery_shape_after" = "$recovery_shape_before"
+transition_shape=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname upgrade_o1b \
+  --command "
+    SELECT
+      count(*) FILTER (WHERE \"status\" = 'ACTIVE'),
+      count(*) FILTER (WHERE \"status\" = 'RELEASED'),
+      count(*) FILTER (WHERE \"status\" = 'EXPIRED'),
+      (SELECT count(*) FROM \"CartItem\" WHERE \"currentReservationId\" IS NOT NULL)
+    FROM \"CartReservation\";
+  ")
+test "$transition_shape" = '0|2|1|0'
+transition_fingerprint_before=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname upgrade_o1b \
+  --command "
+    SELECT string_agg(
+      \"id\"::text || ':' || \"status\"::text || ':' ||
+      coalesce(\"releasedAt\"::text, '') || ':' || \"updatedAt\"::text,
+      ',' ORDER BY \"id\"
+    )
+    FROM \"CartReservation\";
+  ")
+run_recovery_transition upgrade_o1b
+transition_fingerprint_after=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname upgrade_o1b \
+  --command "
+    SELECT string_agg(
+      \"id\"::text || ':' || \"status\"::text || ':' ||
+      coalesce(\"releasedAt\"::text, '') || ':' || \"updatedAt\"::text,
+      ',' ORDER BY \"id\"
+    )
+    FROM \"CartReservation\";
+  ")
+test "$transition_fingerprint_after" = "$transition_fingerprint_before"
+
+docker exec "$container_name" psql --single-transaction --set ON_ERROR_STOP=1 \
+  --username "$database_user" --dbname upgrade_o1b \
+  --command "
+    DELETE FROM \"CartItem\"
+    WHERE \"id\" = '40000000-0000-4000-8000-000000000001';
+    DELETE FROM \"CartItem\"
+    WHERE \"cartId\" = '30000000-0000-4000-8000-000000000002';
+  " >/dev/null
+compatibility_shape=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname upgrade_o1b \
+  --command "
+    SELECT
+      (SELECT count(*) FROM \"Cart\"),
+      (SELECT count(*) FROM \"CartItem\" WHERE \"cartId\" IN (
+        '30000000-0000-4000-8000-000000000001',
+        '30000000-0000-4000-8000-000000000002'
+      )),
+      (SELECT count(*) FROM \"CartReservation\"),
+      (SELECT count(*) FROM \"CartReservation\" WHERE \"cartItemId\" IS NULL),
+      (SELECT count(*) FROM \"Product\"),
+      (SELECT sum(\"stockQuantity\") FROM \"Product\");
+  ")
+IFS='|' read -r carts_before _ products_before stock_before reservations_before \
+  <<< "$recovery_shape_before"
+test "$compatibility_shape" = "$carts_before|0|$reservations_before|$reservations_before|$products_before|$stock_before"
 
 docker exec "$container_name" psql --single-transaction --set ON_ERROR_STOP=1 \
   --username "$database_user" --dbname upgrade_o1b \
@@ -181,4 +341,4 @@ if docker inspect "$container_name" >/dev/null 2>&1; then
   exit 1
 fi
 
-echo 'O1B disposable PostgreSQL gate: PASS; atomicity, upgrade, rollback and cleanup proved'
+echo 'O1B disposable PostgreSQL gate: PASS; atomicity, upgrade, recovery compatibility/idempotency, rollback and cleanup proved'
