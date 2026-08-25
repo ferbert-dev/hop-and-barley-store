@@ -104,6 +104,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cart/recheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recheck and reserve all current cart lines
+         * @description Rechecks every retained line in one server-authoritative operation. Positive availability is clamped and reserved; zero-stock lines remain in the cart unreserved.
+         */
+        post: operations["CartController_recheck"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cart/items": {
         parameters: {
             query?: never;
@@ -331,6 +351,10 @@ export interface components {
             lineTotalMinor: number | null;
             /** @enum {string} */
             availability: "available" | "unavailable";
+            /** @enum {string} */
+            reservationStatus: "active" | "expired" | "unreserved";
+            /** Format: date-time */
+            reservationExpiresAt: string | null;
         };
         CartDto: {
             /** @enum {string} */
@@ -343,6 +367,9 @@ export interface components {
             /** Format: int32 */
             subtotalMinor: number;
             checkoutEligible: boolean;
+            /** Format: date-time */
+            serverNow: string;
+            adjustmentMessage: string | null;
         };
         CartCsrfResponseDto: {
             csrfToken: string;
@@ -670,6 +697,42 @@ export interface operations {
             };
             /** @description Presented cart capability is not valid */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CartController_recheck: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartDto"];
+                };
+            };
+            /** @description Presented cart capability is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Origin or CSRF is not valid */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

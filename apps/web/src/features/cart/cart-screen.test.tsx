@@ -18,6 +18,7 @@ vi.mock('next/image', () => ({
 }));
 
 const cart = {
+  adjustmentMessage: null,
   checkoutEligible: true,
   currency: 'USD' as const,
   distinctItemCount: 1,
@@ -32,8 +33,11 @@ const cart = {
       productId: '10000000-0000-4000-8000-000000000001',
       productSlug: 'citra-hops',
       quantity: 1,
+      reservationExpiresAt: '2026-08-25T12:15:00.000Z',
+      reservationStatus: 'active' as const,
     },
   ],
+  serverNow: '2026-08-25T12:00:00.000Z',
   subtotalMinor: 599,
   totalQuantity: 1,
 };
@@ -127,6 +131,7 @@ describe('CartScreen', () => {
       add: vi.fn(async () => cart),
       clear: vi.fn(async () => cart),
       load: vi.fn(async () => cart),
+      recheck: vi.fn(async () => cart),
       remove: vi.fn(async () => cart),
       update: vi.fn(
         () =>
