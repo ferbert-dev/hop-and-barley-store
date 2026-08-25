@@ -106,23 +106,20 @@ describe('CartScreen', () => {
     );
   });
 
-  it('retains expired lines and exposes one cart-level availability recheck', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-08-25T12:00:00.000Z'));
-    const expiringCart: Cart = {
+  it('retains canonically expired lines without falsely claiming zero stock', () => {
+    const expiredCart: Cart = {
       ...cart,
+      checkoutEligible: false,
       items: [
         {
           ...cart.items[0],
-          reservationExpiresAt: '2026-08-25T12:00:02.000Z',
+          availability: 'unavailable',
+          reservationExpiresAt: '2026-08-25T12:00:00.000Z',
+          reservationStatus: 'expired',
         },
       ],
     };
-    render(<CartScreen initialState={{ cart: expiringCart, kind: 'ready' }} />);
-
-    act(() => {
-      vi.advanceTimersByTime(2_000);
-    });
+    render(<CartScreen initialState={{ cart: expiredCart, kind: 'ready' }} />);
 
     expect(screen.getByText('Citra Hops')).toBeVisible();
     expect(
@@ -133,6 +130,13 @@ describe('CartScreen', () => {
     expect(
       screen.queryByRole('link', { name: 'Proceed to Checkout' }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText('Out of stock')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Remove unavailable items before checkout.'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Recheck availability before checkout.'),
+    ).toBeVisible();
     expect(
       screen.getByRole('button', { name: 'Decrease Citra Hops quantity' }),
     ).toBeDisabled();
@@ -149,6 +153,7 @@ describe('CartScreen', () => {
       items: [
         {
           ...cart.items[0],
+          availability: 'unavailable',
           reservationStatus: 'expired',
         },
       ],

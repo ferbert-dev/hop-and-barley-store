@@ -193,6 +193,15 @@ test.describe('F3 cart reservations', () => {
     await expect(
       page.getByRole('button', { name: 'Recheck availability' }),
     ).toHaveCount(1);
+    await expect(page.getByText('Out of stock', { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(
+      page.getByText('Remove unavailable items before checkout.'),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText('Recheck availability before checkout.', { exact: true }),
+    ).toBeVisible();
     await expect(
       page.getByRole('link', { name: 'Proceed to Checkout' }),
     ).toHaveCount(0);
@@ -396,7 +405,7 @@ function cartFixture({
 }
 
 function cartLine({
-  availability = 'available',
+  availability,
   name,
   productSlug = name.toLowerCase().replaceAll(' ', '-'),
   quantity = 1,
@@ -414,9 +423,11 @@ function cartLine({
       : new Date(
           Date.now() + (reservation === 'active' ? 15 * 60_000 : -1_000),
         ).toISOString();
-  const currentUnitPriceMinor = availability === 'available' ? 599 : null;
+  const resolvedAvailability =
+    availability ?? (reservation === 'active' ? 'available' : 'unavailable');
+  const currentUnitPriceMinor = 599;
   return {
-    availability,
+    availability: resolvedAvailability,
     currentUnitPriceMinor,
     imagePath: `/assets/products/${productSlug}.jpg`,
     lineTotalMinor:

@@ -163,7 +163,9 @@ function CartContents({
 }>) {
   const reservation = useReservationClock(cart);
   const hasUnavailableItem = cartItems.some(
-    (item) => item.availability === 'unavailable',
+    (item) =>
+      item.availability === 'unavailable' &&
+      item.reservationStatus !== 'expired',
   );
   const checkoutEligible =
     cart.checkoutEligible &&
@@ -228,7 +230,8 @@ function CartContents({
                   <div>
                     <h2>{item.name}</h2>
                     <p className={styles.qualifier}>{item.priceQualifier}</p>
-                    {item.availability === 'unavailable' ? (
+                    {item.availability === 'unavailable' &&
+                    item.reservationStatus !== 'expired' ? (
                       <p className={styles.availability} role="status">
                         Out of stock
                       </p>
@@ -342,10 +345,10 @@ function CartContents({
           </dl>
           {!totalsAreRefreshing && !checkoutEligible ? (
             <p className={styles.ineligible} role="status">
-              {hasUnavailableItem
-                ? 'Remove unavailable items before checkout.'
-                : reservation.hasExpired
-                  ? 'Recheck availability before checkout.'
+              {reservation.hasExpired
+                ? 'Recheck availability before checkout.'
+                : hasUnavailableItem
+                  ? 'Remove unavailable items before checkout.'
                   : 'Your cart is not ready for checkout.'}
             </p>
           ) : null}
