@@ -104,10 +104,10 @@ test('has no unexpected horizontal overflow at every Q1 viewport probe', async (
 }) => {
   for (const probe of viewportProbes) {
     await page.setViewportSize({ width: probe.width, height: probe.height });
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(
       page.getByRole('heading', { name: 'Hop & Barley Store' }),
-    ).toBeVisible();
+    ).toBeAttached();
 
     const overflow = await page.evaluate(
       () =>

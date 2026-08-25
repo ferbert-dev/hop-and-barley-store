@@ -4,7 +4,6 @@ import type {
 } from '@hop-and-barley/api-client';
 import Image from 'next/image';
 
-import { Badge } from '../../components/ui/badge';
 import { ProductCard } from '../../components/ui/card';
 import { Price } from '../../components/ui/price';
 import { productAssetsBySlug } from '../../design-system/assets';
@@ -23,13 +22,6 @@ export function PagedCatalogCard({
 
   return (
     <ProductCard
-      badge={
-        <Badge
-          tone={product.availability === 'in-stock' ? 'success' : 'warning'}
-        >
-          {product.availability === 'in-stock' ? 'In stock' : 'Out of stock'}
-        </Badge>
-      }
       className={styles.productCard}
       description={product.teaser}
       href={`/product/${product.slug}`}
@@ -63,7 +55,6 @@ export function LegacyCatalogCard({
 
   return (
     <ProductCard
-      badge={<Badge tone="neutral">Availability unavailable</Badge>}
       className={styles.productCard}
       description={product.description}
       href={`/product/${product.slug}`}

@@ -1,12 +1,14 @@
+import Image from 'next/image';
+
+import { assets } from '../../design-system/assets';
+import styles from './catalog.module.css';
+
 export type CatalogApiStatus = 'connected' | 'not-contacted' | 'unavailable';
 
-const statusCopy: Record<
-  CatalogApiStatus,
-  { className: string; label: string }
-> = {
-  connected: { className: 'online', label: 'API connected' },
-  'not-contacted': { className: 'offline', label: 'API not contacted' },
-  unavailable: { className: 'offline', label: 'API unavailable' },
+const statusCopy: Record<CatalogApiStatus, { label: string }> = {
+  connected: { label: 'API connected' },
+  'not-contacted': { label: 'API not contacted' },
+  unavailable: { label: 'API unavailable' },
 };
 
 export function CatalogHero({
@@ -17,22 +19,21 @@ export function CatalogHero({
   status: CatalogApiStatus;
 }) {
   const copy = statusCopy[status];
+  const hero = assets.hopsFieldHero;
 
   return (
-    <section className="hero" id="top">
-      <div>
-        <p className="eyebrow">Independent brewing · dependable supply</p>
-        <h1>Hop &amp; Barley Store</h1>
-        <p className="lede">
-          Hops, malt, yeast and brewing kits selected for better batches at
-          home.
-        </p>
-      </div>
-      <p
-        className={`status ${copy.className}`}
-        role={announce ? 'status' : undefined}
-      >
-        <span aria-hidden="true" />
+    <section aria-label="Product catalog" className={styles.hero} id="top">
+      <h1 className="visually-hidden">Hop &amp; Barley Store</h1>
+      <Image
+        alt={hero.alt}
+        className={styles.heroImage}
+        height={hero.height}
+        preload
+        sizes={hero.sizes}
+        src={hero.src}
+        width={hero.width}
+      />
+      <p className="visually-hidden" role={announce ? 'status' : undefined}>
         {copy.label}
       </p>
     </section>

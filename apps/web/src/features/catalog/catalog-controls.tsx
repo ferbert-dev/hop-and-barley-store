@@ -2,7 +2,7 @@ import type { PagedCatalogResponse } from '@hop-and-barley/api-client';
 
 import { Button } from '../../components/ui/button';
 import { Field, Select } from '../../components/ui/field';
-import type { CatalogQuery } from './catalog-query';
+import { buildCatalogHref, type CatalogQuery } from './catalog-query';
 import styles from './catalog.module.css';
 
 export function CatalogControls({
@@ -14,9 +14,14 @@ export function CatalogControls({
   query: CatalogQuery;
   showClear: boolean;
 }) {
-  const limitOptions = [...new Set([query.limit, 12, 24, 48])].sort(
-    (left, right) => left - right,
-  );
+  const searchTokens = query.search?.split(' ') ?? [];
+  const productTypes = categories
+    .filter((category) => PRODUCT_TYPE_LABELS.has(category.slug))
+    .sort(
+      (left, right) =>
+        PRODUCT_TYPE_ORDER.indexOf(left.slug) -
+        PRODUCT_TYPE_ORDER.indexOf(right.slug),
+    );
 
   return (
     <form
@@ -27,10 +32,7 @@ export function CatalogControls({
       role="search"
     >
       <div className={styles.filterHeading}>
-        <div>
-          <p className="eyebrow">Find your ingredients</p>
-          <h2>Filter products</h2>
-        </div>
+        <p className="eyebrow">Find your ingredients</p>
         {showClear ? (
           <Button href="/" variant="secondary">
             Clear filters
@@ -38,7 +40,7 @@ export function CatalogControls({
         ) : null}
       </div>
 
-      <div className={styles.filterFields}>
+      <div className={styles.searchRow}>
         <Field
           defaultValue={query.search ?? ''}
           id="catalog-search"
@@ -48,37 +50,63 @@ export function CatalogControls({
           placeholder="Try citrus hops"
           type="search"
         />
-        <Select
-          defaultValue={query.category ?? ''}
-          id="catalog-category"
-          label="Category"
-          name="category"
-        >
-          <option value="">All categories</option>
-          {categories.map((category) => (
-            <option key={category.slug} value={category.slug}>
-              {category.name}
-            </option>
+        <Button className={styles.searchButton} type="submit">
+          Search
+        </Button>
+      </div>
+
+      {searchTokens.length > 0 ? (
+        <ul aria-label="Search keywords" className={styles.keywordChips}>
+          {searchTokens.map((token, index) => (
+            <li key={`${String(index)}:${token}`}>
+              <a
+                aria-label={`Remove keyword ${token}`}
+                href={buildCatalogHref(
+                  query,
+                  {
+                    search: removeSearchToken(searchTokens, index),
+                  },
+                  true,
+                )}
+              >
+                {token}
+                <span aria-hidden="true">×</span>
+              </a>
+            </li>
           ))}
-        </Select>
-        <Field
-          defaultValue={query.minPriceMinor ?? ''}
-          description="Enter cents: 500 means $5.00."
-          id="catalog-min-price"
-          inputMode="numeric"
-          label="Minimum price"
-          name="minPriceMinor"
-          pattern="(?:0|[1-9][0-9]*)"
-        />
-        <Field
-          defaultValue={query.maxPriceMinor ?? ''}
-          description="Enter cents: 1500 means $15.00."
-          id="catalog-max-price"
-          inputMode="numeric"
-          label="Maximum price"
-          name="maxPriceMinor"
-          pattern="(?:0|[1-9][0-9]*)"
-        />
+        </ul>
+      ) : null}
+
+      <fieldset
+        aria-label="Product Type"
+        className={styles.productTypes}
+        role="radiogroup"
+      >
+        <legend>Product Type</legend>
+        <div className={styles.productTypeList}>
+          {productTypes.map((category) => (
+            <label className={styles.productType} key={category.slug}>
+              <input
+                defaultChecked={query.category === category.slug}
+                name="category"
+                type="radio"
+                value={category.slug}
+              />
+              <span>{PRODUCT_TYPE_LABELS.get(category.slug)}</span>
+            </label>
+          ))}
+        </div>
+        {query.category ? (
+          <a
+            className={styles.clearProductType}
+            href={buildCatalogHref(query, { category: undefined }, true)}
+          >
+            Clear product type
+          </a>
+        ) : null}
+      </fieldset>
+
+      <div className={styles.sortField}>
         <Select
           defaultValue={query.sort}
           id="catalog-sort"
@@ -90,23 +118,35 @@ export function CatalogControls({
           <option value="price-asc">Price: low to high</option>
           <option value="price-desc">Price: high to low</option>
         </Select>
-        <Select
-          defaultValue={String(query.limit)}
-          id="catalog-limit"
-          label="Products per page"
-          name="limit"
-        >
-          {limitOptions.map((limit) => (
-            <option key={limit} value={limit}>
-              {limit}
-            </option>
-          ))}
-        </Select>
       </div>
 
-      <Button className={styles.applyButton} type="submit">
-        Apply filters
-      </Button>
+      {query.minPriceMinor !== undefined ? (
+        <input name="minPriceMinor" type="hidden" value={query.minPriceMinor} />
+      ) : null}
+      {query.maxPriceMinor !== undefined ? (
+        <input name="maxPriceMinor" type="hidden" value={query.maxPriceMinor} />
+      ) : null}
+      {query.limit !== 12 ? (
+        <input name="limit" type="hidden" value={query.limit} />
+      ) : null}
     </form>
   );
+}
+
+const PRODUCT_TYPE_ORDER = ['hops', 'malts', 'yeast', 'adjuncts'];
+const PRODUCT_TYPE_LABELS = new Map([
+  ['hops', 'Hops'],
+  ['malts', 'Malt'],
+  ['yeast', 'Yeast'],
+  ['adjuncts', 'Adjuncts'],
+]);
+
+function removeSearchToken(
+  tokens: string[],
+  index: number,
+): string | undefined {
+  const next = tokens
+    .filter((_token, tokenIndex) => tokenIndex !== index)
+    .join(' ');
+  return next || undefined;
 }
