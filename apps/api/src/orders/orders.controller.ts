@@ -4,8 +4,10 @@ import {
   Headers,
   Post,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -20,8 +22,10 @@ import {
   ApiUnsupportedMediaTypeResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import type { AuthRequest } from '../auth/auth-request';
 import { CartCapabilityGuard } from '../cart/cart-capability.guard';
+import { type CartCookieMode, clearCartCookie } from '../cart/cart-cookie';
 import type { CartRequest } from '../cart/cart-request';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderDto } from './dto/order-response.dto';
@@ -36,6 +40,7 @@ export class OrdersController {
   constructor(
     private readonly orders: OrdersService,
     private readonly idempotencyKeys: IdempotencyKeyPipe,
+    private readonly config: ConfigService,
   ) {}
 
   @Post()
@@ -68,7 +73,16 @@ export class OrdersController {
     },
   })
   @ApiBody({ required: true, type: CreateOrderDto })
-  @ApiCreatedResponse({ type: OrderDto })
+  @ApiCreatedResponse({
+    headers: {
+      'Set-Cookie': {
+        description:
+          'Clears the consumed cart capability after every successful or idempotently replayed browser order response.',
+        schema: { type: 'string' },
+      },
+    },
+    type: OrderDto,
+  })
   @ApiBadRequestResponse({
     description: 'Invalid or unknown checkout input or idempotency key',
   })
@@ -85,15 +99,16 @@ export class OrdersController {
       'Cart, reservation, product, quantity, stock or payment method is unavailable',
   })
   @ApiUnsupportedMediaTypeResponse({ description: 'JSON body required' })
-  create(
+  async create(
     @Headers('idempotency-key') rawIdempotencyKey: string | undefined,
     @Body() dto: CreateOrderDto,
     @Req() request: CheckoutRequest,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<OrderDto> {
     const idempotencyKey = this.idempotencyKeys.transform(rawIdempotencyKey);
     const session = requireActiveSession(request);
     const cart = requireActiveCart(request);
-    return this.orders.create(
+    const order = await this.orders.create(
       {
         cartId: cart.cartId,
         idempotencyKey,
@@ -101,6 +116,12 @@ export class OrdersController {
       },
       dto,
     );
+    response.setHeader('Set-Cookie', clearCartCookie(this.cookieMode()));
+    return order;
+  }
+
+  private cookieMode(): CartCookieMode {
+    return this.config.getOrThrow<CartCookieMode>('CART_COOKIE_MODE');
   }
 }
 

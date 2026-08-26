@@ -1256,6 +1256,8 @@ export interface operations {
         responses: {
             201: {
                 headers: {
+                    /** @description Clears the consumed cart capability after every successful or idempotently replayed browser order response. */
+                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {

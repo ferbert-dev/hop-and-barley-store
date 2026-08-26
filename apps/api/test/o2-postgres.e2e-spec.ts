@@ -427,10 +427,36 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
       paymentState: 'due_on_delivery',
       status: 'placed',
     });
+    expect(created.headers['set-cookie']).toEqual([
+      expect.stringContaining('hb_cart=; Max-Age=0;'),
+    ]);
+    const createdOrderId = responseBodyId(created.body);
     expect(JSON.stringify(created.body)).not.toContain(userId);
     expect(
       await prisma.order.findUniqueOrThrow({ where: { cartId } }),
     ).toMatchObject({ userId });
+
+    const nextCart = await request(server)
+      .post('/api/v1/cart/items')
+      .set('Cookie', sessionCookie)
+      .set('Origin', 'http://localhost:3000')
+      .send({ productSlug, quantity: 1 })
+      .expect(200);
+    const nextCartSetCookies = nextCart.headers['set-cookie'];
+    expect(nextCartSetCookies).toHaveLength(1);
+    const nextCartCookie = nextCartSetCookies[0].split(';', 1)[0];
+    expect(nextCartCookie).not.toBe(cartCookie);
+
+    const secondOrder = await request(server)
+      .post('/api/v1/orders')
+      .set('Cookie', [sessionCookie, nextCartCookie])
+      .set('Origin', 'http://localhost:3000')
+      .set('X-CSRF-Token', csrf)
+      .set('Idempotency-Key', 'http-order-0002')
+      .send(checkoutBody(1))
+      .expect(201);
+    expect(responseBodyId(secondOrder.body)).not.toBe(createdOrderId);
+    expect(await prisma.order.count({ where: { userId } })).toBe(2);
   });
 
   afterAll(async () => {
@@ -475,6 +501,18 @@ function checkoutBody(quantity: number) {
     phoneNumber: '+1 555 0100',
     shippingAddress: '10 Brewery Lane',
   };
+}
+
+function responseBodyId(body: unknown): string {
+  if (
+    body === null ||
+    typeof body !== 'object' ||
+    !('id' in body) ||
+    typeof body.id !== 'string'
+  ) {
+    throw new Error('Expected response body id');
+  }
+  return body.id;
 }
 
 function atMinutes(minutes: number): Date {
