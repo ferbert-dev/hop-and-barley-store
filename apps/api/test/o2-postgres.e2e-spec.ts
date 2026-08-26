@@ -165,7 +165,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     expect(await prisma.order.count()).toBe(1);
   });
 
-  it('rolls back order, stock and reservation when an item insert fails', async () => {
+  it('rolls back order, stock and reservation after consumption when cart clearing fails', async () => {
     const userId = await createUser('rollback@example.com');
     const { cartId, checkout } = await reservedCheckout(2);
     const before = await prisma.product.findUniqueOrThrow({
@@ -173,14 +173,14 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
       where: { slug: productSlug },
     });
     await postgres.query(`
-      CREATE FUNCTION o2_reject_order_item() RETURNS trigger AS $$
+      CREATE FUNCTION o2_reject_cart_clear() RETURNS trigger AS $$
       BEGIN
-        RAISE EXCEPTION 'O2 injected item failure';
+        RAISE EXCEPTION 'O2 injected cart clearing failure';
       END;
       $$ LANGUAGE plpgsql;
-      CREATE TRIGGER "o2_reject_order_item"
-      BEFORE INSERT ON "OrderItem"
-      FOR EACH ROW EXECUTE FUNCTION o2_reject_order_item();
+      CREATE TRIGGER "o2_reject_cart_clear"
+      BEFORE DELETE ON "CartItem"
+      FOR EACH ROW EXECUTE FUNCTION o2_reject_cart_clear();
     `);
 
     try {
@@ -193,8 +193,8 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
       ).rejects.toBeDefined();
     } finally {
       await postgres.query(`
-        DROP TRIGGER IF EXISTS "o2_reject_order_item" ON "OrderItem";
-        DROP FUNCTION IF EXISTS o2_reject_order_item();
+        DROP TRIGGER IF EXISTS "o2_reject_cart_clear" ON "CartItem";
+        DROP FUNCTION IF EXISTS o2_reject_cart_clear();
       `);
     }
 
@@ -269,6 +269,50 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
         await prisma.cartReservation.findFirstOrThrow({ where: { cartId } }),
       ).toMatchObject({ orderId: null, status: 'ACTIVE' });
     }
+  });
+
+  it('rechecks reservation expiry after waiting for the cart lock', async () => {
+    const userId = await createUser('lock-expiry@example.com');
+    const { cartId, checkout } = await reservedCheckout(1);
+    const before = await prisma.product.findUniqueOrThrow({
+      select: { stockQuantity: true },
+      where: { slug: productSlug },
+    });
+
+    await postgres.query('BEGIN');
+    let finalization: Promise<unknown>;
+    try {
+      await postgres.query(
+        'SELECT "id" FROM "Cart" WHERE "id" = $1 FOR UPDATE',
+        [cartId],
+      );
+      const expiresAt = new Date(Date.now() + 750);
+      await prisma.cartReservation.updateMany({
+        data: {
+          expiresAt,
+          reservedAt: new Date(expiresAt.getTime() - 15 * 60 * 1_000),
+        },
+        where: { cartId, status: 'ACTIVE' },
+      });
+      finalization = orders.create(
+        { cartId, idempotencyKey: 'lock-expiry-order-0001', userId },
+        checkout,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+    } finally {
+      await postgres.query('COMMIT');
+    }
+
+    await expect(finalization!).rejects.toBeInstanceOf(
+      UnprocessableEntityException,
+    );
+    expect(await prisma.order.count()).toBe(0);
+    expect(
+      await prisma.cartReservation.findFirstOrThrow({ where: { cartId } }),
+    ).toMatchObject({ orderId: null, status: 'ACTIVE' });
+    expect(
+      await prisma.product.findUniqueOrThrow({ where: { slug: productSlug } }),
+    ).toMatchObject({ stockQuantity: before.stockQuantity });
   });
 
   it('coalesces concurrent same-cart retries into one order and stock decrement', async () => {

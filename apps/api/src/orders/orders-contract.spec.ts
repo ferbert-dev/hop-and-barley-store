@@ -3,6 +3,7 @@ import {
   ConflictException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { API_CORS_ALLOWED_HEADERS } from '../app-cors';
 import { createAppValidationPipe } from '../app-validation';
 import type { PrismaService } from '../database/prisma.service';
 import { CheckoutPaymentMethod, CreateOrderDto } from './dto/create-order.dto';
@@ -76,6 +77,12 @@ describe('O2 order contract', () => {
     ]) {
       expect(() => pipe.transform(value)).toThrow(BadRequestException);
     }
+  });
+
+  it('allows the required idempotency header through browser CORS', () => {
+    expect(
+      API_CORS_ALLOWED_HEADERS.map((header) => header.toLowerCase()),
+    ).toContain('idempotency-key');
   });
 
   it('allows only forward order-status transitions', () => {

@@ -149,7 +149,7 @@ export class OrdersService {
         providerPaymentReference: input.providerPaymentReference,
         status: 'PAID',
       },
-      now,
+      requestedNow,
     );
   }
 
@@ -161,7 +161,6 @@ export class OrdersService {
   ): Promise<OrderDto> {
     const checkout = canonicalCheckout(suppliedCheckout);
     const requestHash = fingerprint(context, checkout, payment);
-    const now = requestedNow ?? new Date();
 
     const stored = await runOrderSerializable(
       this.prisma,
@@ -195,7 +194,6 @@ export class OrdersService {
           where: { cartId: context.cartId },
         });
         if (byCart) return sameOutcome(byCart, requestHash);
-        if (cartExpiresAt.getTime() <= now.getTime()) unavailable();
 
         const candidates = await transaction.cartItem.findMany({
           orderBy: [{ productId: 'asc' }, { id: 'asc' }],
@@ -207,6 +205,8 @@ export class OrdersService {
           transaction,
           candidates.map(({ productId }) => productId),
         );
+        const now = requestedNow ?? new Date();
+        if (cartExpiresAt.getTime() <= now.getTime()) unavailable();
 
         const lines = await transaction.cartItem.findMany({
           orderBy: [{ productId: 'asc' }, { id: 'asc' }],

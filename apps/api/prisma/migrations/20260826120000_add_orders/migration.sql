@@ -1,6 +1,8 @@
 -- O2 is additive. Existing users, carts, reservations, products and stock are
 -- preserved. A pre-O2 runtime may be restored while these tables remain.
 
+BEGIN;
+
 DO $$
 BEGIN
   IF EXISTS (
@@ -159,3 +161,5 @@ ALTER TABLE "CartReservation"
     "orderId" IS NULL
     OR ("status" = 'CONSUMED' AND "consumedAt" IS NOT NULL)
   );
+
+COMMIT;

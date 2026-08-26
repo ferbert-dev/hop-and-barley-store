@@ -55,10 +55,11 @@ apply_prior_migrations() {
 
 docker exec "$container_name" createdb -U "$database_user" atomic_o2
 apply_prior_migrations atomic_o2
+test "$(tail -n 1 "$migration_path")" = 'COMMIT;'
 if {
-  sed -n '1,$p' "$migration_path"
-  printf '\nSELECT 1 / 0;\n'
-} | docker exec --interactive "$container_name" psql --single-transaction \
+  sed '$d' "$migration_path"
+  printf '\nSELECT 1 / 0;\nCOMMIT;\n'
+} | docker exec --interactive "$container_name" psql \
   --set ON_ERROR_STOP=1 --username "$database_user" --dbname atomic_o2 \
   >/dev/null 2>&1; then
   echo 'Expected injected O2 migration failure' >&2
