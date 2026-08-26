@@ -129,6 +129,55 @@ void cartDelete;
 void cartClear;
 void cartRecheck;
 
+const createOrder = configuredClient.POST('/api/v1/orders', {
+  body: {
+    city: 'Portland',
+    fullName: 'Ada Brewer',
+    items: [{ productSlug: 'cascade-hops', quantity: 2 }],
+    paymentMethod: 'cash_on_delivery',
+    phoneNumber: '+1 555 0100',
+    shippingAddress: '10 Brewery Lane',
+  },
+  params: {
+    header: {
+      'Idempotency-Key': 'checkout-order-0001',
+      Origin: 'http://localhost:3000',
+      'X-CSRF-Token': `v1.${'A'.repeat(43)}`,
+    },
+  },
+});
+void createOrder;
+
+const safeOrder: components['schemas']['OrderDto'] = {
+  currency: 'USD',
+  id: '60000000-0000-4000-8000-000000000001',
+  itemSubtotalMinor: 1398,
+  items: [
+    {
+      lineTotalMinor: 1398,
+      priceQualifier: 'per pound',
+      productName: 'Cascade Hops',
+      productSlug: 'cascade-hops',
+      quantity: 2,
+      unitPriceMinor: 699,
+    },
+  ],
+  paidAt: null,
+  paymentMethod: 'cash_on_delivery',
+  paymentState: 'due_on_delivery',
+  placedAt: '2026-08-26T12:01:00.000Z',
+  shipping: {
+    city: 'Portland',
+    fullName: 'Ada Brewer',
+    phoneNumber: '+1 555 0100',
+    shippingAddress: '10 Brewery Lane',
+  },
+  shippingMinor: 500,
+  status: 'placed',
+  totalMinor: 1898,
+};
+void safeOrder;
+
 const safeCart: components['schemas']['CartDto'] = {
   adjustmentMessage: null,
   checkoutEligible: true,

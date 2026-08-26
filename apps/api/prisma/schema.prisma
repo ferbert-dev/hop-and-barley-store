@@ -25,6 +25,27 @@ enum CartReservationStatus {
   CONSUMED
 }
 
+enum OrderStatus {
+  PLACED
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  STRIPE_DEBIT_CARD
+  CASH_ON_DELIVERY
+}
+
+enum PaymentState {
+  PENDING
+  PAID
+  DUE_ON_DELIVERY
+  FAILED
+  CANCELLED
+}
+
 model User {
   id                 String              @id(map: "User_pkey") @default(uuid()) @db.Uuid
   email              String              @db.VarChar(320)
@@ -35,6 +56,7 @@ model User {
   updatedAt          DateTime            @updatedAt
   passwordCredential PasswordCredential?
   authSessions       AuthSession[]
+  orders             Order[]
 }
 
 model PasswordCredential {
@@ -96,6 +118,7 @@ model Product {
   category         Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Product_categoryId_fkey")
   cartItems        CartItem[]
   cartReservations CartReservation[]
+  orderItems       OrderItem[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -112,6 +135,7 @@ model Cart {
   updatedAt    DateTime          @updatedAt
   items        CartItem[]
   reservations CartReservation[]
+  order        Order?
 
   @@index([expiresAt], map: "Cart_expiresAt_idx")
 }
@@ -151,8 +175,61 @@ model CartReservation {
   cartItem   CartItem?             @relation("CartItemReservationHistory", fields: [cartItemId], references: [id], onDelete: SetNull, onUpdate: Cascade, map: "CartReservation_cartItemId_fkey")
   currentFor CartItem?             @relation("CartItemCurrentReservation")
   product    Product               @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "CartReservation_productId_fkey")
+  orderId    String?               @db.Uuid
+  order      Order?                @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "CartReservation_orderId_fkey")
 
   @@index([cartId, status, expiresAt], map: "CartReservation_cartId_status_expiresAt_idx")
   @@index([cartItemId, reservedAt], map: "CartReservation_cartItemId_reservedAt_idx")
   @@index([productId, status, expiresAt], map: "CartReservation_productId_status_expiresAt_idx")
+  @@index([orderId], map: "CartReservation_orderId_idx")
+}
+
+model Order {
+  id                       String            @id(map: "Order_pkey") @default(uuid()) @db.Uuid
+  userId                   String            @db.Uuid
+  cartId                   String            @unique(map: "Order_cartId_key") @db.Uuid
+  idempotencyKey           String            @db.VarChar(128)
+  requestHash              Bytes
+  status                   OrderStatus
+  paymentMethod            PaymentMethod
+  paymentState             PaymentState
+  providerPaymentReference String?           @unique(map: "Order_providerPaymentReference_key") @db.VarChar(255)
+  currency                 String            @db.VarChar(3)
+  itemSubtotalMinor        Int
+  shippingMinor            Int
+  totalMinor               Int
+  fullName                 String            @db.VarChar(200)
+  phoneNumber              String            @db.VarChar(32)
+  city                     String            @db.VarChar(120)
+  shippingAddress          String            @db.VarChar(500)
+  placedAt                 DateTime
+  paidAt                   DateTime?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  user                     User              @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Order_userId_fkey")
+  cart                     Cart              @relation(fields: [cartId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Order_cartId_fkey")
+  items                    OrderItem[]
+  reservations             CartReservation[]
+
+  @@unique([userId, idempotencyKey], map: "Order_userId_idempotencyKey_key")
+  @@index([userId, placedAt, id], map: "Order_userId_placedAt_id_idx")
+  @@index([status, placedAt], map: "Order_status_placedAt_idx")
+}
+
+model OrderItem {
+  id             String   @id(map: "OrderItem_pkey") @default(uuid()) @db.Uuid
+  orderId        String   @db.Uuid
+  productId      String   @db.Uuid
+  productSlug    String
+  productName    String
+  priceQualifier String   @db.VarChar(64)
+  unitPriceMinor Int
+  quantity       Int      @db.SmallInt
+  lineTotalMinor Int
+  createdAt      DateTime @default(now())
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "OrderItem_orderId_fkey")
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "OrderItem_productId_fkey")
+
+  @@unique([orderId, productId], map: "OrderItem_orderId_productId_key")
+  @@index([productId], map: "OrderItem_productId_idx")
 }
