@@ -240,6 +240,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an order from the active reserved cart
+         * @description Creates a server-priced Cash on Delivery order from the authenticated user’s active cart reservation. Debit Card is finalized only by the future verified Stripe webhook boundary and cannot be finalized by this browser route.
+         */
+        post: operations["OrdersController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -435,6 +455,64 @@ export interface components {
         LogoutResponseDto: {
             /** @enum {string} */
             status: "signed-out";
+        };
+        CreateOrderItemDto: {
+            productSlug: string;
+            /** Format: int32 */
+            quantity: number;
+        };
+        CreateOrderDto: {
+            fullName: string;
+            phoneNumber: string;
+            city: string;
+            shippingAddress: string;
+            /** @enum {string} */
+            paymentMethod: "cash_on_delivery" | "stripe_debit_card";
+            items: components["schemas"]["CreateOrderItemDto"][];
+        };
+        OrderItemDto: {
+            productSlug: string;
+            productName: string;
+            priceQualifier: string;
+            /** Format: int32 */
+            unitPriceMinor: number;
+            /** Format: int32 */
+            quantity: number;
+            /** Format: int32 */
+            lineTotalMinor: number;
+        };
+        OrderShippingDto: {
+            fullName: string;
+            phoneNumber: string;
+            city: string;
+            shippingAddress: string;
+        };
+        OrderDto: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            status: "placed" | "paid" | "shipped" | "delivered" | "cancelled";
+            /** @enum {string} */
+            paymentMethod: "stripe_debit_card" | "cash_on_delivery";
+            /** @enum {string} */
+            paymentState: "paid" | "due_on_delivery";
+            /** @enum {string} */
+            currency: "USD";
+            items: components["schemas"]["OrderItemDto"][];
+            /** Format: int32 */
+            itemSubtotalMinor: number;
+            /**
+             * Format: int32
+             * @example 500
+             */
+            shippingMinor: number;
+            /** Format: int32 */
+            totalMinor: number;
+            shipping: components["schemas"]["OrderShippingDto"];
+            /** Format: date-time */
+            placedAt: string;
+            /** Format: date-time */
+            paidAt: string | null;
         };
     };
     responses: never;
@@ -1151,6 +1229,78 @@ export interface operations {
             };
             /** @description Origin or CSRF is not valid */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrdersController_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Retry key scoped to the authenticated user. Reuse with different input fails. */
+                "Idempotency-Key": string;
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOrderDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    /** @description Clears the consumed cart capability after every successful or idempotently replayed browser order response. */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderDto"];
+                };
+            };
+            /** @description Invalid or unknown checkout input or idempotency key */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session or cart capability is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Origin or session CSRF is not valid */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Idempotency key, cart or payment reference was reused differently */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description JSON body required */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cart, reservation, product, quantity, stock or payment method is unavailable */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

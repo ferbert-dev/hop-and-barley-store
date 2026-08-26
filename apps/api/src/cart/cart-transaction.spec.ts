@@ -1,7 +1,7 @@
 import { runCartSerializable } from './cart-transaction';
 
 describe('cart Serializable transaction retry', () => {
-  it('retries only P2034 with bounded full-jitter delays', async () => {
+  it('retries P2034 with bounded full-jitter delays', async () => {
     const transaction = jest
       .fn()
       .mockRejectedValueOnce({ code: 'P2034' })
@@ -24,6 +24,27 @@ describe('cart Serializable transaction retry', () => {
     });
     expect(sleep).toHaveBeenNthCalledWith(1, 3);
     expect(sleep).toHaveBeenNthCalledWith(2, 5);
+  });
+
+  it('retries PostgreSQL adapter serialization conflicts', async () => {
+    const transaction = jest
+      .fn()
+      .mockRejectedValueOnce({
+        code: 'P2010',
+        meta: {
+          driverAdapterError: { cause: { originalCode: '40001' } },
+        },
+      })
+      .mockResolvedValue('done');
+
+    await expect(
+      runCartSerializable(
+        { $transaction: transaction },
+        () => Promise.resolve('ignored'),
+        { random: () => 0, sleep: () => Promise.resolve(undefined) },
+      ),
+    ).resolves.toBe('done');
+    expect(transaction).toHaveBeenCalledTimes(2);
   });
 
   it('stops after the bounded attempt count', async () => {

@@ -24,6 +24,7 @@
     "test:a1b:postgres": "bash scripts/test-a1b-postgres.sh",
     "test:o0:postgres": "bash scripts/test-o0-postgres.sh",
     "test:o1b:postgres": "bash scripts/test-o1b-postgres.sh",
+    "test:o2:postgres": "bash scripts/test-o2-postgres.sh",
     "test:a1:argon2:alpine": "bash scripts/test-a1-argon2-alpine.sh",
     "test:a1b:argon2:alpine": "bash scripts/test-a1b-argon2-alpine.sh",
     "typecheck": "prisma generate && tsc --noEmit",

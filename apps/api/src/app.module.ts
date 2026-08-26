@@ -7,6 +7,7 @@ import { CartModule } from './cart/cart.module';
 import { validateEnvironment } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
+import { OrdersModule } from './orders/orders.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { HealthModule } from './health/health.module';
     CatalogModule,
     CartModule,
     AuthModule,
+    OrdersModule,
   ],
   controllers: [AppController],
 })

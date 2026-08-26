@@ -83,6 +83,8 @@ jobs:
         run: pnpm test:o0:postgres
       - name: Verify cart reservation migration, lifecycle, and concurrency
         run: pnpm test:o1b:postgres
+      - name: Verify transactional order migration, lifecycle, and concurrency
+        run: pnpm test:o2:postgres
       - name: Verify the A1B Argon2 resource profile
         run: pnpm test:a1b:argon2:alpine
 

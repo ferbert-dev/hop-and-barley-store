@@ -8,6 +8,7 @@ import { CartService } from './cart.service';
 
 @Module({
   controllers: [CartController],
+  exports: [CartCapabilityGuard, CartService],
   providers: [
     CartCapabilityGuard,
     CartCsrfService,

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { API_CORS_ALLOWED_HEADERS } from './app-cors';
 import { configureAppRouting } from './app-routing';
 import { configureAppValidation } from './app-validation';
 import { configureOpenApi } from './openapi';
@@ -13,7 +14,7 @@ async function bootstrap() {
   app.set('trust proxy', false);
   configureAppRouting(app);
   app.enableCors({
-    allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'X-Request-Id'],
+    allowedHeaders: [...API_CORS_ALLOWED_HEADERS],
     credentials: true,
     exposedHeaders: ['X-Request-Id'],
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

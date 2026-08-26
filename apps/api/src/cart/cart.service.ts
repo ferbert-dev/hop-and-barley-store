@@ -599,14 +599,20 @@ async function lockCart(
   cartId: string,
 ): Promise<Date> {
   const rows = await transaction.$queryRaw<
-    Array<{ expiresAt: Date; id: string }>
+    Array<{ expiresAt: Date; hasOrder: boolean; id: string }>
   >`
-    SELECT "id", "expiresAt"
-    FROM "Cart"
-    WHERE "id" = ${cartId}::uuid
+    SELECT
+      cart."id",
+      cart."expiresAt",
+      EXISTS (
+        SELECT 1 FROM "Order" placed WHERE placed."cartId" = cart."id"
+      ) AS "hasOrder"
+    FROM "Cart" cart
+    WHERE cart."id" = ${cartId}::uuid
     FOR UPDATE
   `;
   if (rows.length !== 1) throw new UnauthorizedException(UNAUTHORIZED);
+  if (rows[0].hasOrder) unavailable();
   return rows[0].expiresAt;
 }
 

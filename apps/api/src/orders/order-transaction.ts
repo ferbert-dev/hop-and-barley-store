@@ -15,18 +15,10 @@ type TransactionHost = {
   ): Promise<T>;
 };
 
-type RetryControls = Readonly<{
-  random?: () => number;
-  sleep?: (milliseconds: number) => Promise<void>;
-}>;
-
-export async function runCartSerializable<T>(
+export async function runOrderSerializable<T>(
   host: TransactionHost,
   operation: (transaction: Prisma.TransactionClient) => Promise<T>,
-  controls: RetryControls = {},
 ): Promise<T> {
-  const random = controls.random ?? Math.random;
-  const sleep = controls.sleep ?? wait;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
       return await host.$transaction(operation, {
@@ -42,10 +34,10 @@ export async function runCartSerializable<T>(
         MAX_DELAY_MS,
         BASE_DELAY_MS * 2 ** (attempt - 1),
       );
-      await sleep(Math.floor(random() * (ceiling + 1)));
+      await wait(Math.floor(Math.random() * (ceiling + 1)));
     }
   }
-  throw new Error('Unreachable cart transaction retry state');
+  throw new Error('Unreachable order transaction retry state');
 }
 
 function isRetryableSerialization(error: unknown): boolean {
