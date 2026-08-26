@@ -155,6 +155,7 @@ ALTER TABLE "CartReservation"
   ADD CONSTRAINT "CartReservation_orderId_fkey"
   FOREIGN KEY ("orderId") REFERENCES "Order"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE,
-  ADD CONSTRAINT "CartReservation_consumed_order_check" CHECK (
-    "status" <> 'CONSUMED' OR "orderId" IS NOT NULL
+  ADD CONSTRAINT "CartReservation_order_state_check" CHECK (
+    "orderId" IS NULL
+    OR ("status" = 'CONSUMED' AND "consumedAt" IS NOT NULL)
   );

@@ -151,14 +151,16 @@ export async function releaseActiveReservations(
 
 /**
  * Future order allocation may call this inside its own transaction. Reservation
- * ids are persisted by the future order before commit; repeating the same ids
- * is safe because only ACTIVE rows decrement stock and CONSUMED rows are
- * returned unchanged. This helper intentionally creates no order/payment state.
+ * The order owner, when supplied, is persisted atomically with consumption.
+ * Repeating the same ids is safe because only ACTIVE rows decrement stock and
+ * CONSUMED rows are returned unchanged. This helper creates no order/payment
+ * state itself and remains usable by the pre-order reservation contract.
  */
 export async function consumeCartReservations(
   transaction: Prisma.TransactionClient,
   reservationIds: readonly string[],
   requestedNow?: Date,
+  orderId?: string,
 ): Promise<ConsumedCartReservation[]> {
   const ids = [...new Set(reservationIds)].sort();
   if (ids.length === 0) return [];
@@ -202,7 +204,7 @@ export async function consumeCartReservations(
       throw new UnprocessableEntityException(UNAVAILABLE);
     }
     await transaction.cartReservation.update({
-      data: { consumedAt: now, status: 'CONSUMED' },
+      data: { consumedAt: now, orderId, status: 'CONSUMED' },
       where: { id: row.id },
     });
     result.push(toConsumed({ ...row, consumedAt: now, status: 'CONSUMED' }));

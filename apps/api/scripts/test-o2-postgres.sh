@@ -20,13 +20,14 @@ docker run --rm --detach \
   --publish 127.0.0.1::5432 \
   postgres:17.6-alpine >/dev/null
 
+ready_count=0
 for _ in $(seq 1 60); do
-  if docker exec "$container_name" pg_isready \
-    --username "$database_user" --dbname bootstrap_o2 >/dev/null 2>&1; then
-    break
-  fi
+  ready_count=$(docker logs "$container_name" 2>&1 | grep -c \
+    'database system is ready to accept connections' || true)
+  if (( ready_count >= 2 )); then break; fi
   sleep 0.5
 done
+test "$ready_count" -ge 2
 docker exec "$container_name" pg_isready \
   --username "$database_user" --dbname bootstrap_o2 >/dev/null
 published_address=$(docker port "$container_name" 5432/tcp)

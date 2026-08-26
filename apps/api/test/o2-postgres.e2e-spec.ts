@@ -22,7 +22,7 @@ import { OrdersService } from '../src/orders/orders.service';
 const describePostgres =
   process.env.RUN_O2_POSTGRES_INTEGRATION === '1' ? describe : describe.skip;
 
-const baseNow = new Date('2026-08-26T12:00:00.000Z');
+const baseNow = new Date(Math.floor(Date.now() / 1_000) * 1_000);
 const productSlug = 'cascade-hops';
 
 describePostgres('O2 orders with disposable PostgreSQL', () => {
@@ -71,7 +71,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
         'OrderItem_quantity_check',
         'OrderItem_amounts_check',
         'OrderItem_snapshot_check',
-        'CartReservation_consumed_order_check',
+        'CartReservation_order_state_check',
         'CartReservation_orderId_fkey'
       )
       ORDER BY conname

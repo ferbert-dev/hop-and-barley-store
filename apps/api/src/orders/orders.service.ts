@@ -292,17 +292,12 @@ export class OrdersService {
           select: orderSelect,
         });
 
-        const linked = await transaction.cartReservation.updateMany({
-          data: { orderId: order.id },
-          where: {
-            cartId: context.cartId,
-            id: { in: reservationIds },
-            orderId: null,
-            status: 'ACTIVE',
-          },
-        });
-        if (linked.count !== reservationIds.length) unavailable();
-        await consumeCartReservations(transaction, reservationIds, now);
+        await consumeCartReservations(
+          transaction,
+          reservationIds,
+          now,
+          order.id,
+        );
         await transaction.cartItem.deleteMany({
           where: { cartId: context.cartId },
         });
