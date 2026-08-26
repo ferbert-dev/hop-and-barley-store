@@ -14,6 +14,7 @@ import { CsrfService } from '../src/auth/session/csrf.service';
 import { createSessionCookie } from '../src/auth/session/session-cookie';
 import { SessionService } from '../src/auth/session/session.service';
 import { createCartCookie } from '../src/cart/cart-cookie';
+import { CartCsrfService } from '../src/cart/cart-csrf.service';
 import { CartService } from '../src/cart/cart.service';
 import { PrismaService } from '../src/database/prisma.service';
 import { CheckoutPaymentMethod } from '../src/orders/dto/create-order.dto';
@@ -342,6 +343,77 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     ).toMatchObject({ stockQuantity: before.stockQuantity - 3 });
   });
 
+  it('rejects an old-cart mutation already waiting when checkout commits', async () => {
+    const userId = await createUser('in-flight-cart@example.com');
+    const { cartId, checkout, rawCartToken } = await reservedCheckout(2);
+    const capability = await carts.authenticate(rawCartToken, baseNow);
+    if (!capability) throw new Error('Expected active cart capability');
+    const before = await prisma.product.findUniqueOrThrow({
+      select: { stockQuantity: true },
+      where: { slug: productSlug },
+    });
+    const advisoryKey = 2_026_082_602;
+
+    await postgres.query(`
+      CREATE FUNCTION o2_pause_cart_finalization() RETURNS trigger AS $$
+      BEGIN
+        PERFORM pg_advisory_xact_lock(${advisoryKey});
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+      CREATE TRIGGER "o2_pause_cart_finalization"
+      BEFORE UPDATE ON "Cart"
+      FOR EACH ROW EXECUTE FUNCTION o2_pause_cart_finalization();
+    `);
+    let advisoryTransactionOpen = false;
+    let mutation: Promise<unknown>;
+    try {
+      await postgres.query('BEGIN');
+      advisoryTransactionOpen = true;
+      await postgres.query('SELECT pg_advisory_xact_lock($1)', [advisoryKey]);
+      const finalization = orders.create(
+        { cartId, idempotencyKey: 'in-flight-order-0001', userId },
+        checkout,
+        atMinutes(1),
+      );
+
+      try {
+        await waitForWaitingLock('advisory');
+        mutation = carts.add(
+          capability,
+          { productSlug, quantity: 1 },
+          atMinutes(1),
+        );
+        await waitForWaitingLock('transactionid');
+      } finally {
+        await postgres.query('COMMIT');
+        advisoryTransactionOpen = false;
+      }
+
+      await expect(finalization).resolves.toMatchObject({ status: 'placed' });
+      await expect(mutation).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+    } finally {
+      if (advisoryTransactionOpen) await postgres.query('ROLLBACK');
+      await postgres.query(`
+        DROP TRIGGER IF EXISTS "o2_pause_cart_finalization" ON "Cart";
+        DROP FUNCTION IF EXISTS o2_pause_cart_finalization();
+      `);
+    }
+
+    expect(await prisma.order.count({ where: { cartId } })).toBe(1);
+    expect(await prisma.cartItem.count({ where: { cartId } })).toBe(0);
+    expect(
+      await prisma.cartReservation.count({
+        where: { cartId, status: 'ACTIVE' },
+      }),
+    ).toBe(0);
+    expect(
+      await prisma.product.findUniqueOrThrow({ where: { slug: productSlug } }),
+    ).toMatchObject({ stockQuantity: before.stockQuantity - 2 });
+  });
+
   it('finalizes paid Stripe only through the trusted service boundary', async () => {
     const userId = await createUser('stripe@example.com');
     const { cartId, checkout } = await reservedCheckout(1);
@@ -396,15 +468,16 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     const csrf = app.get(CsrfService).issue(session.rawToken);
     const server = app.getHttpServer() as App;
 
-    await request(server)
+    const unauthorized = await request(server)
       .post('/api/v1/orders')
       .set('Cookie', cartCookie)
       .set('Origin', 'http://localhost:3000')
       .set('Idempotency-Key', 'http-order-0001')
       .send(checkout)
       .expect(401);
+    expect(unauthorized.headers['set-cookie']).toBeUndefined();
 
-    await request(server)
+    const invalid = await request(server)
       .post('/api/v1/orders')
       .set('Cookie', [sessionCookie, cartCookie])
       .set('Origin', 'http://localhost:3000')
@@ -412,6 +485,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
       .set('Idempotency-Key', 'http-order-0001')
       .send({ ...checkout, totalMinor: 1 })
       .expect(400);
+    expect(invalid.headers['set-cookie']).toBeUndefined();
 
     const created = await request(server)
       .post('/api/v1/orders')
@@ -435,6 +509,33 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     expect(
       await prisma.order.findUniqueOrThrow({ where: { cartId } }),
     ).toMatchObject({ userId });
+
+    const replayed = await request(server)
+      .post('/api/v1/orders')
+      .set('Cookie', [sessionCookie, cartCookie])
+      .set('Origin', 'http://localhost:3000')
+      .set('X-CSRF-Token', csrf)
+      .set('Idempotency-Key', 'http-order-0001')
+      .send(checkout)
+      .expect(201);
+    expect(responseBodyId(replayed.body)).toBe(createdOrderId);
+    expect(replayed.headers['set-cookie']).toEqual([
+      expect.stringContaining('hb_cart=; Max-Age=0;'),
+    ]);
+
+    const cartCsrf = app.get(CartCsrfService).issue(rawCartToken);
+    await request(server)
+      .post('/api/v1/cart/items')
+      .set('Cookie', [sessionCookie, cartCookie])
+      .set('Origin', 'http://localhost:3000')
+      .set('X-CSRF-Token', cartCsrf)
+      .send({ productSlug, quantity: 1 })
+      .expect(422);
+    expect(
+      await prisma.cartReservation.count({
+        where: { cartId, status: 'ACTIVE' },
+      }),
+    ).toBe(0);
 
     const nextCart = await request(server)
       .post('/api/v1/cart/items')
@@ -489,6 +590,18 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
       checkout: checkoutBody(quantity),
       rawCartToken: created.rawToken,
     };
+  }
+
+  async function waitForWaitingLock(locktype: string): Promise<void> {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const locks = await postgres.query<{ count: string }>(
+        'SELECT COUNT(*) AS count FROM pg_locks WHERE locktype = $1 AND NOT granted',
+        [locktype],
+      );
+      if (Number(locks.rows[0].count) > 0) return;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw new Error(`Timed out waiting for ${locktype} lock contention`);
   }
 });
 

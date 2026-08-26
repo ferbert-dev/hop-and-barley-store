@@ -301,6 +301,10 @@ export class OrdersService {
         await transaction.cartItem.deleteMany({
           where: { cartId: context.cartId },
         });
+        await transaction.cart.update({
+          data: { updatedAt: now },
+          where: { id: context.cartId },
+        });
         return order;
       },
     );
