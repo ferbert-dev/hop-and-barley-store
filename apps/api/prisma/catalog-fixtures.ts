@@ -528,7 +528,7 @@ function saleRulesFor(slug: CatalogProductSlug): CatalogSaleRules {
       kitYieldVolumeMl: null,
       maximumOrderAmount: null,
       minimumOrderAmount: 100_000,
-      orderStepAmount: 5_000,
+      orderStepAmount: 100_000,
       packageNetWeightMg: null,
       priceBasisAmount: 100_000,
       saleKind: 'WEIGHT',

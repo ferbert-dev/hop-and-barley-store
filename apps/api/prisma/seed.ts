@@ -29,15 +29,17 @@ export async function seedCatalog(client: PrismaClient): Promise<void> {
       });
 
       for (const product of catalogProducts) {
-        const { categorySlug, ...data } = product;
+        const { categorySlug, stockAmount, ...data } = product;
 
         await transaction.product.upsert({
           create: {
             ...data,
+            stockAmount,
             category: { connect: { slug: categorySlug } },
           },
           update: {
             ...data,
+            // Inventory is operational state, not catalog fixture content.
             category: { connect: { slug: categorySlug } },
           },
           where: { slug: product.slug },

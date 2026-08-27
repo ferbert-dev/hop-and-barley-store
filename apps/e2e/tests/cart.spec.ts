@@ -451,7 +451,7 @@ function cartLine({
     saleKind: 'WEIGHT',
     priceBasisAmount,
     minimumOrderAmount: 100_000,
-    orderStepAmount: 5_000,
+    orderStepAmount: 100_000,
     maximumOrderAmount: null,
     stockAmount: 100_000_000,
     packageNetWeightMg: null,

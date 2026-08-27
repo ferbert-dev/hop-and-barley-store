@@ -78,7 +78,7 @@ SET
       'caramel-malt', 'cascade-hops', 'centennial-hops', 'citra-hops',
       'maris-otter-malt', 'mosaic-hops', 'pilsner-malt', 'saaz-hops',
       'unmalted-wheat'
-    ) THEN 5000
+    ) THEN 100000
     ELSE 1
   END,
   "stockAmount" = CASE
@@ -170,7 +170,7 @@ UPDATE "CartItem" item
 SET "amount" = CASE
   WHEN product."slug" IN (
     'caramel-malt', 'maris-otter-malt', 'pilsner-malt', 'unmalted-wheat'
-  ) THEN ((item."amount" * 453592 + 2500) / 5000) * 5000
+  ) THEN GREATEST(100000, (item."amount" * 453592 / 100000) * 100000)
   WHEN product."slug" IN (
     'cascade-hops', 'centennial-hops', 'citra-hops', 'mosaic-hops', 'saaz-hops'
   ) THEN item."amount" * 100000
@@ -193,7 +193,10 @@ UPDATE "CartReservation" reservation
 SET "amount" = CASE
   WHEN product."slug" IN (
     'caramel-malt', 'maris-otter-malt', 'pilsner-malt', 'unmalted-wheat'
-  ) THEN ((reservation."amount" * 453592 + 2500) / 5000) * 5000
+  ) THEN GREATEST(
+    100000,
+    (reservation."amount" * 453592 / 100000) * 100000
+  )
   WHEN product."slug" IN (
     'cascade-hops', 'centennial-hops', 'citra-hops', 'mosaic-hops', 'saaz-hops'
   ) THEN reservation."amount" * 100000
@@ -201,6 +204,116 @@ SET "amount" = CASE
 END
 FROM "Product" product
 WHERE product."id" = reservation."productId";
+
+-- Legacy stock is converted at nearest-mg physical precision, while sellable
+-- weight amounts are floored to the 100 g lattice. Reconcile any pre-existing
+-- over-reservation deterministically in FIFO order. Earlier valid holds retain
+-- priority; a later hold is reduced with its current cart line when at least
+-- one sellable step remains, otherwise it is released and its desired cart
+-- amount remains available for an explicit recheck.
+DO $$
+DECLARE
+  product_row RECORD;
+  reservation_row RECORD;
+  remaining_amount BIGINT;
+  allocated_amount INTEGER;
+BEGIN
+  FOR product_row IN
+    SELECT
+      "id", "minimumOrderAmount", "orderStepAmount", "stockAmount"
+    FROM "Product"
+    WHERE "saleKind" = 'WEIGHT'
+    ORDER BY "id"
+  LOOP
+    remaining_amount := product_row."stockAmount";
+
+    FOR reservation_row IN
+      SELECT
+        reservation."id",
+        reservation."amount",
+        reservation."cartItemId",
+        reservation."reservedAt"
+      FROM "CartReservation" reservation
+      WHERE reservation."productId" = product_row."id"
+        AND reservation."status" = 'ACTIVE'
+      ORDER BY reservation."reservedAt", reservation."id"
+      FOR UPDATE
+    LOOP
+      IF NOT EXISTS (
+        SELECT 1
+        FROM "CartItem" item
+        WHERE item."id" = reservation_row."cartItemId"
+          AND item."currentReservationId" = reservation_row."id"
+      ) THEN
+        UPDATE "CartReservation"
+        SET
+          "releasedAt" = GREATEST(CURRENT_TIMESTAMP, "reservedAt"),
+          "status" = 'RELEASED',
+          "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = reservation_row."id";
+        CONTINUE;
+      END IF;
+
+      IF reservation_row."amount" <= remaining_amount THEN
+        remaining_amount := remaining_amount - reservation_row."amount";
+        CONTINUE;
+      END IF;
+
+      IF remaining_amount >= product_row."minimumOrderAmount" THEN
+        allocated_amount := product_row."minimumOrderAmount" + (
+          (remaining_amount - product_row."minimumOrderAmount")
+          / product_row."orderStepAmount"
+        ) * product_row."orderStepAmount";
+
+        UPDATE "CartReservation"
+        SET "amount" = allocated_amount, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = reservation_row."id";
+        UPDATE "CartItem"
+        SET "amount" = allocated_amount, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = reservation_row."cartItemId"
+          AND "currentReservationId" = reservation_row."id";
+        remaining_amount := remaining_amount - allocated_amount;
+      ELSE
+        UPDATE "CartItem"
+        SET "currentReservationId" = NULL, "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = reservation_row."cartItemId"
+          AND "currentReservationId" = reservation_row."id";
+        UPDATE "CartReservation"
+        SET
+          "releasedAt" = GREATEST(CURRENT_TIMESTAMP, "reservedAt"),
+          "status" = 'RELEASED',
+          "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = reservation_row."id";
+      END IF;
+    END LOOP;
+  END LOOP;
+
+  IF EXISTS (
+    SELECT 1
+    FROM "Product" product
+    JOIN "CartReservation" reservation
+      ON reservation."productId" = product."id"
+      AND reservation."status" = 'ACTIVE'
+    WHERE product."saleKind" = 'WEIGHT'
+    GROUP BY product."id", product."stockAmount"
+    HAVING SUM(reservation."amount"::bigint) > product."stockAmount"
+  ) OR EXISTS (
+    SELECT 1
+    FROM "CartReservation" reservation
+    JOIN "Product" product ON product."id" = reservation."productId"
+    LEFT JOIN "CartItem" item
+      ON item."id" = reservation."cartItemId"
+      AND item."currentReservationId" = reservation."id"
+      AND item."amount" = reservation."amount"
+    WHERE product."saleKind" = 'WEIGHT'
+      AND reservation."status" = 'ACTIVE'
+      AND item."id" IS NULL
+  ) THEN
+    RAISE EXCEPTION 'O2Q active weight reservation reconciliation failed';
+  END IF;
+END
+$$;
+
 ALTER TABLE "CartReservation"
   ADD CONSTRAINT "CartReservation_amount_check" CHECK (
     "amount" BETWEEN 1 AND 2000000000

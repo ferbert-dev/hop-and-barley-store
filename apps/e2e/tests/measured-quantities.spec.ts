@@ -10,7 +10,7 @@ test.describe('measured product quantities', () => {
     await clearGuestCart(page);
   });
 
-  test('supports weight minimums, 5g alignment, step buttons, kg input and server-owned previews', async ({
+  test('supports a kg-only 100g lattice, step buttons and server-owned previews', async ({
     page,
   }) => {
     await page.goto('/product/citra-hops');
@@ -19,10 +19,9 @@ test.describe('measured product quantities', () => {
     ).toBeVisible();
 
     const amount = amountInput(page);
-    const unit = unitSelect(page);
     await expect(amount).toBeVisible();
-    await expect(unit).toBeVisible();
-    await expect(amount).toHaveValue('100');
+    await expect(page.getByRole('combobox')).toHaveCount(0);
+    await expect(amount).toHaveValue('0.1');
     await expect(
       page.getByText('US$5.99', { exact: true }).first(),
     ).toBeVisible();
@@ -34,25 +33,21 @@ test.describe('measured product quantities', () => {
       name: /Decrease weight amount/i,
     });
     await increase.click();
-    await expect(amount).toHaveValue('200');
+    await expect(amount).toHaveValue('0.2');
     await expect(
       page.getByText('US$11.98', { exact: true }).first(),
     ).toBeVisible();
     await decrease.click();
-    await expect(amount).toHaveValue('100');
+    await expect(amount).toHaveValue('0.1');
 
-    await amount.fill('155');
+    await amount.fill('0.9');
     await amount.press('Tab');
-    await expect(amount).toHaveValue('155');
-    await expect(page.getByText('155g selected')).toBeVisible();
+    await expect(amount).toHaveValue('0.9');
+    await expect(page.getByText('900g selected')).toBeVisible();
     await expect(
-      page.getByText('US$9.28', { exact: true }).first(),
+      page.getByText('US$53.91', { exact: true }).first(),
     ).toBeVisible();
 
-    const kgOption = unit.locator('option').filter({ hasText: /kg/i }).first();
-    const kgValue = await kgOption.getAttribute('value');
-    expect(kgValue, 'the unit selector exposes kg').toBeTruthy();
-    await unit.selectOption(kgValue!);
     await amount.fill('10');
     await amount.press('Tab');
     await expect(amount).toHaveValue('10');
@@ -96,14 +91,14 @@ test.describe('measured product quantities', () => {
       }
     });
 
-    for (const invalid of ['95', '157']) {
+    for (const invalid of ['0.095', '0.15']) {
       await amount.fill(invalid);
       await amount.press('Tab');
       await add.click();
       await expect(amount).toHaveAttribute('aria-invalid', 'true');
       await expect(
         page.getByText(
-          /minimum.*100|100.*minimum|increments?.*5|5.*increment/i,
+          /minimum.*100|100.*minimum|increments?.*100|100.*increment/i,
         ),
       ).toBeVisible();
       await expect(add).toBeEnabled();
@@ -117,14 +112,14 @@ test.describe('measured product quantities', () => {
   }) => {
     await page.goto('/product/citra-hops');
     const amount = amountInput(page);
-    await amount.fill('155');
+    await amount.fill('0.9');
     await amount.press('Tab');
     await expect(
-      page.getByText('US$9.28', { exact: true }).first(),
+      page.getByText('US$53.91', { exact: true }).first(),
     ).toBeVisible();
 
     await expect(addSelectedAmount(page)).resolves.toEqual({
-      amount: 155_000,
+      amount: 900_000,
       productSlug: 'citra-hops',
     });
     await expect(
@@ -135,15 +130,15 @@ test.describe('measured product quantities', () => {
     await expect(
       page.getByRole('heading', { name: 'Citra Hops' }),
     ).toBeVisible();
-    await expect(page.getByText(/155\s*g/i).first()).toBeVisible();
+    await expect(page.getByText(/900\s*g/i).first()).toBeVisible();
     await expect(
-      page.getByLabel('Cart summary').getByText('US$9.28'),
+      page.getByLabel('Cart summary').getByText('US$53.91'),
     ).toBeVisible();
 
     await page.reload();
-    await expect(page.getByText(/155\s*g/i).first()).toBeVisible();
+    await expect(page.getByText(/900\s*g/i).first()).toBeVisible();
     await expect(
-      page.getByLabel('Cart summary').getByText('US$9.28'),
+      page.getByLabel('Cart summary').getByText('US$53.91'),
     ).toBeVisible();
   });
 
@@ -212,10 +207,10 @@ test.describe('measured product quantities', () => {
 
     await page.goto('/product/citra-hops');
     const weight = amountInput(page);
-    await weight.fill('155');
+    await weight.fill('0.2');
     await weight.press('Tab');
     await expect(addSelectedAmount(page)).resolves.toEqual({
-      amount: 155_000,
+      amount: 200_000,
       productSlug: 'citra-hops',
     });
     await expect(
@@ -233,11 +228,11 @@ test.describe('measured product quantities', () => {
     const amount = amountInput(page);
     await amount.focus();
     await page.keyboard.press('ControlOrMeta+A');
-    await page.keyboard.type('155');
+    await page.keyboard.type('0.9');
     await page.keyboard.press('Tab');
-    await expect(amount).toHaveValue('155');
+    await expect(amount).toHaveValue('0.9');
     await expect(
-      page.getByText('US$9.28', { exact: true }).first(),
+      page.getByText('US$53.91', { exact: true }).first(),
     ).toBeVisible();
 
     const increase = page.getByRole('button', {
@@ -245,7 +240,8 @@ test.describe('measured product quantities', () => {
     });
     await increase.focus();
     await page.keyboard.press('Enter');
-    await expect(amount).toHaveValue('255');
+    await expect(amount).toHaveValue('1');
+    await expect(page.getByText('1kg selected')).toBeVisible();
 
     const overflow = await page.evaluate(
       () =>
@@ -259,10 +255,6 @@ test.describe('measured product quantities', () => {
 
 function amountInput(page: Page) {
   return page.getByLabel(/Quantity|Packs|Kits/i).first();
-}
-
-function unitSelect(page: Page) {
-  return page.getByRole('combobox', { name: /unit/i }).first();
 }
 
 async function addSelectedAmount(page: Page) {

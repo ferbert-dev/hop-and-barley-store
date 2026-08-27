@@ -15,7 +15,7 @@ const weight = {
   kitYieldVolumeMl: null,
   maximumOrderAmount: 100_000_000,
   minimumOrderAmount: 100_000,
-  orderStepAmount: 5_000,
+  orderStepAmount: 100_000,
   packageNetWeightMg: null,
   priceBasisAmount: 100_000,
   saleKind: 'WEIGHT' as const,
@@ -23,22 +23,23 @@ const weight = {
 };
 
 describe('measured quantity presentation', () => {
-  it('accepts a physical weight contract and formats g/kg without floating-point loss', () => {
+  it('parses kilograms and formats the selected weight without floating-point loss', () => {
     const metadata = readQuantityMetadata(weight);
     expect(metadata).toEqual(weight);
-    expect(parseWeightInput('155', 'g')).toBe(155_000);
-    expect(parseWeightInput('10', 'kg')).toBe(10_000_000);
-    expect(formatAmount(155_000, weight)).toBe('155g');
+    expect(parseWeightInput('0.1')).toBe(100_000);
+    expect(parseWeightInput('10')).toBe(10_000_000);
+    expect(formatAmount(900_000, weight)).toBe('900g');
+    expect(formatAmount(1_200_000, weight)).toBe('1.2kg');
     expect(formatAmount(10_000_000, weight)).toBe('10kg');
     expect(formatSaleUnit(weight)).toBe('per 100g');
   });
 
-  it('enforces the server-provided minimum, 5g increment, maximum and stock without disclosing stock', () => {
+  it('enforces the server-provided minimum, 100g increment, maximum and stock without disclosing stock', () => {
     expect(validateOrderAmount(95_000, weight)).toBe(
       'Minimum order amount is 100g.',
     );
-    expect(validateOrderAmount(102_000, weight)).toBe(
-      'Choose increments of 5g.',
+    expect(validateOrderAmount(150_000, weight)).toBe(
+      'Choose increments of 100g.',
     );
     expect(validateOrderAmount(100_005_000, weight)).toBe(
       'Maximum order amount is 100kg.',
@@ -49,7 +50,7 @@ describe('measured quantity presentation', () => {
   });
 
   it('calculates a deterministic, rounded display estimate while leaving the server authoritative', () => {
-    expect(estimateLineTotalMinor(599, 155_000, weight)).toBe(928);
+    expect(estimateLineTotalMinor(599, 900_000, weight)).toBe(5_391);
   });
 
   it('labels packages only with a net weight when the API provides one', () => {

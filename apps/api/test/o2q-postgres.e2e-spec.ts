@@ -89,7 +89,7 @@ describePostgres('O2Q measured products with disposable PostgreSQL', () => {
       amountUnit: 'MILLIGRAM',
       maximumOrderAmount: null,
       minimumOrderAmount: 100_000,
-      orderStepAmount: 5_000,
+      orderStepAmount: 100_000,
       priceBasisAmount: 100_000,
       priceMinor: 599,
       saleKind: 'WEIGHT',
@@ -114,23 +114,23 @@ describePostgres('O2Q measured products with disposable PostgreSQL', () => {
     });
   });
 
-  it('prices 155 g authoritatively and rejects values outside the 5 g lattice', async () => {
+  it('prices 200 g authoritatively and rejects values outside the 100 g lattice', async () => {
     const server = app.getHttpServer() as App;
     const accepted = await request(server)
       .post('/api/v1/cart/items')
       .set('Origin', 'http://localhost:3000')
-      .send({ amount: 155_000, productSlug: citraSlug })
+      .send({ amount: 200_000, productSlug: citraSlug })
       .expect(200);
 
     expect(accepted.body).toMatchObject({
       checkoutEligible: true,
       distinctItemCount: 1,
-      subtotalMinor: 928,
+      subtotalMinor: 1_198,
       items: [
         {
-          amount: 155_000,
+          amount: 200_000,
           amountUnit: 'MILLIGRAM',
-          lineTotalMinor: 928,
+          lineTotalMinor: 1_198,
           priceBasisAmount: 100_000,
           priceMinor: 599,
           productSlug: citraSlug,
@@ -143,12 +143,12 @@ describePostgres('O2Q measured products with disposable PostgreSQL', () => {
       await prisma.cartReservation.findFirstOrThrow({
         where: { status: 'ACTIVE' },
       }),
-    ).toMatchObject({ amount: 155_000 });
+    ).toMatchObject({ amount: 200_000 });
 
     await request(server)
       .post('/api/v1/cart/items')
       .set('Origin', 'http://localhost:3000')
-      .send({ amount: 157_000, productSlug: citraSlug })
+      .send({ amount: 155_000, productSlug: citraSlug })
       .expect(422);
     await request(server)
       .post('/api/v1/cart/items')

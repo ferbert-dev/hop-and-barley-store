@@ -29,7 +29,7 @@ const cart: Cart = {
       maximumOrderAmount: 100_000_000,
       minimumOrderAmount: 100_000,
       name: 'Citra Hops',
-      orderStepAmount: 5_000,
+      orderStepAmount: 100_000,
       packageNetWeightMg: null,
       priceBasisAmount: 100_000,
       priceQualifier: 'per 100g',
@@ -229,7 +229,7 @@ describe('CartScreen', () => {
     );
 
     await user.clear(await screen.findByLabelText('Quantity'));
-    await user.type(screen.getByLabelText('Quantity'), '200');
+    await user.type(screen.getByLabelText('Quantity'), '0.2');
     await user.click(screen.getByRole('button', { name: 'Update Citra Hops' }));
 
     expect(

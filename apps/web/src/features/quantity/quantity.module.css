@@ -19,8 +19,7 @@
   font-weight: 700;
 }
 
-.inputLabel input,
-.unitLabel select {
+.inputLabel input {
   background: var(--hb-color-surface);
   border: 1px solid var(--hb-color-border-strong);
   border-radius: var(--hb-radius-md);
@@ -34,8 +33,9 @@
   inline-size: min(9rem, 35vw);
 }
 
-.unitLabel select {
-  inline-size: 4.5rem;
+.unitLabel {
+  align-items: center;
+  min-block-size: 2.75rem;
 }
 
 .selectedAmount,

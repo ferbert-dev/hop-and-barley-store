@@ -13,7 +13,7 @@ const quantityMetadata = {
   kitYieldVolumeMl: null,
   maximumOrderAmount: 100_000_000,
   minimumOrderAmount: 100_000,
-  orderStepAmount: 5_000,
+  orderStepAmount: 100_000,
   packageNetWeightMg: null,
   priceBasisAmount: 100_000,
   saleKind: 'WEIGHT' as const,
@@ -93,7 +93,7 @@ describe('ProductCartControl', () => {
   it('adds the selected physical weight as milligrams without authentication UI', async () => {
     const user = userEvent.setup();
     const transport = createTransport(emptyCart, {
-      add: vi.fn(async () => cartWithAmount(155_000)),
+      add: vi.fn(async () => cartWithAmount(200_000)),
     });
     renderControl('in-stock', transport);
 
@@ -104,13 +104,13 @@ describe('ProductCartControl', () => {
     const input = screen.getAllByLabelText('Quantity').at(-1);
     if (!input) throw new Error('Quantity input missing');
     await user.clear(input);
-    await user.type(input, '155');
+    await user.type(input, '0.2');
     await user.click(
       screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
     );
 
-    await waitFor(() => expect(screen.getByText('155g in cart')).toBeVisible());
-    expect(transport.add).toHaveBeenCalledWith(productSlug, 155_000);
+    await waitFor(() => expect(screen.getByText('200g in cart')).toBeVisible());
+    expect(transport.add).toHaveBeenCalledWith(productSlug, 200_000);
     expect(screen.queryByRole('link', { name: /sign in/i })).toBeNull();
   });
 
@@ -128,7 +128,7 @@ describe('ProductCartControl', () => {
     const input = screen.getAllByLabelText('Quantity').at(-1);
     if (!input) throw new Error('Quantity input missing');
     await user.clear(input);
-    await user.type(input, '200');
+    await user.type(input, '0.2');
     await user.click(
       screen.getByRole('button', { name: 'Update Citra Hops cart amount' }),
     );
@@ -163,7 +163,7 @@ describe('ProductCartControl', () => {
     const input = screen.getAllByLabelText('Quantity').at(-1);
     if (!input) throw new Error('Quantity input missing');
     await user.clear(input);
-    await user.type(input, '200');
+    await user.type(input, '0.2');
     await user.click(
       screen.getByRole('button', { name: 'Update Citra Hops cart amount' }),
     );
@@ -197,7 +197,7 @@ describe('ProductCartControl', () => {
     const input = screen.getAllByLabelText('Quantity').at(-1);
     if (!input) throw new Error('Quantity input missing');
     await user.clear(input);
-    await user.type(input, '200');
+    await user.type(input, '0.2');
     await user.click(
       screen.getByRole('button', { name: 'Update Citra Hops cart amount' }),
     );

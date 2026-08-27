@@ -184,9 +184,10 @@ Page 1 (0:1)
 
 **User-confirmed quantity extension — 2026-08-27**
 
-- Bulk ingredients are sold by weight. The storefront shows grams or kilograms,
-  prices them against an explicit 100 g basis, accepts direct values aligned to
-  5 g, enforces a 100 g minimum, and uses 100 g for the plus/minus step.
+- Bulk ingredients are sold by weight. The storefront uses one kilogram input,
+  prices against an explicit 100 g basis, starts at 0.1 kg, and accepts direct
+  values aligned to 0.1 kg. The selected summary uses grams below 1 kg and
+  kilograms from 1 kg upward.
 - Packaged products remain an integer pack count. Show package net weight only
   when catalog data supplies it; do not infer a pouch weight.
 - Recipe kits remain an integer kit count and show the aggregate batch yield for
@@ -212,8 +213,8 @@ Page 1 (0:1)
 
 - The displayed value is the physical amount, not a generic item count: for
   example `200 g`, `10 kg`, `2 packs`, or `4 kits`.
-- Weight plus/minus changes the amount by 100 g while direct entry remains valid
-  in 5 g increments. Product sale rules and current stock define the maximum.
+- Weight plus/minus and direct entry use the same 100 g lattice. Product sale
+  rules and current stock define the maximum.
 
 ### Shopping cart — `cart`
 
@@ -234,9 +235,10 @@ Page 1 (0:1)
 
 - Each line shows its sale kind, exact selected physical amount, price basis, and
   server-calculated line total.
-- Weight lines support grams and kilograms; package and kit lines use integer
-  counts. A kit line also shows aggregate yield, for example four 5-gallon kits
-  as 20 gal and approximately 76 L.
+- Weight input uses kilograms while the selected physical amount is formatted
+  in grams below 1 kg and kilograms from 1 kg upward. Package and kit lines use
+  integer counts. A kit line also shows aggregate yield, for example four
+  5-gallon kits as 20 gal and approximately 76 L.
 - The header badge counts distinct product lines. It never sums grams, packs,
   and kits into one dimensionless number.
 

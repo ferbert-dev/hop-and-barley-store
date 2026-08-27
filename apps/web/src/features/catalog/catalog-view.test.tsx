@@ -25,7 +25,7 @@ const product = {
   maximumOrderAmount: 100_000_000,
   minimumOrderAmount: 100_000,
   name: 'Cascade Hops',
-  orderStepAmount: 5_000,
+  orderStepAmount: 100_000,
   packageNetWeightMg: null,
   priceBasisAmount: 100_000,
   priceMinor: 749,

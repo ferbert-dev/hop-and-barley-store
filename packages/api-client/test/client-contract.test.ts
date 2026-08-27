@@ -239,7 +239,7 @@ const detail: components['schemas']['ProductDetailDto'] = {
   maximumOrderAmount: null,
   minimumOrderAmount: 100_000,
   name: 'Citra Hops',
-  orderStepAmount: 5_000,
+  orderStepAmount: 100_000,
   packageNetWeightMg: null,
   priceBasisAmount: 100_000,
   priceMinor: 599,

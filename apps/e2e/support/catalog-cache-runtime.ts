@@ -367,7 +367,7 @@ function respondWithProductDetail(slug: string, response: ServerResponse) {
     maximumOrderAmount: null,
     minimumOrderAmount: 100_000,
     name: slug === 'citra-hops' ? 'Citra Hops' : 'Mosaic Hops',
-    orderStepAmount: 5_000,
+    orderStepAmount: 100_000,
     packageNetWeightMg: null,
     priceBasisAmount: 100_000,
     priceMinor: slug === 'citra-hops' ? 599 : 689,

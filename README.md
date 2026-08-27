@@ -171,7 +171,7 @@ Implemented now:
 - guest carts with expiring stock reservations and server-owned totals;
 - transactional cash-on-delivery order creation with immutable commercial
   snapshots;
-- measured sale rules for bulk weight, packages, and kits, including g/kg entry,
+- measured sale rules for bulk weight, packages, and kits, including kg entry,
   known package net weight, and aggregate kit yield;
 - Nest-owned email/password registration, login, and opaque sessions;
 - developer console, Swagger UI, generated client, and baseline tests.

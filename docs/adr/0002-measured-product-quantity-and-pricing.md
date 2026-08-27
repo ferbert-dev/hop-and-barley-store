@@ -53,8 +53,8 @@ migration, but it is not parsed and is never a business-rule input.
 The initial rules are:
 
 - Bulk products use `MILLIGRAM`, a 100,000 mg price basis, a 100,000 mg minimum,
-  and a 5,000 mg validation step. The UI plus/minus affordance moves by 100,000
-  mg; direct entry may use any valid 5 g-aligned amount, including 155 g.
+  and a 100,000 mg validation step. Direct entry and the UI plus/minus
+  affordance therefore use the same 0.1 kg lattice.
 - Packages and kits use `EACH` with basis, minimum, and step equal to one.
 - A nullable maximum means that stock is the current effective ceiling. When a
   maximum exists, both the configured maximum and available stock apply.
@@ -71,19 +71,20 @@ incompatible physical dimensions into a `totalQuantity`.
 
 ## Why integer milligrams
 
-Grams are the primary storefront unit, but the approved 5 g step and possible
-future package metadata require an exact, currency-independent base unit.
-Integer milligrams avoid decimal database and JSON ambiguities, retain exact
-round trips, and leave room for more precise catalog metadata without changing
-the contract. The UI converts explicitly:
+Kilograms are the input unit for bulk products, while the selected summary uses
+grams below 1 kg and kilograms from 1 kg upward. Package metadata and physical
+inventory still require an exact, currency-independent base unit. Integer
+milligrams avoid decimal database and JSON ambiguities, retain exact round
+trips, and leave room for more precise catalog metadata without changing the
+contract. The UI converts explicitly:
 
 ```text
 grams = milligrams / 1,000
 kilograms = milligrams / 1,000,000
 ```
 
-The UI accepts grams or kilograms and normalizes to milligrams before calling
-the API. Validation messages remain in the unit selected by the customer.
+The UI accepts kilograms and normalizes to milligrams before calling the API.
+The visible `kg` suffix makes the input unit explicit.
 
 ## Inventory, cart, and order invariants
 
@@ -110,10 +111,20 @@ matching the new integer bounds.
 
 Legacy per-100g cart and reservation counts are multiplied by 100,000 mg.
 Legacy per-pound cart and reservation counts are converted using 453,592 mg per
-pound and the aggregate result is rounded to the nearest 5,000 mg so every live
-line remains valid on the new order lattice. Product stock uses the nearest-mg
-conversion because stock itself does not need to align to the customer order
-step. Package and kit counts remain unchanged.
+pound and floored to the 100,000 mg order lattice, with a 100,000 mg minimum.
+Flooring prevents a converted hold from claiming more than its legacy physical
+amount. Product stock uses the nearest-mg conversion because stock itself does
+not need to align to the customer order step. Active weight reservations are
+then reconciled deterministically in reserved-time and ID order: earlier holds
+retain priority, a later hold is reduced to the largest valid amount that fits,
+or released when less than the minimum remains. Current cart lines are updated
+with reduced holds, and the migration aborts if surviving active holds exceed
+stock or diverge from their current lines. Package and kit counts remain
+unchanged.
+
+Catalog seeding treats inventory as operational state. Fixture stock is used
+when a product is created, while repeated seed runs preserve `stockAmount` for
+existing products so migration output cannot mint inventory.
 
 Historical order rows retain their exact arithmetic meaning. A legacy order
 item is backfilled as `PACKAGE`/`EACH` with a basis of one, its previous
@@ -127,9 +138,10 @@ fixtures already use a 100 g basis. Package and kit prices remain per unit.
 
 ## Storefront behavior
 
-- Weight controls show the explicit amount and a `g`/`kg` selector. They enforce
-  a 100 g minimum and explain 5 g alignment without silently rounding customer
-  input.
+- Weight controls show one kilogram input with a visible `kg` suffix. They
+  start at 0.1 kg, enforce 0.1 kg increments, and never silently round customer
+  input. The selected summary renders grams below 1 kg and kilograms from 1 kg
+  upward.
 - Package controls show integer packs and display net weight only when present.
 - Kit controls show integer kits and aggregate yield. Four 18,927 ml kits render
   as approximately 20 US gal / 76 L.
@@ -150,7 +162,7 @@ rather than claims about the original Figma content.
 | Treat every value as an item count             | A value of two cannot safely mean both 200 g and two pouches, and mixed totals become misleading.  |
 | Store decimal grams or kilograms               | It introduces scale and rounding policy into inventory, reservation, JSON, and money calculations. |
 | Parse `priceQualifier` strings                 | Display copy is not a stable schema and cannot safely drive pricing or validation.                 |
-| Create one SKU for every weight                | It makes direct 155 g orders and large weights impractical and fragments stock unnecessarily.      |
+| Create one SKU for every 100 g increment       | It makes large weights impractical and fragments stock unnecessarily.                              |
 | Guess missing pouch weights                    | It invents product facts and can mislead purchasing and fulfilment.                                |
 | Let the browser calculate authoritative totals | It permits stale or manipulated price, basis, and amount combinations at checkout.                 |
 

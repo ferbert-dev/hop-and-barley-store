@@ -17,8 +17,6 @@ export type SaleKind = ProductQuantityFields['saleKind'];
 export type AmountUnit = ProductQuantityFields['amountUnit'];
 export type QuantityMetadata = Readonly<ProductQuantityFields>;
 
-export type WeightInputUnit = 'g' | 'kg';
-
 const MILLIGRAMS_PER_GRAM = 1_000;
 const MILLIGRAMS_PER_KILOGRAM = 1_000_000;
 
@@ -85,26 +83,21 @@ export function validateOrderAmount(
   return null;
 }
 
-export function parseWeightInput(
-  input: string,
-  unit: WeightInputUnit,
-): number | null {
+export function parseWeightInput(input: string): number | null {
   const match = /^(\d+)(?:\.(\d{1,6}))?$/u.exec(input.trim());
   if (!match) return null;
 
   const [, wholeDigits, fractionDigits = ''] = match;
-  const multiplier =
-    unit === 'kg' ? MILLIGRAMS_PER_KILOGRAM : MILLIGRAMS_PER_GRAM;
   const scale = 10 ** fractionDigits.length;
   const whole = Number(wholeDigits);
   const fraction = fractionDigits === '' ? 0 : Number(fractionDigits);
   if (!Number.isSafeInteger(whole) || !Number.isSafeInteger(fraction))
     return null;
 
-  const fractionalMilligrams = (fraction * multiplier) / scale;
+  const fractionalMilligrams = (fraction * MILLIGRAMS_PER_KILOGRAM) / scale;
   if (!Number.isSafeInteger(fractionalMilligrams)) return null;
 
-  const amount = whole * multiplier + fractionalMilligrams;
+  const amount = whole * MILLIGRAMS_PER_KILOGRAM + fractionalMilligrams;
   return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
 }
 
@@ -149,12 +142,8 @@ export function formatPackageNetWeight(
   return `${formatWeightAmount(metadata.packageNetWeightMg)} net each`;
 }
 
-export function formatWeightInput(
-  amount: number,
-  unit: WeightInputUnit,
-): string {
-  const divisor = unit === 'kg' ? MILLIGRAMS_PER_KILOGRAM : MILLIGRAMS_PER_GRAM;
-  return formatDecimal(amount, divisor);
+export function formatWeightInput(amount: number): string {
+  return formatDecimal(amount, MILLIGRAMS_PER_KILOGRAM);
 }
 
 export function estimateLineTotalMinor(
@@ -173,8 +162,8 @@ export function estimateLineTotalMinor(
 }
 
 function formatWeightAmount(amountMg: number): string {
-  if (amountMg % MILLIGRAMS_PER_KILOGRAM === 0) {
-    return `${String(amountMg / MILLIGRAMS_PER_KILOGRAM)}kg`;
+  if (amountMg >= MILLIGRAMS_PER_KILOGRAM) {
+    return `${formatDecimal(amountMg, MILLIGRAMS_PER_KILOGRAM)}kg`;
   }
   return `${formatDecimal(amountMg, MILLIGRAMS_PER_GRAM)}g`;
 }

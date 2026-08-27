@@ -76,23 +76,26 @@ create_legacy_measured_fixtures() {
         ('72000000-0000-4000-8000-000000000002', decode(repeat('22', 32), 'hex'), CURRENT_TIMESTAMP + interval '30 days', CURRENT_TIMESTAMP),
         ('72000000-0000-4000-8000-000000000003', decode(repeat('33', 32), 'hex'), CURRENT_TIMESTAMP + interval '30 days', CURRENT_TIMESTAMP),
         ('72000000-0000-4000-8000-000000000004', decode(repeat('44', 32), 'hex'), CURRENT_TIMESTAMP + interval '30 days', CURRENT_TIMESTAMP),
-        ('72000000-0000-4000-8000-000000000005', decode(repeat('55', 32), 'hex'), CURRENT_TIMESTAMP + interval '30 days', CURRENT_TIMESTAMP);
+        ('72000000-0000-4000-8000-000000000005', decode(repeat('55', 32), 'hex'), CURRENT_TIMESTAMP + interval '30 days', CURRENT_TIMESTAMP),
+        ('72000000-0000-4000-8000-000000000006', decode(repeat('66', 32), 'hex'), CURRENT_TIMESTAMP + interval '30 days', CURRENT_TIMESTAMP);
 
       INSERT INTO \"CartItem\" (\"id\", \"cartId\", \"productId\", \"quantity\", \"updatedAt\")
       VALUES
         ('73000000-0000-4000-8000-000000000001', '72000000-0000-4000-8000-000000000001', '71000000-0000-4000-8000-000000000001', 11, CURRENT_TIMESTAMP),
-        ('73000000-0000-4000-8000-000000000002', '72000000-0000-4000-8000-000000000002', '71000000-0000-4000-8000-000000000002', 2, CURRENT_TIMESTAMP),
+        ('73000000-0000-4000-8000-000000000002', '72000000-0000-4000-8000-000000000002', '71000000-0000-4000-8000-000000000002', 3, CURRENT_TIMESTAMP),
         ('73000000-0000-4000-8000-000000000003', '72000000-0000-4000-8000-000000000003', '71000000-0000-4000-8000-000000000003', 4, CURRENT_TIMESTAMP),
-        ('73000000-0000-4000-8000-000000000004', '72000000-0000-4000-8000-000000000004', '71000000-0000-4000-8000-000000000005', 4, CURRENT_TIMESTAMP);
+        ('73000000-0000-4000-8000-000000000004', '72000000-0000-4000-8000-000000000004', '71000000-0000-4000-8000-000000000005', 4, CURRENT_TIMESTAMP),
+        ('73000000-0000-4000-8000-000000000005', '72000000-0000-4000-8000-000000000006', '71000000-0000-4000-8000-000000000001', 1, CURRENT_TIMESTAMP);
 
       INSERT INTO \"CartReservation\" (
         \"id\", \"cartId\", \"cartItemId\", \"productId\", \"quantity\",
         \"status\", \"reservedAt\", \"expiresAt\", \"updatedAt\"
       ) VALUES
         ('74000000-0000-4000-8000-000000000001', '72000000-0000-4000-8000-000000000001', '73000000-0000-4000-8000-000000000001', '71000000-0000-4000-8000-000000000001', 11, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + interval '15 minutes', CURRENT_TIMESTAMP),
-        ('74000000-0000-4000-8000-000000000002', '72000000-0000-4000-8000-000000000002', '73000000-0000-4000-8000-000000000002', '71000000-0000-4000-8000-000000000002', 2, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + interval '15 minutes', CURRENT_TIMESTAMP),
+        ('74000000-0000-4000-8000-000000000002', '72000000-0000-4000-8000-000000000002', '73000000-0000-4000-8000-000000000002', '71000000-0000-4000-8000-000000000002', 3, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + interval '15 minutes', CURRENT_TIMESTAMP),
         ('74000000-0000-4000-8000-000000000003', '72000000-0000-4000-8000-000000000003', '73000000-0000-4000-8000-000000000003', '71000000-0000-4000-8000-000000000003', 4, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + interval '15 minutes', CURRENT_TIMESTAMP),
-        ('74000000-0000-4000-8000-000000000004', '72000000-0000-4000-8000-000000000004', '73000000-0000-4000-8000-000000000004', '71000000-0000-4000-8000-000000000005', 4, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + interval '15 minutes', CURRENT_TIMESTAMP);
+        ('74000000-0000-4000-8000-000000000004', '72000000-0000-4000-8000-000000000004', '73000000-0000-4000-8000-000000000004', '71000000-0000-4000-8000-000000000005', 4, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + interval '15 minutes', CURRENT_TIMESTAMP),
+        ('74000000-0000-4000-8000-000000000005', '72000000-0000-4000-8000-000000000006', '73000000-0000-4000-8000-000000000005', '71000000-0000-4000-8000-000000000001', 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + interval '15 minutes', CURRENT_TIMESTAMP);
 
       UPDATE \"CartItem\" item
       SET \"currentReservationId\" = reservation.\"id\"
@@ -169,15 +172,38 @@ upgrade_shape=$(docker exec "$container_name" psql --tuples-only --no-align \
   --command "
     SELECT string_agg(
       product.\"slug\" || ':' || item.\"amount\" || ':' || reservation.\"amount\" || ':' ||
+      reservation.\"status\" || ':' ||
+      coalesce((item.\"currentReservationId\" = reservation.\"id\")::text, 'false') || ':' ||
       product.\"stockAmount\" || ':' || product.\"priceMinor\" || ':' ||
       product.\"priceBasisAmount\" || ':' || product.\"orderStepAmount\",
-      ',' ORDER BY product.\"slug\"
+      ',' ORDER BY product.\"slug\", item.\"id\"
     )
     FROM \"CartItem\" item
     JOIN \"CartReservation\" reservation ON reservation.\"cartItemId\" = item.\"id\"
     JOIN \"Product\" product ON product.\"id\" = item.\"productId\";
   ")
-test "$upgrade_shape" = 'caramel-malt:4990000:4990000:4989512:66:100000:5000,citra-hops:400000:400000:100000000:599:100000:5000,maris-otter-malt:905000:905000:907184:55:100000:5000,west-coast-ipa-kit:4:4:20:4999:1:1'
+test "$upgrade_shape" = 'caramel-malt:4900000:4900000:ACTIVE:true:4989512:66:100000:100000,caramel-malt:400000:400000:RELEASED:false:4989512:66:100000:100000,citra-hops:400000:400000:ACTIVE:true:100000000:599:100000:100000,maris-otter-malt:900000:900000:ACTIVE:true:907184:55:100000:100000,west-coast-ipa-kit:4:4:ACTIVE:true:20:4999:1:1'
+
+lattice_shape=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname upgrade_o2q \
+  --command "
+    SELECT
+      (SELECT count(*)
+       FROM \"CartItem\" item JOIN \"Product\" product ON product.\"id\" = item.\"productId\"
+       WHERE product.\"saleKind\" = 'WEIGHT'
+         AND (item.\"amount\" < 100000 OR item.\"amount\" % 100000 <> 0)),
+      (SELECT count(*)
+       FROM \"CartReservation\" reservation JOIN \"Product\" product ON product.\"id\" = reservation.\"productId\"
+       WHERE product.\"saleKind\" = 'WEIGHT'
+         AND (reservation.\"amount\" < 100000 OR reservation.\"amount\" % 100000 <> 0)),
+      (SELECT sum(reservation.\"amount\")
+       FROM \"CartReservation\" reservation
+       WHERE reservation.\"productId\" = '71000000-0000-4000-8000-000000000001'
+         AND reservation.\"status\" = 'ACTIVE'),
+      (SELECT \"stockAmount\" FROM \"Product\"
+       WHERE \"id\" = '71000000-0000-4000-8000-000000000001');
+  ")
+test "$lattice_shape" = '0|0|4900000|4989512'
 
 snapshot_shape=$(docker exec "$container_name" psql --tuples-only --no-align \
   --username "$database_user" --dbname upgrade_o2q \
@@ -206,6 +232,28 @@ metadata_shape=$(docker exec "$container_name" psql --tuples-only --no-align \
     WHERE \"slug\" IN ('safale-us05-yeast', 'west-coast-ipa-kit');
   ")
 test "$metadata_shape" = 'safale-us05-yeast:PACKAGE:EACH:11500:null,west-coast-ipa-kit:KIT:EACH:null:18927'
+
+stock_before_seed=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname upgrade_o2q \
+  --command "
+    SELECT string_agg(\"slug\" || ':' || \"stockAmount\", ',' ORDER BY \"slug\")
+    FROM \"Product\";
+  ")
+upgrade_database_url=$(database_url upgrade_o2q)
+DATABASE_URL="$upgrade_database_url" pnpm --dir "$repo_root" \
+  --filter @hop-and-barley/api db:seed
+stock_after_seed=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname upgrade_o2q \
+  --command "
+    SELECT string_agg(\"slug\" || ':' || \"stockAmount\", ',' ORDER BY \"slug\")
+    FROM \"Product\"
+    WHERE \"slug\" IN (
+      'caramel-malt', 'citra-hops', 'maris-otter-malt',
+      'safale-us05-yeast', 'west-coast-ipa-kit'
+    );
+  ")
+test "$stock_after_seed" = "$stock_before_seed"
+test "$stock_after_seed" = 'caramel-malt:4989512,citra-hops:100000000,maris-otter-malt:907184,safale-us05-yeast:50,west-coast-ipa-kit:20'
 
 docker exec "$container_name" createdb -U "$database_user" verified_o2q
 verified_database_url=$(database_url verified_o2q)

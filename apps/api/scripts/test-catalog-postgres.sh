@@ -92,6 +92,7 @@ fi
 seed_twice_and_verify() {
   local database_url=$1
   local database_name=$2
+  local expected_fixture_stock_rows=$3
 
   DATABASE_URL="$database_url" pnpm --dir "$repo_root" --filter @hop-and-barley/api db:seed
   local first_ids
@@ -110,17 +111,17 @@ seed_twice_and_verify() {
   final_state=$(docker exec "$container_name" psql --tuples-only --no-align \
     --username "$database_user" --dbname "$database_name" \
     --command 'SELECT (SELECT count(*) FROM "Product") || '"'"':'"'"' || (SELECT count(*) FROM "Category") || '"'"':'"'"' || (SELECT count(*) FROM "Category" WHERE "slug" = '"'"'legacy-foundation'"'"') || '"'"':'"'"' || (SELECT count(*) FROM "Product" WHERE "slug" IN ('"'"'house-lager'"'"', '"'"'citrus-pale-ale'"'"')) || '"'"':'"'"' || (SELECT count(*) FROM "Product" WHERE "currency" = '"'"'USD'"'"' AND "isActive" AND (("saleKind" = '"'"'WEIGHT'"'"' AND "stockAmount" = 100000000) OR ("saleKind" IN ('"'"'PACKAGE'"'"', '"'"'KIT'"'"') AND "stockAmount" = 100)));')
-  test "$final_state" = '12:5:0:0:12'
+  test "$final_state" = "12:5:0:0:$expected_fixture_stock_rows"
 }
 
-seed_twice_and_verify "$upgrade_url" upgrade_catalog
+seed_twice_and_verify "$upgrade_url" upgrade_catalog 11
 upgrade_citra_id=$(docker exec "$container_name" psql --tuples-only --no-align \
   --username "$database_user" --dbname upgrade_catalog \
   --command 'SELECT "id" FROM "Product" WHERE "slug" = '"'"'citra-hops'"'"';')
 test "$upgrade_citra_id" = '20000000-0000-4000-8000-000000000001'
 
 DATABASE_URL="$fresh_url" pnpm --dir "$repo_root" --filter @hop-and-barley/api db:migrate:deploy
-seed_twice_and_verify "$fresh_url" fresh_catalog
+seed_twice_and_verify "$fresh_url" fresh_catalog 12
 
 DATABASE_URL="$fresh_url" NODE_OPTIONS='--experimental-vm-modules' \
   RUN_CATALOG_POSTGRES_INTEGRATION=1 \

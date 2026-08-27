@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 
 import { Button } from '../../components/ui/button';
 import { Price } from '../../components/ui/price';
@@ -11,7 +11,6 @@ import {
   formatWeightInput,
   parseWeightInput,
   type QuantityMetadata,
-  type WeightInputUnit,
   validateOrderAmount,
 } from './quantity-model';
 import styles from './quantity.module.css';
@@ -28,6 +27,21 @@ type QuantityFormProps = Readonly<{
 
 export function QuantityForm({
   amount,
+  metadata,
+  ...props
+}: QuantityFormProps) {
+  return (
+    <QuantityFormEditor
+      {...props}
+      amount={amount}
+      key={`${metadata.saleKind}:${String(amount)}`}
+      metadata={metadata}
+    />
+  );
+}
+
+function QuantityFormEditor({
+  amount,
   currency,
   disabled = false,
   metadata,
@@ -36,30 +50,16 @@ export function QuantityForm({
   submitLabel,
 }: QuantityFormProps) {
   const formId = useId();
-  const [weightUnit, setWeightUnit] = useState<WeightInputUnit>('g');
-  const [input, setInput] = useState(() => formatInput(amount, metadata, 'g'));
+  const [input, setInput] = useState(() => formatInput(amount, metadata));
   const [error, setError] = useState<string | null>(null);
-  const weightUnitRef = useRef(weightUnit);
   const isWeight = metadata.saleKind === 'WEIGHT';
-
-  useEffect(() => {
-    weightUnitRef.current = weightUnit;
-  }, [weightUnit]);
-
-  // The cart response is canonical. A recheck or stock clamp must replace an
-  // optimistic local amount, while normal typing remains local because its
-  // `amount` prop has not changed.
-  useEffect(() => {
-    setInput(formatInput(amount, metadata, weightUnitRef.current));
-    setError(null);
-  }, [amount, metadata]);
   const parsedAmount = isWeight
-    ? parseWeightInput(input, weightUnit)
+    ? parseWeightInput(input)
     : parseCountInput(input);
   const validation =
     parsedAmount === null
       ? isWeight
-        ? 'Enter a weight in grams or kilograms.'
+        ? 'Enter a weight in kilograms.'
         : `Enter a whole number of ${metadata.saleKind === 'PACKAGE' ? 'packs' : 'kits'}.`
       : validateOrderAmount(parsedAmount, metadata);
   const selectedAmount = parsedAmount ?? amount;
@@ -71,7 +71,7 @@ export function QuantityForm({
   const errorId = `${inputId}-error`;
 
   const setPhysicalAmount = (nextAmount: number) => {
-    setInput(formatInput(nextAmount, metadata, weightUnit));
+    setInput(formatInput(nextAmount, metadata));
     setError(validateOrderAmount(nextAmount, metadata));
   };
 
@@ -130,33 +130,28 @@ export function QuantityForm({
             aria-invalid={error ? true : undefined}
             disabled={disabled}
             id={inputId}
-            inputMode="decimal"
+            inputMode={isWeight ? 'decimal' : 'numeric'}
+            min={
+              isWeight
+                ? formatWeightInput(metadata.minimumOrderAmount)
+                : metadata.minimumOrderAmount
+            }
             onChange={(event) => {
               setInput(event.target.value);
               setError(null);
             }}
+            step={
+              isWeight
+                ? formatWeightInput(metadata.orderStepAmount)
+                : metadata.orderStepAmount
+            }
             value={input}
           />
         </label>
         {isWeight ? (
-          <label className={styles.unitLabel} htmlFor={`${inputId}-unit`}>
-            <span className="visually-hidden">Weight unit</span>
-            <select
-              disabled={disabled}
-              id={`${inputId}-unit`}
-              onChange={(event) => {
-                const nextUnit = event.target.value as WeightInputUnit;
-                setWeightUnit(nextUnit);
-                if (parsedAmount !== null) {
-                  setInput(formatWeightInput(parsedAmount, nextUnit));
-                }
-              }}
-              value={weightUnit}
-            >
-              <option value="g">g</option>
-              <option value="kg">kg</option>
-            </select>
-          </label>
+          <span className={styles.unitLabel} aria-hidden="true">
+            kg
+          </span>
         ) : null}
         <Button
           aria-label={`Increase ${metadata.saleKind.toLowerCase()} amount`}
@@ -194,13 +189,9 @@ export function QuantityForm({
   );
 }
 
-function formatInput(
-  amount: number,
-  metadata: QuantityMetadata,
-  weightUnit: WeightInputUnit,
-) {
+function formatInput(amount: number, metadata: QuantityMetadata) {
   return metadata.saleKind === 'WEIGHT'
-    ? formatWeightInput(amount, weightUnit)
+    ? formatWeightInput(amount)
     : String(amount);
 }
 
