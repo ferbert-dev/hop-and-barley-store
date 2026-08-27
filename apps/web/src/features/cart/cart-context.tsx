@@ -15,6 +15,7 @@ import {
   type Cart,
   type CartTransport,
 } from './cart-transport';
+import { estimateLineTotalMinor } from '../quantity/quantity-model';
 
 export type CartState =
   | Readonly<{ kind: 'loading' }>
@@ -60,6 +61,10 @@ export function CartProvider({
   const initialLoad = useRef<Promise<void> | null>(null);
   const pendingRef = useRef<CartPendingOperation | null>(null);
   const pendingMutation = useRef<Promise<void> | null>(null);
+  const queuedUpdate = useRef<
+    Extract<CartPendingOperation, { kind: 'update' }> | undefined
+  >(undefined);
+  const updateMutation = useRef<Promise<void> | null>(null);
 
   const loadCanonical = useCallback(
     async (showLoading: boolean) => {
@@ -145,6 +150,78 @@ export function CartProvider({
     [transport],
   );
 
+  const update = useCallback(
+    (productSlug: string, amount: number): Promise<void> => {
+      const currentPending = pendingRef.current;
+      if (
+        currentPending &&
+        (currentPending.kind !== 'update' ||
+          currentPending.productSlug !== productSlug)
+      ) {
+        return Promise.resolve();
+      }
+
+      if (
+        currentPending?.kind === 'update' &&
+        currentPending.productSlug === productSlug &&
+        currentPending.amount === amount
+      ) {
+        return updateMutation.current ?? Promise.resolve();
+      }
+
+      const nextPending = { kind: 'update', productSlug, amount } as const;
+      queuedUpdate.current = nextPending;
+      pendingRef.current = nextPending;
+      setPending(nextPending);
+
+      if (updateMutation.current) return updateMutation.current;
+
+      const requestId = ++responseId.current;
+      const mutation = (async () => {
+        try {
+          while (queuedUpdate.current) {
+            const requestedUpdate = queuedUpdate.current;
+            queuedUpdate.current = undefined;
+            const cart = await transport.update(
+              requestedUpdate.productSlug,
+              requestedUpdate.amount,
+            );
+            if (responseId.current === requestId) {
+              setState(readyState(cart));
+            }
+          }
+        } catch {
+          queuedUpdate.current = undefined;
+          try {
+            const cart = await transport.load();
+            if (responseId.current === requestId) {
+              setState(
+                readyState(
+                  cart,
+                  'Your cart was refreshed after the change could not be completed.',
+                ),
+              );
+            }
+          } catch {
+            if (responseId.current === requestId) {
+              setState({ kind: 'unavailable' });
+            }
+          }
+        } finally {
+          pendingRef.current = null;
+          pendingMutation.current = null;
+          updateMutation.current = null;
+          setPending(null);
+        }
+      })();
+
+      updateMutation.current = mutation;
+      pendingMutation.current = mutation;
+      return mutation;
+    },
+    [transport],
+  );
+
   const value = useMemo<CartContextValue>(
     () => ({
       add: (productSlug, amount) =>
@@ -161,12 +238,9 @@ export function CartProvider({
         ),
       state,
       totalsAreRefreshing: state.kind === 'ready' && pending !== null,
-      update: (productSlug, amount) =>
-        mutate({ kind: 'update', productSlug, amount }, () =>
-          transport.update(productSlug, amount),
-        ),
+      update,
     }),
-    [ensureLoaded, mutate, pending, refresh, state, transport],
+    [ensureLoaded, mutate, pending, refresh, state, transport, update],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
@@ -196,7 +270,14 @@ function projectItems(
   }
   return state.cart.items.map((item) =>
     item.productSlug === pending.productSlug
-      ? { ...item, amount: pending.amount }
+      ? {
+          ...item,
+          amount: pending.amount,
+          lineTotalMinor:
+            item.priceMinor === null
+              ? null
+              : estimateLineTotalMinor(item.priceMinor, pending.amount, item),
+        }
       : item,
   );
 }

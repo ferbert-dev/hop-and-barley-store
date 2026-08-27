@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { Button } from '../../components/ui/button';
 import { Price } from '../../components/ui/price';
@@ -15,14 +15,27 @@ import {
 } from './quantity-model';
 import styles from './quantity.module.css';
 
-type QuantityFormProps = Readonly<{
+type QuantityFormBaseProps = Readonly<{
   amount: number;
+  ariaLabel?: string;
+  busy?: boolean;
   currency: string;
   disabled?: boolean;
   onSubmit: (amount: number) => void | Promise<void>;
   priceMinor: number | null;
-  submitLabel: string;
   metadata: QuantityMetadata;
+}>;
+
+type QuantityFormProps = QuantityFormBaseProps &
+  (
+    | Readonly<{ mode: 'auto'; submitLabel?: never }>
+    | Readonly<{ mode?: 'submit'; submitLabel: string }>
+  );
+
+type QuantityEditorState = Readonly<{
+  amount: number;
+  error: string | null;
+  input: string;
 }>;
 
 export function QuantityForm({
@@ -30,28 +43,36 @@ export function QuantityForm({
   metadata,
   ...props
 }: QuantityFormProps) {
-  return (
-    <QuantityFormEditor
-      {...props}
-      amount={amount}
-      key={`${metadata.saleKind}:${String(amount)}`}
-      metadata={metadata}
-    />
-  );
+  return <QuantityFormEditor {...props} amount={amount} metadata={metadata} />;
 }
 
 function QuantityFormEditor({
   amount,
+  ariaLabel,
+  busy = false,
   currency,
   disabled = false,
   metadata,
+  mode = 'submit',
   onSubmit,
   priceMinor,
   submitLabel,
 }: QuantityFormProps) {
   const formId = useId();
-  const [input, setInput] = useState(() => formatInput(amount, metadata));
-  const [error, setError] = useState<string | null>(null);
+  const canonicalEditor: QuantityEditorState = {
+    amount,
+    error: null,
+    input: formatInput(amount, metadata),
+  };
+  const [editor, setEditor] = useState(canonicalEditor);
+  const lastAutoSubmittedAmount = useRef(amount);
+  useEffect(() => {
+    lastAutoSubmittedAmount.current = amount;
+  }, [amount]);
+  if (editor.amount !== amount) setEditor(canonicalEditor);
+
+  const currentEditor = editor.amount === amount ? editor : canonicalEditor;
+  const { error, input } = currentEditor;
   const isWeight = metadata.saleKind === 'WEIGHT';
   const parsedAmount = isWeight
     ? parseWeightInput(input)
@@ -70,9 +91,33 @@ function QuantityFormEditor({
   const inputId = `quantity-${formId}`;
   const errorId = `${inputId}-error`;
 
+  const submitAmount = (nextAmount: number, nextValidation: string | null) => {
+    setEditor((current) => ({ ...current, error: nextValidation }));
+    if (nextValidation !== null) return;
+
+    if (mode === 'auto') {
+      if (lastAutoSubmittedAmount.current === nextAmount) return;
+      lastAutoSubmittedAmount.current = nextAmount;
+    }
+    void onSubmit(nextAmount);
+  };
+
+  const commitInput = () => {
+    if (validation === null && parsedAmount !== null) {
+      submitAmount(parsedAmount, validation);
+    } else {
+      setEditor((current) => ({ ...current, error: validation }));
+    }
+  };
+
   const setPhysicalAmount = (nextAmount: number) => {
-    setInput(formatInput(nextAmount, metadata));
-    setError(validateOrderAmount(nextAmount, metadata));
+    const nextValidation = validateOrderAmount(nextAmount, metadata);
+    setEditor({
+      amount,
+      error: nextValidation,
+      input: formatInput(nextAmount, metadata),
+    });
+    if (mode === 'auto') submitAmount(nextAmount, nextValidation);
   };
 
   const stepAmount =
@@ -98,13 +143,12 @@ function QuantityFormEditor({
 
   return (
     <form
+      aria-label={ariaLabel}
+      aria-busy={busy || undefined}
       className={styles.form}
       onSubmit={(event) => {
         event.preventDefault();
-        setError(validation);
-        if (validation === null && parsedAmount !== null) {
-          void onSubmit(parsedAmount);
-        }
+        commitInput();
       }}
     >
       <div className={styles.control}>
@@ -137,8 +181,20 @@ function QuantityFormEditor({
                 : metadata.minimumOrderAmount
             }
             onChange={(event) => {
-              setInput(event.target.value);
-              setError(null);
+              setEditor({
+                amount,
+                error: null,
+                input: event.target.value,
+              });
+            }}
+            onBlur={() => {
+              if (mode !== 'auto') return;
+              commitInput();
+            }}
+            onKeyDown={(event) => {
+              if (mode !== 'auto' || event.key !== 'Enter') return;
+              event.preventDefault();
+              commitInput();
             }}
             step={
               isWeight
@@ -163,28 +219,34 @@ function QuantityFormEditor({
           +
         </Button>
       </div>
-      <p className={styles.selectedAmount} aria-live="polite">
-        {formatAmount(selectedAmount, metadata)} selected
-      </p>
-      {formatPackageNetWeight(metadata) ? (
-        <p className={styles.supportingText}>
-          {formatPackageNetWeight(metadata)}
-        </p>
-      ) : null}
-      {estimatedPrice !== null ? (
-        <p className={styles.estimate}>
-          Selection price{' '}
-          <Price currency={currency} minorUnits={estimatedPrice} />
-        </p>
+      {mode === 'submit' ? (
+        <>
+          <p className={styles.selectedAmount} aria-live="polite">
+            {formatAmount(selectedAmount, metadata)} selected
+          </p>
+          {formatPackageNetWeight(metadata) ? (
+            <p className={styles.supportingText}>
+              {formatPackageNetWeight(metadata)}
+            </p>
+          ) : null}
+          {estimatedPrice !== null ? (
+            <p className={styles.estimate}>
+              Selection price{' '}
+              <Price currency={currency} minorUnits={estimatedPrice} />
+            </p>
+          ) : null}
+        </>
       ) : null}
       {error ? (
         <p className={styles.error} id={errorId} role="alert">
           {error}
         </p>
       ) : null}
-      <Button disabled={disabled} type="submit">
-        {submitLabel}
-      </Button>
+      {mode === 'submit' ? (
+        <Button disabled={disabled} type="submit">
+          {submitLabel}
+        </Button>
+      ) : null}
     </form>
   );
 }
