@@ -122,24 +122,24 @@ function QuantityFormEditor({
 
   const stepAmount =
     metadata.saleKind === 'WEIGHT' ? 100_000 : metadata.orderStepAmount;
+  const minimumAmount =
+    metadata.saleKind === 'WEIGHT' ? 100_000 : metadata.minimumOrderAmount;
+  const maximumAmount =
+    metadata.saleKind === 'WEIGHT'
+      ? Math.min(metadata.maximumOrderAmount ?? 100_000_000, 100_000_000)
+      : metadata.maximumOrderAmount;
   const decrement = () => {
-    const nextAmount = Math.max(
-      metadata.minimumOrderAmount,
-      selectedAmount - stepAmount,
-    );
+    const nextAmount = Math.max(minimumAmount, selectedAmount - stepAmount);
     setPhysicalAmount(nextAmount);
   };
   const increment = () => {
-    const ceiling = metadata.maximumOrderAmount ?? metadata.stockAmount;
+    const ceiling = maximumAmount ?? Infinity;
     const nextAmount = Math.min(ceiling, selectedAmount + stepAmount);
     setPhysicalAmount(nextAmount);
   };
-  const canDecrement =
-    !disabled && selectedAmount > metadata.minimumOrderAmount;
+  const canDecrement = !disabled && selectedAmount > minimumAmount;
   const canIncrement =
-    !disabled &&
-    selectedAmount + stepAmount <=
-      Math.min(metadata.maximumOrderAmount ?? Infinity, metadata.stockAmount);
+    !disabled && selectedAmount + stepAmount <= (maximumAmount ?? Infinity);
 
   return (
     <form
@@ -175,11 +175,7 @@ function QuantityFormEditor({
             disabled={disabled}
             id={inputId}
             inputMode={isWeight ? 'decimal' : 'numeric'}
-            min={
-              isWeight
-                ? formatWeightInput(metadata.minimumOrderAmount)
-                : metadata.minimumOrderAmount
-            }
+            min={isWeight ? formatWeightInput(minimumAmount) : minimumAmount}
             onChange={(event) => {
               setEditor({
                 amount,
@@ -196,11 +192,7 @@ function QuantityFormEditor({
               event.preventDefault();
               commitInput();
             }}
-            step={
-              isWeight
-                ? formatWeightInput(metadata.orderStepAmount)
-                : metadata.orderStepAmount
-            }
+            step={isWeight ? '0.1' : metadata.orderStepAmount}
             value={input}
           />
         </label>

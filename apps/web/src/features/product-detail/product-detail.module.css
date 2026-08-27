@@ -108,15 +108,8 @@
   justify-items: start;
 }
 
-.cartAvailability,
-.cartMessage,
-.cartReservationStatus {
+.cartMessage {
   margin: 0;
-}
-
-.cartAvailability,
-.cartReservationStatus {
-  color: var(--hb-color-danger);
 }
 
 .cartMessage {

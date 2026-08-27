@@ -23,28 +23,14 @@
   margin-bottom: var(--hb-space-8);
 }
 
-.message,
-.reservationCountdown,
-.reservationNotice {
+.message {
   border-radius: var(--hb-radius-md);
   margin-bottom: var(--hb-space-6);
   padding: var(--hb-space-3) var(--hb-space-4);
 }
 
-.message,
-.reservationCountdown {
+.message {
   background: var(--hb-color-brand-soft);
-}
-
-.reservationNotice {
-  background: var(--hb-color-surface-muted);
-  border: 1px solid var(--hb-color-border-strong);
-  display: grid;
-  gap: var(--hb-space-3);
-}
-
-.reservationNotice p {
-  margin: 0;
 }
 
 .layout {
@@ -117,8 +103,7 @@
   margin-top: var(--hb-space-1);
 }
 
-.availability,
-.reservationLineStatus {
+.readinessLineStatus {
   color: var(--hb-color-danger);
   margin: var(--hb-space-2) 0 0;
 }
@@ -190,7 +175,8 @@
   padding-top: var(--hb-space-3);
 }
 
-.ineligible {
+.availabilityAttention,
+.readinessError {
   color: var(--hb-color-danger);
   margin: var(--hb-space-4) 0 0;
 }

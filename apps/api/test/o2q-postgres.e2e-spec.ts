@@ -64,11 +64,12 @@ describePostgres('O2Q measured products with disposable PostgreSQL', () => {
         'CartReservation_amount_check',
         'OrderItem_amount_check',
         'OrderItem_pricing_check',
-        'OrderItem_sale_kind_check'
+        'OrderItem_sale_kind_check',
+        'Product_weight_order_lattice_check'
       )
       ORDER BY conname
     `);
-    expect(constraints.rows).toHaveLength(9);
+    expect(constraints.rows).toHaveLength(10);
 
     const products = await prisma.product.findMany({
       select: {
@@ -123,7 +124,6 @@ describePostgres('O2Q measured products with disposable PostgreSQL', () => {
       .expect(200);
 
     expect(accepted.body).toMatchObject({
-      checkoutEligible: true,
       distinctItemCount: 1,
       subtotalMinor: 1_198,
       items: [
@@ -134,16 +134,11 @@ describePostgres('O2Q measured products with disposable PostgreSQL', () => {
           priceBasisAmount: 100_000,
           priceMinor: 599,
           productSlug: citraSlug,
-          reservationStatus: 'active',
           saleKind: 'WEIGHT',
         },
       ],
     });
-    expect(
-      await prisma.cartReservation.findFirstOrThrow({
-        where: { status: 'ACTIVE' },
-      }),
-    ).toMatchObject({ amount: 200_000 });
+    expect(await prisma.cartReservation.count()).toBe(0);
 
     await request(server)
       .post('/api/v1/cart/items')
@@ -165,7 +160,6 @@ describePostgres('O2Q measured products with disposable PostgreSQL', () => {
       .expect(200);
 
     expect(accepted.body).toMatchObject({
-      checkoutEligible: true,
       subtotalMinor: 599_000,
       items: [
         {
@@ -227,11 +221,7 @@ describePostgres('O2Q measured products with disposable PostgreSQL', () => {
     expect(
       await prisma.product.findUniqueOrThrow({ where: { slug: citraSlug } }),
     ).toMatchObject({ stockAmount: 90_000_000 });
-    expect(
-      await prisma.cartReservation.findFirstOrThrow({
-        where: { orderId: order.id },
-      }),
-    ).toMatchObject({ amount: 10_000_000, status: 'CONSUMED' });
+    expect(await prisma.cartReservation.count()).toBe(0);
   });
 
   afterAll(async () => {

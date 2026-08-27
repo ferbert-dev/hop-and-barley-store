@@ -10,7 +10,6 @@ type ProductQuantityFields = Pick<
   | 'packageNetWeightMg'
   | 'priceBasisAmount'
   | 'saleKind'
-  | 'stockAmount'
 >;
 
 export type SaleKind = ProductQuantityFields['saleKind'];
@@ -32,7 +31,6 @@ export function readQuantityMetadata(value: unknown): QuantityMetadata | null {
     packageNetWeightMg: value.packageNetWeightMg,
     priceBasisAmount: value.priceBasisAmount,
     saleKind: value.saleKind,
-    stockAmount: value.stockAmount,
   };
 
   if (
@@ -41,7 +39,6 @@ export function readQuantityMetadata(value: unknown): QuantityMetadata | null {
     !isPositiveSafeInteger(metadata.priceBasisAmount) ||
     !isPositiveSafeInteger(metadata.minimumOrderAmount) ||
     !isPositiveSafeInteger(metadata.orderStepAmount) ||
-    !isNonNegativeSafeInteger(metadata.stockAmount) ||
     !isNullablePositiveSafeInteger(metadata.maximumOrderAmount) ||
     !isNullablePositiveSafeInteger(metadata.packageNetWeightMg) ||
     !isNullablePositiveSafeInteger(metadata.kitYieldVolumeMl) ||
@@ -65,6 +62,23 @@ export function validateOrderAmount(
   metadata: QuantityMetadata,
 ): string | null {
   if (!isPositiveSafeInteger(amount)) return 'Enter a whole valid amount.';
+  if (metadata.saleKind === 'WEIGHT') {
+    const minimumWeightAmount = 100_000;
+    const maximumWeightAmount = Math.min(
+      metadata.maximumOrderAmount ?? 100_000_000,
+      100_000_000,
+    );
+    if (amount < minimumWeightAmount) {
+      return 'Minimum order amount is 100g.';
+    }
+    if (amount > maximumWeightAmount) {
+      return `Maximum order amount is ${formatWeightAmount(maximumWeightAmount)}.`;
+    }
+    if (amount % minimumWeightAmount !== 0) {
+      return 'Choose increments of 100g.';
+    }
+    return null;
+  }
   if (amount < metadata.minimumOrderAmount) {
     return `Minimum order amount is ${formatAmount(metadata.minimumOrderAmount, metadata)}.`;
   }
@@ -73,9 +87,6 @@ export function validateOrderAmount(
     amount > metadata.maximumOrderAmount
   ) {
     return `Maximum order amount is ${formatAmount(metadata.maximumOrderAmount, metadata)}.`;
-  }
-  if (amount > metadata.stockAmount) {
-    return 'This amount is no longer available.';
   }
   if ((amount - metadata.minimumOrderAmount) % metadata.orderStepAmount !== 0) {
     return `Choose increments of ${formatAmount(metadata.orderStepAmount, metadata)}.`;

@@ -1,21 +1,33 @@
 export const MAX_COMMERCE_AMOUNT = 2_000_000_000;
 export const MAX_MONEY_MINOR = 2_147_483_647;
+export const MAX_WEIGHT_AMOUNT_MG = 100_000_000;
+export const WEIGHT_ORDER_STEP_MG = 100_000;
 
 export type ProductAmountRules = Readonly<{
   maximumOrderAmount: number | null;
   minimumOrderAmount: number;
   orderStepAmount: number;
+  saleKind: 'KIT' | 'PACKAGE' | 'WEIGHT';
 }>;
 
 export function isValidOrderAmount(
   amount: number,
   rules: ProductAmountRules,
 ): boolean {
+  const maximum =
+    rules.saleKind === 'WEIGHT'
+      ? Math.min(
+          rules.maximumOrderAmount ?? MAX_WEIGHT_AMOUNT_MG,
+          MAX_WEIGHT_AMOUNT_MG,
+        )
+      : (rules.maximumOrderAmount ?? MAX_COMMERCE_AMOUNT);
   return (
     Number.isInteger(amount) &&
     amount >= rules.minimumOrderAmount &&
-    amount <= MAX_COMMERCE_AMOUNT &&
-    (rules.maximumOrderAmount === null || amount <= rules.maximumOrderAmount) &&
+    amount <= maximum &&
+    (rules.saleKind !== 'WEIGHT' ||
+      (rules.minimumOrderAmount === WEIGHT_ORDER_STEP_MG &&
+        rules.orderStepAmount === WEIGHT_ORDER_STEP_MG)) &&
     (amount - rules.minimumOrderAmount) % rules.orderStepAmount === 0
   );
 }

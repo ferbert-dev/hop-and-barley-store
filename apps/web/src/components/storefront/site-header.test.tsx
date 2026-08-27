@@ -10,12 +10,9 @@ import { SiteHeaderClient } from './site-header';
 const logoutAction = vi.fn();
 
 const emptyCart: Cart = {
-  adjustmentMessage: null,
-  checkoutEligible: false,
   currency: 'USD',
   distinctItemCount: 0,
   items: [],
-  serverNow: '2026-08-25T10:00:00.000Z',
   subtotalMinor: 0,
 };
 
@@ -227,11 +224,9 @@ describe('SiteHeader', () => {
     const user = userEvent.setup();
     const addedCart: Cart = {
       ...emptyCart,
-      checkoutEligible: true,
       distinctItemCount: 1,
       items: [
         {
-          availability: 'available',
           priceMinor: 599,
           imagePath: '/assets/products/citra-hops.webp',
           kitYieldVolumeMl: null,
@@ -246,8 +241,6 @@ describe('SiteHeader', () => {
           productId: '10000000-0000-4000-8000-000000000001',
           productSlug: 'citra-hops',
           amount: 100_000,
-          reservationExpiresAt: '2026-08-25T10:15:00.000Z',
-          reservationStatus: 'active',
           saleKind: 'WEIGHT',
           stockAmount: 100_000_000,
           amountUnit: 'MILLIGRAM',
@@ -296,9 +289,14 @@ function createTransport(
 ): CartTransport {
   return {
     add: vi.fn(async () => loadedCart),
+    checkoutReadiness: vi.fn(async () => ({
+      checkedAt: '2026-08-27T12:00:00.000Z',
+      lines: [],
+      status:
+        loadedCart.items.length === 0 ? ('empty' as const) : ('ready' as const),
+    })),
     clear: vi.fn(async () => loadedCart),
     load: vi.fn(async () => loadedCart),
-    recheck: vi.fn(async () => loadedCart),
     remove: vi.fn(async () => loadedCart),
     update: vi.fn(async () => loadedCart),
     ...overrides,

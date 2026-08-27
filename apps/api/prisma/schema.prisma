@@ -163,6 +163,7 @@ model CartItem {
   id                   String            @id(map: "CartItem_pkey") @default(uuid()) @db.Uuid
   cartId               String            @db.Uuid
   productId            String            @db.Uuid
+  /// Dormant O1B history pointer. O2S keeps the column for compatibility while a database check requires NULL.
   currentReservationId String?           @unique(map: "CartItem_currentReservationId_key") @db.Uuid
   amount               Int
   createdAt            DateTime          @default(now())
@@ -183,7 +184,8 @@ model CartReservation {
   cartItemId String?               @db.Uuid
   productId  String                @db.Uuid
   amount     Int
-  status     CartReservationStatus @default(ACTIVE)
+  /// Historical only after O2S. A database check rejects future ACTIVE rows.
+  status     CartReservationStatus @default(EXPIRED)
   reservedAt DateTime
   expiresAt  DateTime
   releasedAt DateTime?

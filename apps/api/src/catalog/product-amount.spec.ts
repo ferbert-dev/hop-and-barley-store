@@ -10,6 +10,7 @@ describe('measured product amounts', () => {
     maximumOrderAmount: null,
     minimumOrderAmount: 100_000,
     orderStepAmount: 100_000,
+    saleKind: 'WEIGHT',
   } as const;
 
   it.each([100_000, 200_000, 2_000_000, 10_000_000, 100_000_000])(
@@ -17,10 +18,44 @@ describe('measured product amounts', () => {
     (amount) => expect(isValidOrderAmount(amount, weightRules)).toBe(true),
   );
 
-  it.each([99_999, 100_001, 155_000, MAX_COMMERCE_AMOUNT + 1])(
+  it.each([99_999, 100_001, 155_000, 100_100_000, MAX_COMMERCE_AMOUNT + 1])(
     'rejects below-minimum, off-step, or unsafe amount %i',
     (amount) => expect(isValidOrderAmount(amount, weightRules)).toBe(false),
   );
+
+  it('applies a lower explicit maximum to one weight product only', () => {
+    expect(
+      isValidOrderAmount(20_000_000, {
+        ...weightRules,
+        maximumOrderAmount: 20_000_000,
+      }),
+    ).toBe(true);
+    expect(
+      isValidOrderAmount(20_100_000, {
+        ...weightRules,
+        maximumOrderAmount: 20_000_000,
+      }),
+    ).toBe(false);
+  });
+
+  it('retains the integer lattice and technical bound for package and kit products', () => {
+    expect(
+      isValidOrderAmount(2_000_000_000, {
+        maximumOrderAmount: null,
+        minimumOrderAmount: 1,
+        orderStepAmount: 1,
+        saleKind: 'PACKAGE',
+      }),
+    ).toBe(true);
+    expect(
+      isValidOrderAmount(12, {
+        maximumOrderAmount: 12,
+        minimumOrderAmount: 2,
+        orderStepAmount: 2,
+        saleKind: 'KIT',
+      }),
+    ).toBe(true);
+  });
 
   it('rounds proportional prices once using exact integer arithmetic', () => {
     expect(calculateLineTotalMinor(599, 100_000, 100_000)).toBe(599);

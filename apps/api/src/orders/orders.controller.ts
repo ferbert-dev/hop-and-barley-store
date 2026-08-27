@@ -27,6 +27,7 @@ import type { AuthRequest } from '../auth/auth-request';
 import { CartCapabilityGuard } from '../cart/cart-capability.guard';
 import { type CartCookieMode, clearCartCookie } from '../cart/cart-cookie';
 import type { CartRequest } from '../cart/cart-request';
+import { AllocationUnavailableDto } from './dto/allocation-unavailable.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderDto } from './dto/order-response.dto';
 import { IdempotencyKeyPipe } from './idempotency-key.pipe';
@@ -48,8 +49,8 @@ export class OrdersController {
   @ApiSecurity({ cartCookie: [], sessionCookie: [] })
   @ApiOperation({
     description:
-      'Creates a server-priced Cash on Delivery order from the authenticated user’s active cart reservation. Debit Card is finalized only by the future verified Stripe webhook boundary and cannot be finalized by this browser route.',
-    summary: 'Create an order from the active reserved cart',
+      'Atomically allocates current inventory, snapshots current server prices, creates a Cash on Delivery order and clears the authenticated user’s cart. Debit Card remains unavailable until its payment-first allocation flow is implemented.',
+    summary: 'Atomically allocate inventory and create a COD order',
   })
   @ApiHeader({ name: 'Origin', required: true, schema: { type: 'string' } })
   @ApiHeader({
@@ -96,7 +97,8 @@ export class OrdersController {
   })
   @ApiUnprocessableEntityResponse({
     description:
-      'Cart, reservation, product, amount, stock or payment method is unavailable',
+      'Cart, product, amount, price, stock or payment method is unavailable. Business allocation failures use safe per-line outcomes without exact stock.',
+    type: AllocationUnavailableDto,
   })
   @ApiUnsupportedMediaTypeResponse({ description: 'JSON body required' })
   async create(

@@ -51,8 +51,9 @@ describe('O2 order contract', () => {
         { data: '', metatype: CreateOrderDto, type: 'body' },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
+    const service = new OrdersService({} as PrismaService);
     await expect(
-      new OrdersService({} as PrismaService).create(
+      service.create(
         {
           cartId: '30000000-0000-4000-8000-000000000001',
           idempotencyKey: 'order-key-001',
@@ -64,6 +65,7 @@ describe('O2 order contract', () => {
         },
       ),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    expect(service).not.toHaveProperty('finalizeVerifiedStripePayment');
   });
 
   it('requires a bounded replay-safe idempotency key', () => {

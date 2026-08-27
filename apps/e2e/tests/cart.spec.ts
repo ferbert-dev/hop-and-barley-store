@@ -155,168 +155,148 @@ test.describe('API-backed guest cart', () => {
   });
 });
 
-test.describe('F3 cart reservations', () => {
-  test('renders the Figma cart controls and a server-derived reservation countdown', async ({
+test.describe('O2S advisory checkout readiness', () => {
+  test('checks once with a stable pending label, then hands a ready cart to checkout', async ({
     page,
   }) => {
-    const activeCart = cartFixture({
+    const cart = cartFixture({
+      items: [cartLine({ name: 'Citra Hops', amount: 500_000 })],
+    });
+    await interceptCart(page, cart, {
+      readiness: readinessFixture('ready', cart.items),
+    });
+
+    await page.goto('/cart');
+    const checkout = page.getByRole('button', { name: 'Proceed to Checkout' });
+    const readinessRequest = page.waitForRequest(
+      (request) =>
+        request.url().endsWith('/api/v1/cart/checkout-readiness') &&
+        request.method() === 'POST',
+    );
+    await checkout.click();
+    await expect(
+      page.getByRole('button', { name: 'Checking availability…' }),
+    ).toBeVisible();
+    await readinessRequest;
+    await expect(page).toHaveURL(/\/checkout$/);
+  });
+
+  test('keeps every line and control when readiness identifies multiple failures', async ({
+    page,
+  }) => {
+    const cart = cartFixture({
       items: [
         cartLine({ name: 'Citra Hops', amount: 500_000 }),
+        cartLine({ name: 'Mosaic Hops', productSlug: 'mosaic-hops' }),
         cartLine({
           name: 'Caramel Malt 60L',
           productSlug: 'caramel-malt-60l',
         }),
       ],
     });
-    await interceptCart(page, activeCart);
+    await interceptCart(page, cart, {
+      readiness: readinessFixture('unavailable', cart.items, {
+        'caramel-malt-60l': 'product_unavailable',
+        'citra-hops': 'insufficient_stock',
+      }),
+    });
 
     await page.goto('/cart');
+    await page.getByRole('button', { name: 'Proceed to Checkout' }).click();
 
-    await expect(
-      page.getByRole('heading', { level: 1, name: 'Shopping Cart' }),
-    ).toBeVisible();
-    await expect(
-      quantityForm(page, 'Citra Hops').getByLabel('Quantity'),
-    ).toHaveValue('0.5');
+    await expect(page).toHaveURL(/\/cart$/);
     await expect(
       page
-        .getByRole('heading', { name: 'Citra Hops' })
-        .locator('..')
-        .getByText('US$5.99 per 100g'),
+        .getByRole('status')
+        .filter({ hasText: 'Availability needs attention' }),
+    ).toBeVisible();
+    const citraLine = page
+      .getByRole('heading', { name: 'Citra Hops' })
+      .locator('xpath=ancestor::div[.//form][1]');
+    await expect(
+      citraLine.getByText('This amount is not currently available.'),
+    ).toBeVisible();
+    const caramelLine = page
+      .getByRole('heading', { name: 'Caramel Malt 60L' })
+      .locator('xpath=ancestor::div[.//form][1]');
+    await expect(
+      caramelLine.getByText('This item is no longer available.'),
     ).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Update Citra Hops' }),
-    ).toHaveCount(0);
+      quantityForm(page, 'Mosaic Hops').getByLabel('Quantity'),
+    ).toBeEnabled();
     await expect(
-      page.getByRole('link', { exact: true, name: 'Citra Hops' }),
-    ).toHaveAttribute('href', '/product/citra-hops');
-    await expect(
-      page.getByRole('link', { name: 'View Citra Hops' }),
-    ).toHaveAttribute('href', '/product/citra-hops');
-    await expect(
-      page.getByRole('button', { name: 'Remove Citra Hops from cart' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('link', { name: 'Proceed to Checkout' }),
-    ).toHaveAttribute('href', '/checkout');
-    await expectReservationCountdown(page);
-  });
-
-  test('keeps expired lines and offers one cart-wide availability recheck', async ({
-    page,
-  }) => {
-    const expiredCart = cartFixture({
-      checkoutEligible: false,
-      items: [
-        cartLine({
-          name: 'Citra Hops',
-          amount: 500_000,
-          reservation: 'expired',
-        }),
-        cartLine({
-          name: 'Caramel Malt 60L',
-          productSlug: 'caramel-malt-60l',
-          reservation: 'expired',
-        }),
-      ],
-    });
-    await interceptCart(page, expiredCart);
-
-    await page.goto('/cart');
-
-    await expect(
-      page.getByRole('heading', { name: 'Citra Hops' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Caramel Malt 60L' }),
-    ).toBeVisible();
-    await expect(
-      page.getByText(
-        'Reservations expired. Recheck availability before checkout.',
-      ),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Recheck availability' }),
-    ).toHaveCount(1);
-    await expect(page.getByText('Out of stock', { exact: true })).toHaveCount(
-      0,
-    );
-    await expect(
-      page.getByText('Remove unavailable items before checkout.'),
-    ).toHaveCount(0);
-    await expect(
-      page.getByText('Recheck availability before checkout.', { exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('link', { name: 'Proceed to Checkout' }),
-    ).toHaveCount(0);
-  });
-
-  test('uses the recheck response as authoritative without removing unavailable lines', async ({
-    page,
-  }) => {
-    const expiredCart = cartFixture({
-      checkoutEligible: false,
-      items: [
-        cartLine({
-          name: 'Citra Hops',
-          amount: 500_000,
-          reservation: 'expired',
-        }),
-        cartLine({
-          name: 'Caramel Malt 60L',
-          productSlug: 'caramel-malt-60l',
-          reservation: 'expired',
-        }),
-      ],
-    });
-    const recheckedCart = cartFixture({
-      adjustmentMessage:
-        'Citra Hops was adjusted to 3. Caramel Malt 60L is out of stock.',
-      checkoutEligible: false,
-      items: [
-        cartLine({ name: 'Citra Hops', amount: 300_000 }),
-        cartLine({
-          availability: 'unavailable',
-          name: 'Caramel Malt 60L',
-          productSlug: 'caramel-malt-60l',
-          reservation: 'unreserved',
-        }),
-      ],
-    });
-    await interceptCart(page, expiredCart, { recheck: recheckedCart });
-
-    await page.goto('/cart');
-    const recheckResponse = page.waitForResponse(
-      (response) =>
-        response.url().endsWith('/api/v1/cart/recheck') &&
-        response.request().method() === 'POST',
-    );
-    await page.getByRole('button', { name: 'Recheck availability' }).click();
-    await recheckResponse;
-
-    await expect(
-      quantityForm(page, 'Citra Hops').getByLabel('Quantity'),
-    ).toHaveValue('0.3');
-    await expectReservationCountdown(page);
-    await expect(
-      page.getByRole('status').filter({
-        hasText:
-          'Citra Hops was adjusted to 3. Caramel Malt 60L is out of stock.',
+      quantityForm(page, 'Citra Hops').getByRole('button', {
+        name: 'Increase weight amount',
       }),
-    ).toHaveText(
-      'Citra Hops was adjusted to 3. Caramel Malt 60L is out of stock.',
+    ).toBeEnabled();
+    await expect(page.getByText(/reservation|recheck/i)).toHaveCount(0);
+  });
+
+  test('keeps independent 0.1 kg weight lines and allows one line at 100 kg without an aggregate cap', async ({
+    page,
+  }) => {
+    const cart = cartFixture({
+      items: [
+        cartLine({ name: 'Citra Hops', amount: 100_000 }),
+        cartLine({ name: 'Mosaic Hops', productSlug: 'mosaic-hops' }),
+      ],
+    });
+    const afterCitraUpdate = cartFixture({
+      items: [
+        cartLine({ name: 'Citra Hops', amount: 100_000_000 }),
+        cartLine({ name: 'Mosaic Hops', productSlug: 'mosaic-hops' }),
+      ],
+    });
+    await interceptCart(page, cart, { update: afterCitraUpdate });
+
+    await page.goto('/cart');
+    const citraAmount = quantityForm(page, 'Citra Hops').getByLabel('Quantity');
+    await citraAmount.fill('100');
+    const updateRequest = page.waitForRequest(
+      (request) =>
+        request.url().includes('/api/v1/cart/items/citra-hops') &&
+        request.method() === 'PATCH',
     );
+    await citraAmount.press('Enter');
+    expect((await updateRequest).postDataJSON()).toEqual({
+      amount: 100_000_000,
+    });
+    await expect(citraAmount).toHaveValue('100');
     await expect(
-      page.getByRole('heading', { name: 'Caramel Malt 60L' }),
-    ).toBeVisible();
-    await expect(page.getByText('Out of stock', { exact: true })).toBeVisible();
-    await expect(
-      page.getByText('Remove unavailable items before checkout.'),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('link', { name: 'Proceed to Checkout' }),
-    ).toHaveCount(0);
+      quantityForm(page, 'Mosaic Hops').getByLabel('Quantity'),
+    ).toHaveValue('0.1');
+  });
+
+  test('uses the restored primary action to recover from a generic readiness transport failure', async ({
+    page,
+  }) => {
+    const cart = cartFixture({
+      items: [cartLine({ name: 'Citra Hops' })],
+    });
+    await interceptCart(page, cart, {
+      readiness: readinessFixture('ready', cart.items),
+      readinessFailures: 1,
+    });
+
+    await page.goto('/cart');
+    const checkout = page.getByRole('button', { name: 'Proceed to Checkout' });
+    await checkout.click();
+    const alert = page
+      .getByRole('alert')
+      .filter({ hasText: 'We couldn’t check availability. Try again.' });
+    await expect(alert).toBeVisible();
+    await expect(alert).not.toContainText(/csrf|token|cookie|fetch|stack/i);
+    await expect(checkout).toBeEnabled();
+
+    const retryRequest = page.waitForRequest(
+      (request) =>
+        request.url().endsWith('/api/v1/cart/checkout-readiness') &&
+        request.method() === 'POST',
+    );
+    await checkout.click();
+    await retryRequest;
+    await expect(page).toHaveURL(/\/checkout$/);
   });
 
   test('keeps amount, remove, and clear controls keyboard-operable with canonical responses', async ({
@@ -337,7 +317,7 @@ test.describe('F3 cart reservations', () => {
     const withoutCitraCart = cartFixture({
       items: [cartLine({ name: 'Mosaic Hops', productSlug: 'mosaic-hops' })],
     });
-    const emptyCart = cartFixture({ checkoutEligible: false, items: [] });
+    const emptyCart = cartFixture({ items: [] });
     await interceptCart(page, initialCart, {
       clear: emptyCart,
       remove: withoutCitraCart,
@@ -396,17 +376,13 @@ test.describe('cart unavailable state', () => {
 });
 
 type CartFixture = Readonly<{
-  adjustmentMessage: string | null;
-  checkoutEligible: boolean;
   currency: 'USD';
   distinctItemCount: number;
   items: CartFixtureItem[];
-  serverNow: string;
   subtotalMinor: number;
 }>;
 
 type CartFixtureItem = Readonly<{
-  availability: 'available' | 'unavailable';
   imagePath: string;
   lineTotalMinor: number | null;
   name: string;
@@ -424,36 +400,42 @@ type CartFixtureItem = Readonly<{
   priceQualifier: string;
   productId: string;
   productSlug: string;
-  reservationExpiresAt: string | null;
-  reservationStatus: 'active' | 'expired' | 'unreserved';
+}>;
+
+type CheckoutReadinessFixture = Readonly<{
+  checkedAt: string;
+  lines: ReadonlyArray<
+    Readonly<{
+      outcome:
+        | 'available'
+        | 'insufficient_stock'
+        | 'product_unavailable'
+        | 'invalid_amount'
+        | 'price_unavailable';
+      productSlug: string;
+      requestedAmount: number;
+    }>
+  >;
+  status: 'ready' | 'empty' | 'unavailable';
 }>;
 
 type CartFixtureHandlers = Readonly<
   Partial<{
     clear: CartFixture;
-    recheck: CartFixture;
     remove: CartFixture;
+    readiness: CheckoutReadinessFixture;
+    readinessFailures: number;
     update: CartFixture;
   }>
 >;
 
 function cartFixture({
-  adjustmentMessage = null,
-  checkoutEligible = true,
   items,
-}: Readonly<{
-  adjustmentMessage?: string | null;
-  checkoutEligible?: boolean;
-  items: CartFixtureItem[];
-}>): CartFixture {
-  const now = new Date();
+}: Readonly<{ items: CartFixtureItem[] }>): CartFixture {
   return {
-    adjustmentMessage,
-    checkoutEligible,
     currency: 'USD',
     distinctItemCount: items.length,
     items,
-    serverNow: now.toISOString(),
     subtotalMinor: items.reduce(
       (sum, item) => sum + (item.lineTotalMinor ?? 0),
       0,
@@ -462,30 +444,17 @@ function cartFixture({
 }
 
 function cartLine({
-  availability,
   amount = 100_000,
   name,
   productSlug = name.toLowerCase().replaceAll(' ', '-'),
-  reservation = 'active',
 }: Readonly<{
-  availability?: 'available' | 'unavailable';
   amount?: number;
   name: string;
   productSlug?: string;
-  reservation?: 'active' | 'expired' | 'unreserved';
 }>): CartFixtureItem {
-  const reservationExpiresAt =
-    reservation === 'unreserved'
-      ? null
-      : new Date(
-          Date.now() + (reservation === 'active' ? 15 * 60_000 : -1_000),
-        ).toISOString();
-  const resolvedAvailability =
-    availability ?? (reservation === 'active' ? 'available' : 'unavailable');
   const priceMinor = 599;
   const priceBasisAmount = 100_000;
   return {
-    availability: resolvedAvailability,
     imagePath: `/assets/products/${productSlug}.jpg`,
     lineTotalMinor:
       priceMinor === null
@@ -508,8 +477,29 @@ function cartLine({
     priceQualifier: 'per 100g',
     productId: fixtureProductId(productSlug),
     productSlug,
-    reservationExpiresAt,
-    reservationStatus: reservation,
+  };
+}
+
+function readinessFixture(
+  status: CheckoutReadinessFixture['status'],
+  items: readonly CartFixtureItem[],
+  overrides: Readonly<
+    Partial<
+      Record<string, CheckoutReadinessFixture['lines'][number]['outcome']>
+    >
+  > = {},
+): CheckoutReadinessFixture {
+  return {
+    checkedAt: '2026-08-27T12:00:00.000Z',
+    lines:
+      status === 'empty'
+        ? []
+        : items.map((item) => ({
+            outcome: overrides[item.productSlug] ?? 'available',
+            productSlug: item.productSlug,
+            requestedAmount: item.amount,
+          })),
+    status,
   };
 }
 
@@ -528,6 +518,7 @@ async function interceptCart(
   handlers: CartFixtureHandlers = {},
 ) {
   let canonicalCart = initialCart;
+  let readinessFailuresRemaining = handlers.readinessFailures ?? 0;
   const handleCartRequest = async (route: Route) => {
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
@@ -551,9 +542,23 @@ async function interceptCart(
       return;
     }
 
-    if (pathname.endsWith('/recheck') && request.method() === 'POST') {
-      canonicalCart = handlers.recheck ?? canonicalCart;
-      await fulfillCart(route, canonicalCart);
+    if (
+      pathname.endsWith('/checkout-readiness') &&
+      request.method() === 'POST'
+    ) {
+      if (readinessFailuresRemaining > 0) {
+        readinessFailuresRemaining -= 1;
+        await route.fulfill({
+          contentType: 'application/json',
+          headers: privateCartHeaders(request),
+          status: 503,
+        });
+        return;
+      }
+      await fulfillReadiness(
+        route,
+        handlers.readiness ?? readinessFixture('empty', []),
+      );
       return;
     }
 
@@ -623,10 +628,16 @@ async function fulfillCart(route: Route, cart: CartFixture) {
   });
 }
 
-async function expectReservationCountdown(page: Page) {
-  const countdown = page.getByText(/^Reservations expire in 1[45]:[0-5]\d$/);
-  await expect(countdown).toHaveCount(1);
-  await expect(countdown).toBeVisible();
+async function fulfillReadiness(
+  route: Route,
+  readiness: CheckoutReadinessFixture,
+) {
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  await route.fulfill({
+    body: JSON.stringify(readiness),
+    contentType: 'application/json',
+    headers: privateCartHeaders(route.request()),
+  });
 }
 
 function quantityForm(page: Page, productName: string) {

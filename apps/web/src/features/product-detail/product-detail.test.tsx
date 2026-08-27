@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -48,21 +54,22 @@ const product = {
 };
 
 const emptyCart: Cart = {
-  adjustmentMessage: null,
-  checkoutEligible: false,
   currency: 'USD',
   distinctItemCount: 0,
   items: [],
-  serverNow: '2026-08-25T10:00:00.000Z',
   subtotalMinor: 0,
 };
 
 function createTransport(): CartTransport {
   return {
     add: vi.fn(async () => emptyCart),
+    checkoutReadiness: vi.fn(async () => ({
+      checkedAt: '2026-08-27T12:00:00.000Z',
+      lines: [],
+      status: 'empty' as const,
+    })),
     clear: vi.fn(async () => emptyCart),
     load: vi.fn(async () => emptyCart),
-    recheck: vi.fn(async () => emptyCart),
     remove: vi.fn(async () => emptyCart),
     update: vi.fn(async () => emptyCart),
   };
@@ -121,7 +128,7 @@ describe('ProductDetail', () => {
     expect(screen.queryByRole('heading', { name: /reviews/i })).toBeNull();
   });
 
-  it('does not expose exact stock details on the product page', async () => {
+  it('keeps cart intent independent from exact product stock details', async () => {
     const transport = createTransport();
     const { rerender } = renderProductDetail(product, transport);
     expect(screen.queryByText(/100 in stock/i)).toBeNull();
@@ -132,10 +139,12 @@ describe('ProductDetail', () => {
         <ProductDetail product={{ ...product, availability: 'out-of-stock' }} />
       </CartProvider>,
     );
-    expect(await screen.findByText('Out of stock')).toBeVisible();
-    expect(
-      screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
-    ).toBeDisabled();
+    expect(screen.queryByText('Out of stock')).toBeNull();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
+      ).toBeEnabled(),
+    );
     expect(screen.getByText('Viewing Citra Hops')).toHaveAttribute(
       'aria-live',
       'polite',
