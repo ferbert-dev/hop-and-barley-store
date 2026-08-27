@@ -6,10 +6,7 @@ import { Button } from '../../components/ui/button';
 import { ErrorState } from '../../components/ui/status';
 import { useCart } from '../cart/cart-context';
 import { QuantityForm } from '../quantity/quantity-form';
-import {
-  formatAmount,
-  type QuantityMetadata,
-} from '../quantity/quantity-model';
+import { type QuantityMetadata } from '../quantity/quantity-model';
 import styles from './product-detail.module.css';
 
 type ProductCartControlProps = Readonly<{
@@ -53,6 +50,14 @@ export function ProductCartControl({
   const item = cart.items.find((entry) => entry.productSlug === productSlug);
   const loading = cart.state.kind === 'loading';
   const message = cart.state.kind === 'ready' ? cart.state.message : undefined;
+  const reservationExpired = item
+    ? item.reservationStatus === 'expired' ||
+      (item.reservationStatus === 'active' &&
+        item.reservationExpiresAt !== null &&
+        cart.state.kind === 'ready' &&
+        Date.parse(item.reservationExpiresAt) <=
+          Date.parse(cart.state.cart.serverNow))
+    : false;
   const productIsPending =
     pending?.kind === 'add' ||
     ((pending?.kind === 'remove' || pending?.kind === 'update') &&
@@ -65,22 +70,16 @@ export function ProductCartControl({
           {message}
         </p>
       ) : null}
-      {item ? (
-        <CartQuantityControl
-          item={item}
-          productName={productName}
-          productSlug={productSlug}
-        />
-      ) : (
-        <AddToCartControl
-          availability={availability}
-          loading={loading}
-          productName={productName}
-          productSlug={productSlug}
-          priceMinor={priceMinor}
-          quantityMetadata={quantityMetadata}
-        />
-      )}
+      <AddToCartControl
+        availability={availability}
+        cartLineUnavailable={item?.availability === 'unavailable'}
+        loading={loading}
+        productName={productName}
+        productSlug={productSlug}
+        priceMinor={priceMinor}
+        quantityMetadata={quantityMetadata}
+        reservationExpired={reservationExpired}
+      />
       {productIsPending ? (
         <p className={styles.cartMessage} role="status">
           Updating cart…
@@ -97,16 +96,24 @@ function AddToCartControl({
   productSlug,
   priceMinor,
   quantityMetadata,
-}: ProductCartControlProps & Readonly<{ loading: boolean }>) {
+  cartLineUnavailable = false,
+  reservationExpired = false,
+}: ProductCartControlProps &
+  Readonly<{
+    cartLineUnavailable?: boolean;
+    loading: boolean;
+    reservationExpired?: boolean;
+  }>) {
   const { add, pending, state } = useCart();
   const outOfStock = availability === 'out-of-stock';
+  const unavailable = outOfStock || cartLineUnavailable || reservationExpired;
 
   return (
     <>
       <QuantityForm
         amount={quantityMetadata.minimumOrderAmount}
         currency={state.kind === 'ready' ? state.cart.currency : 'USD'}
-        disabled={loading || outOfStock || pending !== null}
+        disabled={loading || unavailable || pending !== null}
         metadata={quantityMetadata}
         onSubmit={(amount) => add(productSlug, amount)}
         priceMinor={priceMinor}
@@ -117,49 +124,7 @@ function AddToCartControl({
           Loading your cart…
         </p>
       ) : null}
-      {outOfStock ? (
-        <p className={styles.cartAvailability} role="status">
-          Out of stock
-        </p>
-      ) : null}
-    </>
-  );
-}
-
-function CartQuantityControl({
-  item,
-  productName,
-  productSlug,
-}: Readonly<{
-  item: ReturnType<typeof useCart>['items'][number];
-  productName: string;
-  productSlug: string;
-}>) {
-  const { pending, state, update } = useCart();
-  const reservationExpired =
-    item.reservationStatus === 'expired' ||
-    (item.reservationStatus === 'active' &&
-      item.reservationExpiresAt !== null &&
-      state.kind === 'ready' &&
-      Date.parse(item.reservationExpiresAt) <=
-        Date.parse(state.cart.serverNow));
-  const unavailable = item.availability === 'unavailable' || reservationExpired;
-
-  return (
-    <>
-      <QuantityForm
-        amount={item.amount}
-        currency={state.kind === 'ready' ? state.cart.currency : 'USD'}
-        disabled={pending !== null || unavailable}
-        metadata={item}
-        onSubmit={(amount) => update(productSlug, amount)}
-        priceMinor={item.priceMinor}
-        submitLabel={`Update ${productName} cart amount`}
-      />
-      <p className={styles.cartQuantity} aria-live="polite">
-        {formatAmount(item.amount, item)} in cart
-      </p>
-      {item.availability === 'unavailable' && !reservationExpired ? (
+      {outOfStock || (cartLineUnavailable && !reservationExpired) ? (
         <p className={styles.cartAvailability} role="status">
           Out of stock
         </p>

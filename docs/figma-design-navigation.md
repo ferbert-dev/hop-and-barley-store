@@ -192,6 +192,10 @@ Page 1 (0:1)
   when catalog data supplies it; do not infer a pouch weight.
 - Recipe kits remain an integer kit count and show the aggregate batch yield for
   the selected count in gallons and approximate litres.
+- Product details always keep the `Add to Cart` action. When the product already
+  has a cart line, another add increments that line by the newly selected amount
+  instead of replacing it. The product page does not show a separate `in cart`
+  quantity; line editing remains on the shopping-cart screen.
 - These controls extend the approved Figma visual language. They are a product
   decision, not evidence that the additional labels or states were drawn in the
   source frame.
@@ -215,6 +219,9 @@ Page 1 (0:1)
   example `200 g`, `10 kg`, `2 packs`, or `4 kits`.
 - Weight plus/minus and direct entry use the same 100 g lattice. Product sale
   rules and current stock define the maximum.
+- The 2026-08-27 product decision supersedes this product-detail component
+  state: the detail page retains `Add to Cart` and does not render `1 in cart`.
+  Quantity editing is still available on the shopping-cart screen.
 
 ### Shopping cart — `cart`
 

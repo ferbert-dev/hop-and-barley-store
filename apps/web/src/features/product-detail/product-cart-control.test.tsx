@@ -33,6 +33,7 @@ const emptyCart: Cart = {
 afterEach(() => cleanup());
 
 function cartWithAmount(amount: number): Cart {
+  const lineTotalMinor = (amount / 100_000) * 599;
   return {
     ...emptyCart,
     checkoutEligible: true,
@@ -44,7 +45,7 @@ function cartWithAmount(amount: number): Cart {
         availability: 'available',
         priceMinor: 599,
         imagePath: '/assets/products/citra-hops.webp',
-        lineTotalMinor: 599,
+        lineTotalMinor,
         name: productName,
         priceQualifier: 'per 100g',
         productId: '10000000-0000-4000-8000-000000000001',
@@ -53,7 +54,7 @@ function cartWithAmount(amount: number): Cart {
         reservationStatus: 'active',
       },
     ],
-    subtotalMinor: 599,
+    subtotalMinor: lineTotalMinor,
   };
 }
 
@@ -109,15 +110,20 @@ describe('ProductCartControl', () => {
       screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
     );
 
-    await waitFor(() => expect(screen.getByText('200g in cart')).toBeVisible());
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
+      ).toBeEnabled(),
+    );
     expect(transport.add).toHaveBeenCalledWith(productSlug, 200_000);
+    expect(screen.queryByText(/in cart/i)).toBeNull();
     expect(screen.queryByRole('link', { name: /sign in/i })).toBeNull();
   });
 
-  it('updates an existing physical amount and exposes unavailable state without stock details', async () => {
+  it('adds the selection to an existing line and exposes unavailable state without stock details', async () => {
     const user = userEvent.setup();
     const transport = createTransport(cartWithAmount(100_000), {
-      update: vi.fn(async () => cartWithAmount(200_000)),
+      add: vi.fn(async () => cartWithAmount(300_000)),
     });
     renderControl('in-stock', transport);
 
@@ -130,12 +136,19 @@ describe('ProductCartControl', () => {
     await user.clear(input);
     await user.type(input, '0.2');
     await user.click(
-      screen.getByRole('button', { name: 'Update Citra Hops cart amount' }),
+      screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
     );
 
-    await waitFor(() => expect(screen.getByText('200g in cart')).toBeVisible());
-    expect(transport.update).toHaveBeenCalledWith(productSlug, 200_000);
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
+      ).toBeEnabled(),
+    );
+    expect(transport.add).toHaveBeenCalledWith(productSlug, 200_000);
+    expect(transport.update).not.toHaveBeenCalled();
+    expect(screen.queryByText(/in cart/i)).toBeNull();
 
+    cleanup();
     renderControl('out-of-stock');
     expect(await screen.findByText('Out of stock')).toBeVisible();
     expect(
@@ -144,14 +157,14 @@ describe('ProductCartControl', () => {
     expect(screen.queryByText(/100000|stock amount/i)).toBeNull();
   });
 
-  it('disables the physical amount controls while an update is pending', async () => {
+  it('disables the physical amount controls while an additive request is pending', async () => {
     const user = userEvent.setup();
-    let resolveUpdate: ((cart: Cart) => void) | undefined;
+    let resolveAdd: ((cart: Cart) => void) | undefined;
     const transport = createTransport(cartWithAmount(100_000), {
-      update: vi.fn(
+      add: vi.fn(
         () =>
           new Promise<Cart>((resolve) => {
-            resolveUpdate = resolve;
+            resolveAdd = resolve;
           }),
       ),
     });
@@ -165,17 +178,23 @@ describe('ProductCartControl', () => {
     await user.clear(input);
     await user.type(input, '0.2');
     await user.click(
-      screen.getByRole('button', { name: 'Update Citra Hops cart amount' }),
+      screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
     );
 
     expect(screen.getAllByLabelText('Quantity').at(-1)).toBeDisabled();
     expect(screen.getByText('Updating cart…')).toBeVisible();
 
-    resolveUpdate?.(cartWithAmount(200_000));
-    await waitFor(() => expect(screen.getByText('200g in cart')).toBeVisible());
+    resolveAdd?.(cartWithAmount(300_000));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
+      ).toBeEnabled(),
+    );
+    expect(transport.add).toHaveBeenCalledWith(productSlug, 200_000);
+    expect(screen.queryByText(/in cart/i)).toBeNull();
   });
 
-  it('restores the canonical amount after a failed update and keeps expired lines visible', async () => {
+  it('refreshes after a failed add and keeps expired lines visible', async () => {
     const user = userEvent.setup();
     const expired = cartWithAmount(100_000);
     expired.items[0].availability = 'unavailable';
@@ -185,7 +204,7 @@ describe('ProductCartControl', () => {
         .fn()
         .mockResolvedValueOnce(cartWithAmount(100_000))
         .mockResolvedValueOnce(cartWithAmount(100_000)),
-      update: vi.fn(async () => {
+      add: vi.fn(async () => {
         throw new Error('planned failure');
       }),
     });
@@ -199,7 +218,7 @@ describe('ProductCartControl', () => {
     await user.clear(input);
     await user.type(input, '0.2');
     await user.click(
-      screen.getByRole('button', { name: 'Update Citra Hops cart amount' }),
+      screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
     );
     await waitFor(() =>
       expect(

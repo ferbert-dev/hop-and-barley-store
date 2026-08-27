@@ -110,7 +110,7 @@ test.describe('database-backed product details', () => {
     ).toHaveAttribute('href', '/');
   });
 
-  test('adds as a guest, updates the canonical amount, and preserves the cart after reload', async ({
+  test('adds repeatedly as a guest, accumulates the canonical amount, and keeps the same action', async ({
     page,
   }) => {
     await clearGuestCart(page);
@@ -128,24 +128,39 @@ test.describe('database-backed product details', () => {
         amount: 100_000,
         productSlug: 'mosaic-hops',
       });
-      await expect(page.getByText('100g in cart')).toBeVisible();
       await expect(
         page.getByRole('link', { name: 'Shopping cart, 1 item' }),
       ).toHaveAttribute('href', '/cart');
+      await expect(
+        page.getByRole('button', { name: 'Add Mosaic Hops to Cart' }),
+      ).toBeVisible();
+      await expect(page.getByText(/in cart/i)).toHaveCount(0);
 
       await page
         .getByRole('button', { name: 'Increase weight amount' })
         .click();
+      const secondAddRequest = page.waitForRequest(
+        (candidate) =>
+          candidate.url().endsWith('/api/v1/cart/items') &&
+          candidate.method() === 'POST',
+      );
       await page
-        .getByRole('button', { name: 'Update Mosaic Hops cart amount' })
+        .getByRole('button', { name: 'Add Mosaic Hops to Cart' })
         .click();
-      await expect(page.getByText('200g in cart')).toBeVisible();
+      expect((await secondAddRequest).postDataJSON()).toEqual({
+        amount: 200_000,
+        productSlug: 'mosaic-hops',
+      });
       await expect(
         page.getByRole('link', { name: 'Shopping cart, 1 item' }),
       ).toBeVisible();
+      await expect(page.getByText(/in cart/i)).toHaveCount(0);
 
+      await page.getByRole('link', { name: 'Shopping cart, 1 item' }).click();
+      await expect(page).toHaveURL(/\/cart$/);
+      await expect(page.getByText(/300\s*g/i).first()).toBeVisible();
       await page.reload();
-      await expect(page.getByText('200g in cart')).toBeVisible();
+      await expect(page.getByText(/300\s*g/i).first()).toBeVisible();
     } finally {
       await clearGuestCart(page);
     }

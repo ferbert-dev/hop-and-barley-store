@@ -145,8 +145,13 @@ fixtures already use a 100 g basis. Package and kit prices remain per unit.
 - Package controls show integer packs and display net weight only when present.
 - Kit controls show integer kits and aggregate yield. Four 18,927 ml kits render
   as approximately 20 US gal / 76 L.
-- Catalog cards, product details, the added state, and cart lines use the same
-  sale-rule formatter and generated API contract.
+- Product details always retain the `Add to Cart` action and selection editor.
+  A repeated add atomically increments the existing cart line by the newly
+  selected canonical amount; it does not replace the line or show an `in cart`
+  quantity beside the product control. Direct line editing remains on the cart
+  screen.
+- Catalog cards, product details, and cart lines use the same sale-rule
+  formatter and generated API contract.
 - Controls expose stable accessible names, work from the keyboard, and retain
   their meaning at narrow layouts.
 
