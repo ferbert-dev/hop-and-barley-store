@@ -182,7 +182,7 @@ Page 1 (0:1)
 
 - Initial accordion state, review submission flow, authentication requirement, unavailable/out-of-stock state, and what opens after selecting the cart icon.
 
-**User-confirmed quantity extension — 2026-08-27**
+**User-confirmed quantity extension — 2026-08-27, revised by O2S**
 
 - Bulk ingredients are sold by weight. The storefront uses one kilogram input,
   prices against an explicit 100 g basis, starts at 0.1 kg, and accepts direct
@@ -217,8 +217,10 @@ Page 1 (0:1)
 
 - The displayed value is the physical amount, not a generic item count: for
   example `200 g`, `10 kg`, `2 packs`, or `4 kits`.
-- Weight plus/minus and direct entry use the same 100 g lattice. Product sale
-  rules and current stock define the maximum.
+- Weight plus/minus and direct entry use the same 100 g lattice. Each distinct
+  weight line may reach 100 kg, or a lower explicit product maximum,
+  independently of current stock and every other cart line. There is no
+  aggregate cart-weight ceiling.
 - The 2026-08-27 product decision supersedes this product-detail component
   state: the detail page retains `Add to Cart` and does not render `1 in cart`.
   Quantity editing is still available on the shopping-cart screen.
@@ -249,20 +251,34 @@ Page 1 (0:1)
 - The header badge counts distinct product lines. It never sums grams, packs,
   and kits into one dimensionless number.
 
-**User-confirmed immediate cart interaction extension — 2026-08-27**
+**User-confirmed immediate cart and checkout extension — 2026-08-27, revised by O2S**
 
 - Per-line plus/minus controls persist the new canonical amount immediately;
   valid direct entry persists on Enter or blur. There is no separate `Update`
   action.
 - The line total and cart total update optimistically with integer basis
   pricing, then reconcile to the server response. The server remains
-  authoritative for amount, stock, reservations and money.
+  authoritative for amount and money. Cart intent neither reserves nor
+  decrements stock.
 - The cart does not show redundant `Selected`, `Selection price`, or visible
   `Line total updating` rows. The localized reference price and basis sit below
   the product name; the line total remains at the upper right.
 - Product image and name link to the product detail route. `Remove` is a grey
   secondary action at the lower right. Checkout and clear-cart layout remain
   stable while a line update is pending.
+- Activating `Proceed to Checkout` sends one private, non-mutating availability
+  check. While it is pending, its stable accessible label is `Checking
+availability…`. A ready result navigates to `checkout`. An unavailable
+  result stays on the cart, preserves every line and its quantity controls,
+  shows `Availability needs attention`, and gives each failed line an
+  accessible explanation. The four confirmed explanations are `This item is no
+longer available.`, `This amount is not currently available.`, `Choose a
+valid amount for this item.`, and `This item cannot be checked out right
+now.`
+- A transport failure is generic and recoverable: `We couldn’t check
+availability. Try again.` The restored primary checkout control initiates a
+  fresh check. There is no reservation countdown, renewal, stock recheck
+  control, or cart-time allocation.
 - These behaviors refine the label-implied Figma quantity interaction and are
   a product decision, not evidence that the extra states were drawn in the
   source frame.
@@ -282,7 +298,13 @@ Page 1 (0:1)
 **Unclear — ask the user**
 
 - Required/optional fields, validation, address structure, card/wallet detail collection, payment provider, taxes/shipping, processing, success, failure, retry, cancellation, and order-confirmation screens.
-- Confirm whether `Cash On Delivery` is a supported production method.
+
+**Agreed by the user, absent from the design — O2S**
+
+- Cash On Delivery is the only order-placement method in this slice. Final
+  order placement—not the cart availability check—atomically revalidates and
+  allocates stock before payment success. Stripe/provider orchestration is
+  future scope.
 
 ### Registration — `account/register`
 
@@ -419,4 +441,6 @@ These additions define required behavior only. The implementation may use the sm
 3. Define responsive/mobile layouts and cross-screen loading, empty, validation, disabled, and error states.
 4. Confirm destinations for header/footer content links and whether those sections are in scope.
 5. Confirm admin permissions, edit/add route behavior, category values, `Hide`, and destructive `Delete` handling.
-6. Confirm product/cart stock and quantity rules, order-details behavior, and review submission behavior.
+6. Product/cart quantity and availability behavior is decided by ADR 0002;
+   supplier/backorder sourcing and delivery promises remain future scope.
+   Confirm order-details behavior and review submission behavior.

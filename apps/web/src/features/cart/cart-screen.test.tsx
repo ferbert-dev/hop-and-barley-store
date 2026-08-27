@@ -1,11 +1,17 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CartProvider, type CartState } from './cart-context';
 import { CartScreen } from './cart-screen';
-import type { Cart, CartTransport } from './cart-transport';
+import type { Cart, CartTransport, CheckoutReadiness } from './cart-transport';
+
+const push = vi.fn();
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push }),
+}));
 
 vi.mock('next/image', () => ({
   default: ({ alt, ...props }: ComponentProps<'img'>) => (
@@ -15,13 +21,10 @@ vi.mock('next/image', () => ({
 }));
 
 const cart: Cart = {
-  adjustmentMessage: null,
-  checkoutEligible: true,
   currency: 'USD',
   distinctItemCount: 1,
   items: [
     {
-      availability: 'available',
       priceMinor: 599,
       imagePath: '/assets/products/citra-hops.webp',
       kitYieldVolumeMl: null,
@@ -36,14 +39,11 @@ const cart: Cart = {
       productId: '10000000-0000-4000-8000-000000000001',
       productSlug: 'citra-hops',
       amount: 100_000,
-      reservationExpiresAt: '2026-08-25T12:15:00.000Z',
-      reservationStatus: 'active',
       saleKind: 'WEIGHT',
       stockAmount: 100_000_000,
       amountUnit: 'MILLIGRAM',
     },
   ],
-  serverNow: '2026-08-25T12:00:00.000Z',
   subtotalMinor: 599,
 };
 
@@ -55,7 +55,6 @@ const routeStates: readonly (readonly [string, CartState])[] = [
     {
       cart: {
         ...cart,
-        checkoutEligible: false,
         distinctItemCount: 0,
         items: [],
         subtotalMinor: 0,
@@ -66,7 +65,22 @@ const routeStates: readonly (readonly [string, CartState])[] = [
   ['ready', { cart, kind: 'ready' }],
 ];
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  push.mockReset();
+  vi.useRealTimers();
+});
+
+const unavailableReadiness: CheckoutReadiness = {
+  checkedAt: '2026-08-25T12:00:00.000Z',
+  lines: [
+    {
+      outcome: 'insufficient_stock',
+      productSlug: 'citra-hops',
+      requestedAmount: 100_000,
+    },
+  ],
+  status: 'unavailable',
+};
 
 describe('CartScreen', () => {
   it.each(routeStates)(
@@ -108,123 +122,110 @@ describe('CartScreen', () => {
       screen.getByRole('button', { name: 'Remove Citra Hops from cart' }),
     ).toHaveTextContent('Remove');
     expect(
-      screen.getByRole('link', { name: 'Proceed to Checkout' }),
-    ).toHaveAttribute('href', '/checkout');
+      screen.getByRole('button', { name: 'Proceed to Checkout' }),
+    ).toBeVisible();
     expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Shipping address')).not.toBeInTheDocument();
   });
 
-  it('derives the reservation countdown from server time despite a skewed client clock', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('1999-01-01T00:00:00.000Z'));
-    render(<CartScreen initialState={{ cart, kind: 'ready' }} />);
-
-    expect(screen.getByRole('timer')).toHaveTextContent(
-      'Reservations expire in 15:00',
-    );
-
-    act(() => {
-      vi.advanceTimersByTime(1_000);
-    });
-
-    expect(screen.getByRole('timer')).toHaveTextContent(
-      'Reservations expire in 14:59',
-    );
-  });
-
-  it('retains canonically expired lines without falsely claiming zero stock', () => {
-    const expiredCart: Cart = {
-      ...cart,
-      checkoutEligible: false,
-      items: [
-        {
-          ...cart.items[0],
-          availability: 'unavailable',
-          reservationExpiresAt: '2026-08-25T12:00:00.000Z',
-          reservationStatus: 'expired',
-        },
-      ],
-    };
-    render(<CartScreen initialState={{ cart: expiredCart, kind: 'ready' }} />);
-
-    expect(screen.getByText('Citra Hops')).toBeVisible();
-    expect(
-      screen.getByText(
-        'Reservations expired. Recheck availability before checkout.',
-      ),
-    ).toBeVisible();
-    expect(
-      screen.queryByRole('link', { name: 'Proceed to Checkout' }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText('Out of stock')).not.toBeInTheDocument();
-    expect(
-      screen.queryByText('Remove unavailable items before checkout.'),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByText('Recheck availability before checkout.'),
-    ).toBeVisible();
-    expect(
-      screen.getByRole('button', { name: 'Decrease weight amount' }),
-    ).toBeDisabled();
-    expect(
-      screen.getByRole('button', { name: 'Increase weight amount' }),
-    ).toBeDisabled();
-  });
-
-  it('keeps an out-of-stock line after recheck, announces the adjustment, and blocks checkout', async () => {
+  it('keeps every cart control available and reports a business outcome inline', async () => {
     const user = userEvent.setup();
-    const expiredCart: Cart = {
-      ...cart,
-      checkoutEligible: false,
-      items: [
-        {
-          ...cart.items[0],
-          availability: 'unavailable',
-          reservationStatus: 'expired',
-        },
-      ],
-    };
-    const recheckedCart: Cart = {
-      ...expiredCart,
-      adjustmentMessage: 'Citra Hops is no longer available.',
-      items: [
-        {
-          ...expiredCart.items[0],
-          availability: 'unavailable',
-          priceMinor: null,
-          lineTotalMinor: null,
-          reservationExpiresAt: null,
-          reservationStatus: 'unreserved',
-        },
-      ],
-      serverNow: '2026-08-25T12:01:00.000Z',
-      subtotalMinor: 0,
-    };
-    const recheck = vi.fn(async () => recheckedCart);
-    const transport = createTransport(expiredCart, { recheck });
+    const checkoutReadiness = vi.fn(async () => unavailableReadiness);
+    const transport = createTransport(cart, { checkoutReadiness });
     render(
       <CartProvider transport={transport}>
         <CartScreen />
       </CartProvider>,
     );
 
-    await screen.findByRole('button', { name: 'Recheck availability' });
     await user.click(
-      screen.getByRole('button', { name: 'Recheck availability' }),
+      await screen.findByRole('button', { name: 'Proceed to Checkout' }),
     );
 
-    expect(recheck).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Out of stock')).toBeVisible();
+    expect(checkoutReadiness).toHaveBeenCalledTimes(1);
     expect(
-      screen.getByText('Citra Hops is no longer available.'),
+      screen.getByText('This amount is not currently available.'),
     ).toBeVisible();
+    expect(screen.getByText('Availability needs attention')).toBeVisible();
     expect(
-      screen.getByText('Remove unavailable items before checkout.'),
-    ).toBeVisible();
+      screen.getByRole('button', { name: 'Proceed to Checkout' }),
+    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Clear cart' })).toBeEnabled();
     expect(
-      screen.queryByRole('link', { name: 'Proceed to Checkout' }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText('Citra Hops')).toBeVisible();
+      screen.getByRole('button', { name: 'Remove Citra Hops from cart' }),
+    ).toBeEnabled();
+    expect(screen.getByLabelText('Citra Hops quantity')).toBeEnabled();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('uses the checkout action for an availability preflight and navigates only when ready', async () => {
+    const user = userEvent.setup();
+    let resolveReadiness: ((value: CheckoutReadiness) => void) | undefined;
+    const transport = createTransport(cart, {
+      checkoutReadiness: vi.fn(
+        () =>
+          new Promise<CheckoutReadiness>((resolve) => {
+            resolveReadiness = resolve;
+          }),
+      ),
+    });
+    render(
+      <CartProvider transport={transport}>
+        <CartScreen />
+      </CartProvider>,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Proceed to Checkout' }),
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Checking availability…' }),
+    ).toBeDisabled();
+    expect(transport.checkoutReadiness).toHaveBeenCalledTimes(1);
+
+    resolveReadiness?.({
+      checkedAt: '2026-08-25T12:00:00.000Z',
+      lines: [
+        {
+          outcome: 'available',
+          productSlug: 'citra-hops',
+          requestedAmount: 100_000,
+        },
+      ],
+      status: 'ready',
+    });
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/checkout'));
+  });
+
+  it('keeps the primary action recoverable after a transport failure', async () => {
+    const user = userEvent.setup();
+    const checkoutReadiness = vi.fn(async () => {
+      throw new Error('offline');
+    });
+    const transport = createTransport(cart, { checkoutReadiness });
+    render(
+      <CartProvider transport={transport}>
+        <CartScreen />
+      </CartProvider>,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Proceed to Checkout' }),
+    );
+
+    expect(
+      await screen.findByText('We couldn’t check availability. Try again.'),
+    ).toHaveAttribute('role', 'alert');
+    expect(
+      screen.getByRole('button', { name: 'Proceed to Checkout' }),
+    ).toBeEnabled();
+    await user.click(
+      screen.getByRole('button', { name: 'Proceed to Checkout' }),
+    );
+    expect(checkoutReadiness).toHaveBeenCalledTimes(2);
+    expect(push).not.toHaveBeenCalled();
   });
 
   it('updates line and cart totals immediately while preserving the mounted cart through reconciliation', async () => {
@@ -260,8 +261,8 @@ describe('CartScreen', () => {
       screen.queryByText(/updating from the store/i),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Proceed to Checkout' }),
-    ).toHaveAttribute('aria-disabled', 'true');
+      screen.getByRole('button', { name: 'Proceed to Checkout' }),
+    ).toBeDisabled();
 
     await act(async () => {
       resolveUpdate?.(updatedCart);
@@ -272,8 +273,8 @@ describe('CartScreen', () => {
       productImageLink,
     );
     expect(
-      screen.getByRole('link', { name: 'Proceed to Checkout' }),
-    ).not.toHaveAttribute('aria-disabled');
+      screen.getByRole('button', { name: 'Proceed to Checkout' }),
+    ).toBeEnabled();
   });
 });
 
@@ -283,9 +284,13 @@ function createTransport(
 ): CartTransport {
   return {
     add: vi.fn(async () => loadedCart),
+    checkoutReadiness: vi.fn(async () => ({
+      checkedAt: '2026-08-25T12:00:00.000Z',
+      lines: [],
+      status: 'ready' as const,
+    })),
     clear: vi.fn(async () => loadedCart),
     load: vi.fn(async () => loadedCart),
-    recheck: vi.fn(async () => loadedCart),
     remove: vi.fn(async () => loadedCart),
     update: vi.fn(async () => loadedCart),
     ...overrides,

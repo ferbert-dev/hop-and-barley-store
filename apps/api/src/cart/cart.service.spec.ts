@@ -9,254 +9,181 @@ jest.mock('../database/prisma.service', () => ({
 const cartId = '30000000-0000-4000-8000-000000000001';
 const itemId = '40000000-0000-4000-8000-000000000001';
 const productId = '20000000-0000-4000-8000-000000000002';
-const reservationId = '50000000-0000-4000-8000-000000000001';
-const now = new Date('2026-08-25T12:00:00.000Z');
-const expiresAt = new Date('2026-08-25T12:15:00.000Z');
-
+const now = new Date('2026-08-27T12:00:00.000Z');
 const capability: ActiveCartCapability = {
   cartId,
   expiresAt: new Date('2026-09-21T00:00:00.000Z'),
   rawToken: 'A'.repeat(43),
 };
 
-describe('CartService reservation invariants', () => {
-  it('returns server time and canonical empty reservation response fields', () => {
-    expect(new CartService({} as PrismaService).empty(now)).toEqual({
-      adjustmentMessage: null,
-      checkoutEligible: false,
+describe('CartService desired-amount cart', () => {
+  it('returns a public empty cart without reservation-derived fields', () => {
+    const cart = new CartService({} as PrismaService).empty();
+    expect(cart).toEqual({
       currency: 'USD',
       distinctItemCount: 0,
       items: [],
-      serverNow: '2026-08-25T12:00:00.000Z',
       subtotalMinor: 0,
     });
-  });
-
-  it('uses the exact expiry boundary and never leaks reservation identity', async () => {
-    const prisma = {
-      cart: {
-        findFirst: jest.fn().mockResolvedValue(
-          storedCart(2, {
-            expiresAt,
-            amount: 2,
-            status: 'ACTIVE',
-          }),
-        ),
-      },
-    } as unknown as PrismaService;
-    const service = new CartService(prisma);
-
-    const active = await service.getCart(
-      capability,
-      new Date('2026-08-25T12:14:59.999Z'),
-    );
-    const expired = await service.getCart(capability, expiresAt);
-
-    expect(active.items[0]).toMatchObject({
-      availability: 'available',
-      reservationExpiresAt: expiresAt.toISOString(),
-      reservationStatus: 'active',
-    });
-    expect(expired.items[0]).toMatchObject({
-      availability: 'unavailable',
-      reservationExpiresAt: expiresAt.toISOString(),
-      reservationStatus: 'expired',
-    });
-    expect(JSON.stringify(expired)).not.toMatch(
-      /cartId|reservationId|token|digest/i,
+    expect(JSON.stringify(cart)).not.toMatch(
+      /reservation|checkoutEligible|serverNow|availability/i,
     );
   });
 
-  it('creates a first-line reservation for exactly 15 minutes from the supplied server clock', async () => {
+  it('creates a desired line above current stock without minting a reservation', async () => {
     const transaction = transactionMock();
-    transaction.product.findUnique.mockResolvedValue({ id: productId });
-    transaction.product.findUniqueOrThrow.mockResolvedValue(product());
-    transaction.$queryRaw.mockResolvedValue([{ id: productId }]);
-    transaction.cartReservation.findMany.mockResolvedValue([]);
+    transaction.product.findUnique.mockResolvedValue(
+      product({ stockAmount: 0 }),
+    );
     transaction.cart.create.mockResolvedValue({ id: cartId });
     transaction.cartItem.create.mockResolvedValue({ id: itemId });
-    transaction.cartReservation.create.mockResolvedValue({
-      id: reservationId,
-    });
     transaction.cart.findUniqueOrThrow.mockResolvedValue(
-      storedCart(2, { expiresAt, amount: 2, status: 'ACTIVE' }),
+      storedCart([{ amount: 5, product: product({ stockAmount: 0 }) }]),
     );
-    const service = new CartService(prismaMock(transaction));
 
-    const created = await service.createAndAdd(
-      { productSlug: 'cascade-hops', amount: 2 },
+    const created = await new CartService(prismaMock(transaction)).createAndAdd(
+      { productSlug: 'fixture-product', amount: 5 },
       now,
     );
 
-    expect(transaction.cartReservation.create).toHaveBeenCalledWith({
-      data: {
-        cartId,
-        cartItemId: itemId,
-        expiresAt,
-        productId,
-        amount: 2,
-        reservedAt: now,
-        status: 'ACTIVE',
-      },
-      select: { id: true },
+    expect(transaction.cartItem.create).toHaveBeenCalledWith({
+      data: { amount: 5, cartId, productId },
     });
+    expect(created.cart.items[0]).toMatchObject({
+      amount: 5,
+      productSlug: 'fixture-product',
+      stockAmount: 0,
+    });
+    expect(transaction).not.toHaveProperty('cartReservation');
+  });
+
+  it('updates a desired line without using stock as a ceiling', async () => {
+    const transaction = transactionMock();
+    transaction.$queryRaw.mockResolvedValue([
+      { expiresAt: capability.expiresAt, hasOrder: false, id: cartId },
+    ]);
+    transaction.cartItem.findFirst.mockResolvedValue({
+      id: itemId,
+      product: product({ stockAmount: 1 }),
+    });
+    transaction.cart.findUniqueOrThrow.mockResolvedValue(
+      storedCart([{ amount: 10, product: product({ stockAmount: 1 }) }]),
+    );
+
+    const cart = await new CartService(prismaMock(transaction)).update(
+      capability,
+      'fixture-product',
+      { amount: 10 },
+      now,
+    );
+
     expect(transaction.cartItem.update).toHaveBeenCalledWith({
-      data: { currentReservationId: reservationId },
+      data: { amount: 10 },
       where: { id: itemId },
     });
-    expect(created.cart.serverNow).toBe(now.toISOString());
-    expect(created.cart.items[0].reservationStatus).toBe('active');
+    expect(cart.items[0]).toMatchObject({ amount: 10, stockAmount: 1 });
   });
 
-  it('decreases the held amount without changing the reservation clock', async () => {
+  it('returns every safe checkout-readiness outcome without exact stock', async () => {
     const transaction = transactionMock();
-    transaction.$queryRaw
-      .mockResolvedValueOnce([{ expiresAt: capability.expiresAt, id: cartId }])
-      .mockResolvedValueOnce([{ id: productId }]);
-    transaction.cartItem.findFirst.mockResolvedValue({ id: itemId, productId });
-    transaction.cartItem.findUniqueOrThrow.mockResolvedValue({
-      currentReservation: {
-        expiresAt,
-        id: reservationId,
-        amount: 4,
-        status: 'ACTIVE',
-      },
-      id: itemId,
-      product: product(),
-      amount: 4,
-    });
-    transaction.cart.findUniqueOrThrow.mockResolvedValue(
-      storedCart(2, { expiresAt, amount: 2, status: 'ACTIVE' }),
-    );
-    const service = new CartService(prismaMock(transaction));
-
-    const cart = await service.update(
-      capability,
-      'cascade-hops',
-      { amount: 2 },
-      now,
-    );
-
-    expect(transaction.cartReservation.update).toHaveBeenCalledWith({
-      data: { amount: 2 },
-      where: { id: reservationId },
-    });
-    expect(transaction.cartReservation.create).not.toHaveBeenCalled();
-    expect(cart.items[0].reservationExpiresAt).toBe(expiresAt.toISOString());
-  });
-
-  it('renews only an increased line with a fresh identity and exact new expiry', async () => {
-    const transaction = transactionMock();
-    transaction.$queryRaw
-      .mockResolvedValueOnce([{ expiresAt: capability.expiresAt, id: cartId }])
-      .mockResolvedValueOnce([{ id: productId }]);
-    transaction.cartItem.findFirst.mockResolvedValue({ id: itemId, productId });
-    transaction.cartItem.findUniqueOrThrow.mockResolvedValue({
-      currentReservation: {
-        expiresAt,
-        id: reservationId,
-        amount: 2,
-        status: 'ACTIVE',
-      },
-      id: itemId,
-      product: product(),
-      amount: 2,
-    });
-    transaction.cartReservation.findMany.mockResolvedValue([]);
-    transaction.cartReservation.create.mockResolvedValue({
-      id: '50000000-0000-4000-8000-000000000002',
-    });
-    const renewedAt = new Date('2026-08-25T12:05:00.000Z');
-    const renewedExpiry = new Date('2026-08-25T12:20:00.000Z');
-    transaction.cart.findUniqueOrThrow.mockResolvedValue(
-      storedCart(4, {
-        expiresAt: renewedExpiry,
-        amount: 4,
-        status: 'ACTIVE',
-      }),
-    );
-    const service = new CartService(prismaMock(transaction));
-
-    const cart = await service.update(
-      capability,
-      'cascade-hops',
-      { amount: 4 },
-      renewedAt,
+    transaction.cart.findFirst.mockResolvedValue(
+      storedCart([
+        { amount: 1, product: product({ slug: 'available', stockAmount: 1 }) },
+        {
+          amount: 2,
+          product: product({ slug: 'short', stockAmount: 1 }),
+        },
+        {
+          amount: 1,
+          product: product({ isActive: false, slug: 'hidden' }),
+        },
+        {
+          amount: 2,
+          product: product({
+            minimumOrderAmount: 1,
+            orderStepAmount: 2,
+            slug: 'invalid',
+          }),
+        },
+        {
+          amount: 2_000_000_000,
+          product: product({
+            priceBasisAmount: 1,
+            priceMinor: 2_147_483_647,
+            slug: 'price-overflow',
+            stockAmount: 2_000_000_000,
+          }),
+        },
+      ]),
     );
 
-    expect(transaction.cartReservation.updateMany).toHaveBeenLastCalledWith({
-      data: { releasedAt: renewedAt, status: 'RELEASED' },
-      where: {
-        cartId,
-        cartItemId: { in: [itemId] },
-        status: 'ACTIVE',
-      },
+    const readiness = await new CartService(
+      prismaMock(transaction),
+    ).checkoutReadiness(capability, now);
+
+    expect(readiness).toEqual({
+      checkedAt: now.toISOString(),
+      lines: [
+        { outcome: 'available', productSlug: 'available', requestedAmount: 1 },
+        {
+          outcome: 'insufficient_stock',
+          productSlug: 'short',
+          requestedAmount: 2,
+        },
+        {
+          outcome: 'product_unavailable',
+          productSlug: 'hidden',
+          requestedAmount: 1,
+        },
+        {
+          outcome: 'invalid_amount',
+          productSlug: 'invalid',
+          requestedAmount: 2,
+        },
+        {
+          outcome: 'price_unavailable',
+          productSlug: 'price-overflow',
+          requestedAmount: 2_000_000_000,
+        },
+      ],
+      status: 'unavailable',
     });
-    expect(transaction.cartReservation.create).toHaveBeenCalledWith({
-      data: {
-        cartId,
-        cartItemId: itemId,
-        expiresAt: renewedExpiry,
-        productId,
-        amount: 4,
-        reservedAt: renewedAt,
-        status: 'ACTIVE',
-      },
-      select: { id: true },
-    });
-    expect(cart.items[0].reservationExpiresAt).toBe(
-      renewedExpiry.toISOString(),
+    expect(JSON.stringify(readiness)).not.toMatch(
+      /stockAmount|productId|reservation|supplier|provider/i,
     );
   });
 });
 
-function product() {
+function product(overrides: Record<string, unknown> = {}) {
   return {
+    amountUnit: 'EACH',
     currency: 'USD',
     id: productId,
+    imagePath: '/assets/products/fixture.webp',
     isActive: true,
+    kitYieldVolumeMl: null,
     maximumOrderAmount: null,
     minimumOrderAmount: 1,
+    name: 'Fixture Product',
     orderStepAmount: 1,
-    stockAmount: 10,
+    packageNetWeightMg: null,
+    priceBasisAmount: 1,
+    priceMinor: 500,
+    priceQualifier: 'per fixture',
+    saleKind: 'PACKAGE',
+    slug: 'fixture-product',
+    stockAmount: 100,
+    ...overrides,
   };
 }
 
 function storedCart(
-  amount: number,
-  currentReservation: {
-    expiresAt: Date;
+  items: ReadonlyArray<{
     amount: number;
-    status: 'ACTIVE' | 'CONSUMED' | 'EXPIRED' | 'RELEASED';
-  } | null,
+    product: ReturnType<typeof product>;
+  }>,
 ) {
-  return {
-    items: [
-      {
-        currentReservation,
-        product: {
-          amountUnit: 'EACH',
-          currency: 'USD',
-          id: productId,
-          imagePath: '/assets/products/cascade-hops.webp',
-          isActive: true,
-          kitYieldVolumeMl: null,
-          maximumOrderAmount: null,
-          minimumOrderAmount: 1,
-          name: 'Cascade Hops',
-          orderStepAmount: 1,
-          packageNetWeightMg: null,
-          priceBasisAmount: 1,
-          priceMinor: 699,
-          priceQualifier: 'per pound',
-          saleKind: 'PACKAGE',
-          slug: 'cascade-hops',
-          stockAmount: 10,
-        },
-        amount,
-      },
-    ],
-  };
+  return { items };
 }
 
 function prismaMock(transaction: ReturnType<typeof transactionMock>) {
@@ -265,6 +192,7 @@ function prismaMock(transaction: ReturnType<typeof transactionMock>) {
       (operation: (client: typeof transaction) => Promise<unknown>) =>
         operation(transaction),
     ),
+    cart: transaction.cart,
   } as unknown as PrismaService;
 }
 
@@ -273,6 +201,7 @@ function transactionMock() {
     $queryRaw: jest.fn(),
     cart: {
       create: jest.fn(),
+      findFirst: jest.fn(),
       findUniqueOrThrow: jest.fn(),
     },
     cartItem: {
@@ -281,23 +210,11 @@ function transactionMock() {
       delete: jest.fn(),
       deleteMany: jest.fn(),
       findFirst: jest.fn(),
-      findMany: jest.fn(),
       findUnique: jest.fn(),
-      findUniqueOrThrow: jest.fn(),
       update: jest.fn(),
-      updateMany: jest.fn(),
-    },
-    cartReservation: {
-      create: jest.fn(),
-      findMany: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn(),
     },
     product: {
-      findMany: jest.fn(),
       findUnique: jest.fn(),
-      findUniqueOrThrow: jest.fn(),
-      updateMany: jest.fn(),
     },
   };
 }

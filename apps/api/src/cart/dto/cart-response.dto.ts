@@ -92,22 +92,6 @@ export class CartItemDto {
     type: 'integer',
   })
   lineTotalMinor!: number | null;
-
-  @ApiProperty({ enum: ['available', 'unavailable'], type: String })
-  availability!: 'available' | 'unavailable';
-
-  @ApiProperty({
-    enum: ['active', 'expired', 'unreserved'],
-    type: String,
-  })
-  reservationStatus!: 'active' | 'expired' | 'unreserved';
-
-  @ApiProperty({
-    format: 'date-time',
-    nullable: true,
-    type: String,
-  })
-  reservationExpiresAt!: string | null;
 }
 
 export class CartDto {
@@ -122,15 +106,47 @@ export class CartDto {
 
   @ApiProperty({ format: 'int32', minimum: 0, type: 'integer' })
   subtotalMinor!: number;
+}
 
-  @ApiProperty({ type: Boolean })
-  checkoutEligible!: boolean;
+export class CheckoutReadinessLineDto {
+  @ApiProperty({ pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', type: String })
+  productSlug!: string;
+
+  @ApiProperty({
+    format: 'int32',
+    maximum: 2_000_000_000,
+    minimum: 1,
+    type: 'integer',
+  })
+  requestedAmount!: number;
+
+  @ApiProperty({
+    enum: [
+      'available',
+      'insufficient_stock',
+      'product_unavailable',
+      'invalid_amount',
+      'price_unavailable',
+    ],
+    type: String,
+  })
+  outcome!:
+    | 'available'
+    | 'insufficient_stock'
+    | 'product_unavailable'
+    | 'invalid_amount'
+    | 'price_unavailable';
+}
+
+export class CheckoutReadinessDto {
+  @ApiProperty({ enum: ['ready', 'empty', 'unavailable'], type: String })
+  status!: 'ready' | 'empty' | 'unavailable';
 
   @ApiProperty({ format: 'date-time', type: String })
-  serverNow!: string;
+  checkedAt!: string;
 
-  @ApiProperty({ nullable: true, type: String })
-  adjustmentMessage!: string | null;
+  @ApiProperty({ type: () => [CheckoutReadinessLineDto] })
+  lines!: CheckoutReadinessLineDto[];
 }
 
 export class CartCsrfResponseDto {

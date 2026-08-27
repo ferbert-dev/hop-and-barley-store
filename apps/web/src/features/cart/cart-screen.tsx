@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { Button } from '../../components/ui/button';
@@ -13,7 +14,7 @@ import {
   LoadingState,
 } from '../../components/ui/status';
 import { useCart, type CartContextValue, type CartState } from './cart-context';
-import type { Cart } from './cart-transport';
+import type { Cart, CheckoutReadiness } from './cart-transport';
 import { QuantityForm } from '../quantity/quantity-form';
 import {
   formatAggregateProductDetail,
@@ -42,9 +43,9 @@ function ConnectedCartScreen() {
 type CartScreenContentProps = Pick<
   CartContextValue,
   | 'clear'
+  | 'checkCheckoutReadiness'
   | 'items'
   | 'pending'
-  | 'recheck'
   | 'refresh'
   | 'remove'
   | 'state'
@@ -54,9 +55,9 @@ type CartScreenContentProps = Pick<
 
 function CartScreenContent({
   clear,
+  checkCheckoutReadiness,
   items,
   pending,
-  recheck,
   refresh,
   remove,
   state,
@@ -77,10 +78,10 @@ function CartScreenContent({
     <CartContents
       cart={state.cart}
       cartItems={cartItems}
+      checkCheckoutReadiness={checkCheckoutReadiness}
       clear={clear}
       message={state.message}
       pending={pending}
-      recheck={recheck}
       remove={remove}
       totalsAreRefreshing={totalsAreRefreshing}
       update={update}
@@ -148,38 +149,68 @@ function CartEmptyState() {
 function CartContents({
   cart,
   cartItems,
+  checkCheckoutReadiness,
   clear,
   message,
   pending,
-  recheck,
   remove,
   totalsAreRefreshing,
   update,
 }: Readonly<{
   cart: Cart;
   cartItems: Cart['items'];
+  checkCheckoutReadiness?: CartContextValue['checkCheckoutReadiness'];
   clear?: CartContextValue['clear'];
   message?: string;
   pending?: CartContextValue['pending'];
-  recheck?: CartContextValue['recheck'];
   remove?: CartContextValue['remove'];
   totalsAreRefreshing: boolean;
   update?: CartContextValue['update'];
 }>) {
-  const reservation = useReservationClock(cart);
-  const hasUnavailableItem = cartItems.some(
-    (item) =>
-      item.availability === 'unavailable' &&
-      item.reservationStatus !== 'expired',
+  const router = useRouter();
+  const [readinessState, setReadinessState] = useState<{
+    cart: Cart;
+    result: CheckoutReadiness;
+  } | null>(null);
+  const [readinessErrorCart, setReadinessErrorCart] = useState<Cart | null>(
+    null,
   );
-  const checkoutEligible =
-    cart.checkoutEligible && !hasUnavailableItem && !reservation.hasExpired;
+  const readiness =
+    readinessState?.cart === cart ? readinessState.result : null;
+  const readinessError = readinessErrorCart === cart;
+
+  const checkingAvailability = pending?.kind === 'checkout-readiness';
+  const readinessByProductSlug = new Map(
+    readiness?.lines.map((line) => [line.productSlug, line]),
+  );
+  const hasReadinessAttention =
+    readiness !== null && readiness.status !== 'ready';
   const displayedSubtotalMinor = totalsAreRefreshing
     ? cartItems.reduce(
         (subtotal, item) => subtotal + (item.lineTotalMinor ?? 0),
         0,
       )
     : cart.subtotalMinor;
+
+  const proceedToCheckout = async () => {
+    if (
+      !checkCheckoutReadiness ||
+      checkingAvailability ||
+      totalsAreRefreshing
+    ) {
+      return;
+    }
+
+    setReadinessErrorCart(null);
+    try {
+      const nextReadiness = await checkCheckoutReadiness();
+      setReadinessState({ cart, result: nextReadiness });
+      if (nextReadiness.status === 'ready') router.push('/checkout');
+    } catch {
+      setReadinessState(null);
+      setReadinessErrorCart(cart);
+    }
+  };
 
   return (
     <section aria-labelledby="cart-title" className={styles.page}>
@@ -204,13 +235,6 @@ function CartContents({
         </p>
       ) : null}
 
-      <ReservationStatus
-        hasExpired={reservation.hasExpired}
-        pending={pending}
-        recheck={recheck}
-        remainingSeconds={reservation.remainingSeconds}
-      />
-
       <div className={styles.layout}>
         <div className={styles.lines} aria-label="Cart items">
           {cartItems.map((item) => {
@@ -218,26 +242,21 @@ function CartContents({
               pending,
               item.productSlug,
             );
-            const itemReservationExpired =
-              item.reservationStatus === 'expired' ||
-              (item.reservationStatus === 'active' &&
-                item.reservationExpiresAt !== null &&
-                Date.parse(item.reservationExpiresAt) <=
-                  reservation.serverTime);
-
             const quantityIsDisabled =
-              (pending !== null &&
-                pending !== undefined &&
-                !(
-                  pending.kind === 'update' &&
-                  pending.productSlug === item.productSlug
-                )) ||
-              item.availability === 'unavailable' ||
-              itemReservationExpired;
+              pending !== null &&
+              pending !== undefined &&
+              !(
+                pending.kind === 'update' &&
+                pending.productSlug === item.productSlug
+              );
             const aggregateDetail = formatAggregateProductDetail(
               item.amount,
               item,
             );
+            const readinessLine = readinessByProductSlug.get(item.productSlug);
+            const readinessMessage = readinessLine
+              ? formatReadinessOutcome(readinessLine.outcome)
+              : null;
 
             return (
               <Card className={styles.line} key={item.productSlug}>
@@ -280,15 +299,9 @@ function CartContents({
                         {aggregateDetail}
                       </p>
                     ) : null}
-                    {item.availability === 'unavailable' &&
-                    item.reservationStatus !== 'expired' ? (
-                      <p className={styles.availability} role="status">
-                        Out of stock
-                      </p>
-                    ) : null}
-                    {itemReservationExpired ? (
-                      <p className={styles.reservationLineStatus} role="status">
-                        Reservation expired
+                    {readinessMessage ? (
+                      <p className={styles.readinessLineStatus} role="status">
+                        {readinessMessage}
                       </p>
                     ) : null}
                   </div>
@@ -350,158 +363,47 @@ function CartContents({
               </dd>
             </div>
           </dl>
-          {!totalsAreRefreshing && !checkoutEligible ? (
-            <p className={styles.ineligible} role="status">
-              {reservation.hasExpired
-                ? 'Recheck availability before checkout.'
-                : hasUnavailableItem
-                  ? 'Remove unavailable items before checkout.'
-                  : 'Your cart is not ready for checkout.'}
+          {hasReadinessAttention ? (
+            <p className={styles.availabilityAttention} role="status">
+              Availability needs attention
             </p>
           ) : null}
-          {checkoutEligible ? (
-            <Button
-              aria-disabled={totalsAreRefreshing || undefined}
-              className={styles.checkout}
-              href="/checkout"
-              onClick={(event) => {
-                if (totalsAreRefreshing) event.preventDefault();
-              }}
-            >
-              Proceed to Checkout
-            </Button>
+          {readinessError ? (
+            <p className={styles.readinessError} role="alert">
+              We couldn’t check availability. Try again.
+            </p>
           ) : null}
+          <Button
+            className={styles.checkout}
+            disabled={totalsAreRefreshing || checkingAvailability}
+            onClick={() => void proceedToCheckout()}
+            pending={checkingAvailability}
+            pendingLabel="Checking availability…"
+            type="button"
+          >
+            Proceed to Checkout
+          </Button>
         </aside>
       </div>
     </section>
   );
 }
 
-function ReservationStatus({
-  hasExpired,
-  pending,
-  recheck,
-  remainingSeconds,
-}: Readonly<{
-  hasExpired: boolean;
-  pending?: CartContextValue['pending'];
-  recheck?: CartContextValue['recheck'];
-  remainingSeconds: number | null;
-}>) {
-  if (hasExpired) {
-    return (
-      <div className={styles.reservationNotice}>
-        <p role="status">
-          Reservations expired. Recheck availability before checkout.
-        </p>
-        {recheck ? (
-          <Button
-            disabled={pending !== null && pending !== undefined}
-            onClick={() => void recheck()}
-            pending={pending?.kind === 'recheck'}
-            pendingLabel="Checking availability…"
-            type="button"
-            variant="secondary"
-          >
-            Recheck availability
-          </Button>
-        ) : null}
-      </div>
-    );
+function formatReadinessOutcome(
+  outcome: CheckoutReadiness['lines'][number]['outcome'],
+): string | null {
+  switch (outcome) {
+    case 'available':
+      return null;
+    case 'product_unavailable':
+      return 'This item is no longer available.';
+    case 'insufficient_stock':
+      return 'This amount is not currently available.';
+    case 'invalid_amount':
+      return 'Choose a valid amount for this item.';
+    case 'price_unavailable':
+      return 'This item cannot be checked out right now.';
   }
-
-  if (remainingSeconds === null) return null;
-
-  return (
-    <p className={styles.reservationCountdown} role="timer">
-      Reservations expire in {formatCountdown(remainingSeconds)}
-    </p>
-  );
-}
-
-function useReservationClock(cart: Cart) {
-  const earliestActiveExpiry = getEarliestActiveExpiry(cart.items);
-  const [clock, setClock] = useState({
-    elapsedSinceResponse: 0,
-    serverNow: cart.serverNow,
-  });
-
-  if (clock.serverNow !== cart.serverNow) {
-    setClock({
-      elapsedSinceResponse: 0,
-      serverNow: cart.serverNow,
-    });
-  }
-
-  const elapsedSinceResponse =
-    clock.serverNow === cart.serverNow ? clock.elapsedSinceResponse : 0;
-
-  useEffect(() => {
-    if (earliestActiveExpiry === null) return;
-
-    const remainingAtResponse = Math.max(
-      0,
-      earliestActiveExpiry - Date.parse(cart.serverNow),
-    );
-    if (remainingAtResponse === 0) return;
-
-    const responseReceivedAt = Date.now();
-    const timer = window.setInterval(() => {
-      const elapsed = Math.min(
-        Date.now() - responseReceivedAt,
-        remainingAtResponse,
-      );
-      setClock((current) =>
-        current.serverNow === cart.serverNow
-          ? { ...current, elapsedSinceResponse: elapsed }
-          : current,
-      );
-      if (elapsed >= remainingAtResponse) {
-        window.clearInterval(timer);
-      }
-    }, 1_000);
-
-    return () => window.clearInterval(timer);
-  }, [cart.serverNow, earliestActiveExpiry]);
-
-  const serverNow = Date.parse(cart.serverNow);
-  const serverTime = serverNow + elapsedSinceResponse;
-  const activeReservationHasExpired =
-    earliestActiveExpiry !== null && earliestActiveExpiry <= serverTime;
-
-  return {
-    hasExpired:
-      activeReservationHasExpired ||
-      cart.items.some((item) => item.reservationStatus === 'expired'),
-    remainingSeconds:
-      earliestActiveExpiry === null
-        ? null
-        : Math.max(0, Math.ceil((earliestActiveExpiry - serverTime) / 1_000)),
-    serverTime,
-  };
-}
-
-function getEarliestActiveExpiry(items: Cart['items']): number | null {
-  let earliestExpiry: number | null = null;
-  for (const item of items) {
-    if (
-      item.reservationStatus !== 'active' ||
-      item.reservationExpiresAt === null
-    ) {
-      continue;
-    }
-    const expiry = Date.parse(item.reservationExpiresAt);
-    if (earliestExpiry === null || expiry < earliestExpiry) {
-      earliestExpiry = expiry;
-    }
-  }
-  return earliestExpiry;
-}
-
-function formatCountdown(remainingSeconds: number) {
-  const minutes = Math.floor(remainingSeconds / 60);
-  const seconds = remainingSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 function isPendingForProduct(
@@ -510,7 +412,6 @@ function isPendingForProduct(
 ) {
   return (
     pending !== null &&
-    pending !== undefined &&
     pending !== undefined &&
     'productSlug' in pending &&
     pending.productSlug === productSlug

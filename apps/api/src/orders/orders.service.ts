@@ -6,30 +6,21 @@ import {
 } from '@nestjs/common';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import {
-  consumeCartReservations,
-  lockProducts,
-} from '../cart/cart-reservation';
+  addMoneyMinor,
+  calculateLineTotalMinor,
+} from '../catalog/product-amount';
+import { checkoutLineOutcome } from '../cart/checkout-readiness';
+import type { CheckoutReadinessLineDto } from '../cart/dto/cart-response.dto';
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
-import type {
-  OrderStatus,
-  PaymentMethod,
-  PaymentState,
-} from '../generated/prisma/enums';
 import {
   CheckoutPaymentMethod,
   type CreateOrderDto,
 } from './dto/create-order.dto';
 import type { OrderDto } from './dto/order-response.dto';
 import { runOrderSerializable } from './order-transaction';
-import {
-  addMoneyMinor,
-  calculateLineTotalMinor,
-  isValidOrderAmount,
-} from '../catalog/product-amount';
 
 const SHIPPING_MINOR = 500;
-const UNAVAILABLE = Object.freeze({ status: 'unavailable' as const });
 const PAYMENT_UNAVAILABLE = Object.freeze({
   status: 'payment-unavailable' as const,
 });
@@ -82,26 +73,32 @@ type CanonicalCheckout = Readonly<{
   shippingAddress: string;
 }>;
 
-type PaymentOutcome = Readonly<{
-  paidAt: Date | null;
-  paymentMethod: PaymentMethod;
-  paymentState: PaymentState;
-  providerPaymentReference: string | null;
-  status: OrderStatus;
-}>;
-
 export type OrderCheckoutContext = Readonly<{
   cartId: string;
   idempotencyKey: string;
   userId: string;
 }>;
 
-export type VerifiedStripeFinalization = OrderCheckoutContext &
-  Readonly<{
-    checkout: CreateOrderDto;
-    paidAt?: Date;
-    providerPaymentReference: string;
+type CheckoutLine = Readonly<{
+  id: string;
+  product: Readonly<{
+    amountUnit: 'EACH' | 'MILLIGRAM';
+    currency: string;
+    id: string;
+    isActive: boolean;
+    maximumOrderAmount: number | null;
+    minimumOrderAmount: number;
+    name: string;
+    orderStepAmount: number;
+    priceBasisAmount: number;
+    priceMinor: number;
+    priceQualifier: string;
+    saleKind: 'KIT' | 'PACKAGE' | 'WEIGHT';
+    slug: string;
+    stockAmount: number;
   }>;
+  amount: number;
+}>;
 
 @Injectable()
 export class OrdersService {
@@ -109,90 +106,29 @@ export class OrdersService {
 
   async create(
     context: OrderCheckoutContext,
-    checkout: CreateOrderDto,
-    requestedNow?: Date,
-  ): Promise<OrderDto> {
-    if (checkout.paymentMethod !== CheckoutPaymentMethod.CASH_ON_DELIVERY) {
-      throw new UnprocessableEntityException(PAYMENT_UNAVAILABLE);
-    }
-    return this.finalize(
-      context,
-      checkout,
-      {
-        paidAt: null,
-        paymentMethod: 'CASH_ON_DELIVERY',
-        paymentState: 'DUE_ON_DELIVERY',
-        providerPaymentReference: null,
-        status: 'PLACED',
-      },
-      requestedNow,
-    );
-  }
-
-  /**
-   * Internal O2P boundary. The future Stripe webhook handler owns signature and
-   * event verification before it may call this method. No browser route calls it.
-   */
-  async finalizeVerifiedStripePayment(
-    input: VerifiedStripeFinalization,
+    suppliedCheckout: CreateOrderDto,
     requestedNow?: Date,
   ): Promise<OrderDto> {
     if (
-      input.checkout.paymentMethod !==
-        CheckoutPaymentMethod.STRIPE_DEBIT_CARD ||
-      input.providerPaymentReference.length < 1 ||
-      input.providerPaymentReference.length > 255
+      suppliedCheckout.paymentMethod !== CheckoutPaymentMethod.CASH_ON_DELIVERY
     ) {
       throw new UnprocessableEntityException(PAYMENT_UNAVAILABLE);
     }
-    const now = requestedNow ?? new Date();
-    return this.finalize(
-      input,
-      input.checkout,
-      {
-        paidAt: input.paidAt ?? now,
-        paymentMethod: 'STRIPE_DEBIT_CARD',
-        paymentState: 'PAID',
-        providerPaymentReference: input.providerPaymentReference,
-        status: 'PAID',
-      },
-      requestedNow,
-    );
-  }
-
-  private async finalize(
-    context: OrderCheckoutContext,
-    suppliedCheckout: CreateOrderDto,
-    payment: PaymentOutcome,
-    requestedNow?: Date,
-  ): Promise<OrderDto> {
     const checkout = canonicalCheckout(suppliedCheckout);
-    const requestHash = fingerprint(context, checkout, payment);
-
+    const requestHash = fingerprint(context, checkout);
     const stored = await runOrderSerializable(
       this.prisma,
       async (transaction) => {
+        const replay = await findIdempotentOrder(transaction, context);
+        if (replay) return sameOutcome(replay, requestHash);
+
         await lockActiveUser(transaction, context.userId);
-
-        const byKey = await transaction.order.findUnique({
-          select: orderSelect,
-          where: {
-            userId_idempotencyKey: {
-              idempotencyKey: context.idempotencyKey,
-              userId: context.userId,
-            },
-          },
-        });
-        if (byKey) return sameOutcome(byKey, requestHash);
-
-        if (payment.providerPaymentReference) {
-          const byPayment = await transaction.order.findUnique({
-            select: orderSelect,
-            where: {
-              providerPaymentReference: payment.providerPaymentReference,
-            },
-          });
-          if (byPayment) return sameOutcome(byPayment, requestHash);
+        const replayAfterUserLock = await findIdempotentOrder(
+          transaction,
+          context,
+        );
+        if (replayAfterUserLock) {
+          return sameOutcome(replayAfterUserLock, requestHash);
         }
 
         const cartExpiresAt = await lockCart(transaction, context.cartId);
@@ -207,27 +143,19 @@ export class OrdersService {
           select: { productId: true },
           where: { cartId: context.cartId },
         });
-        if (candidates.length === 0) unavailable();
+        const now = requestedNow ?? new Date();
+        if (cartExpiresAt.getTime() <= now.getTime()) {
+          allocationUnavailable(now, []);
+        }
+        if (candidates.length === 0) allocationUnavailable(now, []);
         await lockProducts(
           transaction,
           candidates.map(({ productId }) => productId),
         );
-        const now = requestedNow ?? new Date();
-        if (cartExpiresAt.getTime() <= now.getTime()) unavailable();
 
         const lines = await transaction.cartItem.findMany({
           orderBy: [{ productId: 'asc' }, { id: 'asc' }],
           select: {
-            currentReservation: {
-              select: {
-                cartId: true,
-                expiresAt: true,
-                id: true,
-                productId: true,
-                amount: true,
-                status: true,
-              },
-            },
             id: true,
             product: {
               select: {
@@ -244,28 +172,26 @@ export class OrdersService {
                 priceQualifier: true,
                 saleKind: true,
                 slug: true,
+                stockAmount: true,
               },
             },
             amount: true,
           },
           where: { cartId: context.cartId },
         });
-        requireMatchingCheckout(lines, checkout, context.cartId, now);
+        const outcomes = allocationOutcomes(lines, checkout);
+        if (outcomes.some(({ outcome }) => outcome !== 'available')) {
+          allocationUnavailable(now, outcomes);
+        }
 
-        const pricedLines = lines.map((line) => {
-          try {
-            return {
-              ...line,
-              lineTotalMinor: calculateLineTotalMinor(
-                line.product.priceMinor,
-                line.amount,
-                line.product.priceBasisAmount,
-              ),
-            };
-          } catch {
-            unavailable();
-          }
-        });
+        const pricedLines = lines.map((line) => ({
+          ...line,
+          lineTotalMinor: calculateLineTotalMinor(
+            line.product.priceMinor,
+            line.amount,
+            line.product.priceBasisAmount,
+          ),
+        }));
         let itemSubtotalMinor = 0;
         try {
           for (const line of pricedLines) {
@@ -276,11 +202,34 @@ export class OrdersService {
           }
           addMoneyMinor(itemSubtotalMinor, SHIPPING_MINOR);
         } catch {
-          unavailable();
+          allocationUnavailable(
+            now,
+            outcomes.map((line) => ({
+              ...line,
+              outcome: 'price_unavailable',
+            })),
+          );
         }
-        const reservationIds = lines.map((line) =>
-          requiredReservationId(line.currentReservation?.id),
-        );
+
+        for (const line of pricedLines) {
+          const allocated = await transaction.product.updateMany({
+            data: { stockAmount: { decrement: line.amount } },
+            where: {
+              id: line.product.id,
+              stockAmount: { gte: line.amount },
+            },
+          });
+          if (allocated.count !== 1) {
+            allocationUnavailable(
+              now,
+              outcomes.map((outcome) =>
+                outcome.productSlug === line.product.slug
+                  ? { ...outcome, outcome: 'insufficient_stock' }
+                  : outcome,
+              ),
+            );
+          }
+        }
 
         const order = await transaction.order.create({
           data: {
@@ -304,28 +253,21 @@ export class OrdersService {
                 saleKind: line.product.saleKind,
               })),
             },
-            paidAt: payment.paidAt,
-            paymentMethod: payment.paymentMethod,
-            paymentState: payment.paymentState,
+            paidAt: null,
+            paymentMethod: 'CASH_ON_DELIVERY',
+            paymentState: 'DUE_ON_DELIVERY',
             phoneNumber: checkout.phoneNumber,
             placedAt: now,
-            providerPaymentReference: payment.providerPaymentReference,
+            providerPaymentReference: null,
             requestHash,
             shippingAddress: checkout.shippingAddress,
             shippingMinor: SHIPPING_MINOR,
-            status: payment.status,
+            status: 'PLACED',
             totalMinor: itemSubtotalMinor + SHIPPING_MINOR,
             userId: context.userId,
           },
           select: orderSelect,
         });
-
-        await consumeCartReservations(
-          transaction,
-          reservationIds,
-          now,
-          order.id,
-        );
         await transaction.cartItem.deleteMany({
           where: { cartId: context.cartId },
         });
@@ -336,71 +278,81 @@ export class OrdersService {
         return order;
       },
     );
-
     return toOrderDto(stored);
   }
 }
 
-type CheckoutLine = Readonly<{
-  currentReservation: Readonly<{
-    cartId: string;
-    expiresAt: Date;
-    id: string;
-    productId: string;
-    amount: number;
-    status: string;
-  }> | null;
-  id: string;
-  product: Readonly<{
-    amountUnit: 'EACH' | 'MILLIGRAM';
-    currency: string;
-    id: string;
-    isActive: boolean;
-    maximumOrderAmount: number | null;
-    minimumOrderAmount: number;
-    name: string;
-    orderStepAmount: number;
-    priceBasisAmount: number;
-    priceMinor: number;
-    priceQualifier: string;
-    saleKind: 'KIT' | 'PACKAGE' | 'WEIGHT';
-    slug: string;
-  }>;
-  amount: number;
-}>;
+async function findIdempotentOrder(
+  transaction: Prisma.TransactionClient,
+  context: OrderCheckoutContext,
+): Promise<StoredOrder | null> {
+  return transaction.order.findUnique({
+    select: orderSelect,
+    where: {
+      userId_idempotencyKey: {
+        idempotencyKey: context.idempotencyKey,
+        userId: context.userId,
+      },
+    },
+  });
+}
 
-function requireMatchingCheckout(
+function allocationOutcomes(
   lines: readonly CheckoutLine[],
   checkout: CanonicalCheckout,
-  cartId: string,
-  now: Date,
-): void {
-  const requested = new Map(
-    checkout.items.map(({ productSlug, amount }) => [productSlug, amount]),
-  );
-  if (
-    requested.size !== checkout.items.length ||
-    requested.size !== lines.length
-  ) {
-    unavailable();
+): CheckoutReadinessLineDto[] {
+  const requestedBySlug = new Map<string, number>();
+  const requestCounts = new Map<string, number>();
+  for (const item of checkout.items) {
+    requestedBySlug.set(item.productSlug, item.amount);
+    requestCounts.set(
+      item.productSlug,
+      (requestCounts.get(item.productSlug) ?? 0) + 1,
+    );
   }
-  for (const line of lines) {
-    const reservation = line.currentReservation;
-    if (
-      requested.get(line.product.slug) !== line.amount ||
-      !line.product.isActive ||
-      line.product.currency !== 'USD' ||
-      line.product.priceMinor < 0 ||
-      !isValidOrderAmount(line.amount, line.product) ||
-      !reservation ||
-      reservation.cartId !== cartId ||
-      reservation.productId !== line.product.id ||
-      reservation.amount !== line.amount ||
-      reservation.status !== 'ACTIVE' ||
-      reservation.expiresAt.getTime() <= now.getTime()
-    ) {
-      unavailable();
+  const cartSlugs = new Set(lines.map(({ product }) => product.slug));
+  const outcomes = lines.map((line) => {
+    const requestedAmount =
+      requestedBySlug.get(line.product.slug) ?? line.amount;
+    const matches =
+      requestCounts.get(line.product.slug) === 1 &&
+      requestedAmount === line.amount;
+    return {
+      outcome: matches
+        ? checkoutLineOutcome(line.product, line.amount)
+        : ('invalid_amount' as const),
+      productSlug: line.product.slug,
+      requestedAmount,
+    };
+  });
+  for (const item of checkout.items) {
+    if (!cartSlugs.has(item.productSlug)) {
+      outcomes.push({
+        outcome: 'invalid_amount',
+        productSlug: item.productSlug,
+        requestedAmount: item.amount,
+      });
     }
+  }
+  return outcomes.sort((left, right) =>
+    left.productSlug.localeCompare(right.productSlug),
+  );
+}
+
+async function lockProducts(
+  transaction: Prisma.TransactionClient,
+  productIds: readonly string[],
+): Promise<void> {
+  const orderedIds = [...new Set(productIds)].sort();
+  const rows = await transaction.$queryRaw<Array<{ id: string }>>`
+    SELECT "id"
+    FROM "Product"
+    WHERE "id" = ANY(${orderedIds}::uuid[])
+    ORDER BY "id"
+    FOR UPDATE
+  `;
+  if (rows.length !== orderedIds.length) {
+    throw new Error('Cart product lock invariant failed');
   }
 }
 
@@ -433,7 +385,7 @@ async function lockCart(
     WHERE "id" = ${cartId}::uuid
     FOR UPDATE
   `;
-  if (rows.length !== 1) unavailable();
+  if (rows.length !== 1) allocationUnavailable(new Date(), []);
   return rows[0].expiresAt;
 }
 
@@ -453,12 +405,11 @@ function canonicalCheckout(checkout: CreateOrderDto): CanonicalCheckout {
 function fingerprint(
   context: OrderCheckoutContext,
   checkout: CanonicalCheckout,
-  payment: PaymentOutcome,
 ): Uint8Array<ArrayBuffer> {
   const canonical = JSON.stringify({
     cartId: context.cartId,
     checkout,
-    providerPaymentReference: payment.providerPaymentReference,
+    providerPaymentReference: null,
     userId: context.userId,
   });
   return Uint8Array.from(createHash('sha256').update(canonical).digest());
@@ -476,13 +427,15 @@ function sameOutcome(order: StoredOrder, requestHash: Uint8Array): StoredOrder {
   return order;
 }
 
-function requiredReservationId(id: string | undefined): string {
-  if (!id) unavailable();
-  return id;
-}
-
-function unavailable(): never {
-  throw new UnprocessableEntityException(UNAVAILABLE);
+function allocationUnavailable(
+  checkedAt: Date,
+  lines: readonly CheckoutReadinessLineDto[],
+): never {
+  throw new UnprocessableEntityException({
+    checkedAt: checkedAt.toISOString(),
+    lines,
+    status: 'allocation-unavailable',
+  });
 }
 
 function toOrderDto(order: StoredOrder): OrderDto {

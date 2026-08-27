@@ -1,184 +1,176 @@
-# ADR 0002: Model sellable amounts explicitly
+# ADR 0002: Keep cart intent separate from inventory allocation
 
-- **Status:** Accepted — implemented and verified, pending merge
+- **Status:** Accepted — O2S replacement contract, implementation pending verification
 - **Date:** 2026-08-27
-- **Decision owner:** O2Q root orchestrator
-- **Ticket:** [O2Q — Implement measured product quantities and transparent yields](https://app.notion.com/p/3c9d78850eab8142bc05e8e1be2afc9f)
-- **Agent Run:** [Orchestrator — O2Q measured product quantities](https://app.notion.com/p/3c9d78850eab8188b39ce53dfeb3d0b1)
-- **Scope:** Catalog sale rules, cart reservations, checkout snapshots, and their storefront representation
+- **Decision owner:** O2S root orchestrator
+- **Scope:** Measured-product amounts, cart intent, checkout-readiness advice, and final order allocation
 
-## Decision summary
+## Context
 
-Hop & Barley will not treat every cart value as a dimensionless item count.
-Each product declares one sale kind and an exact integer amount unit:
+The former cart contract made a cart mutation create, renew, and expose a stock
+reservation. That coupled an editable shopping intent to a short-lived inventory
+hold, introduced a countdown and recheck flow, and made a product's on-hand
+stock an upper bound for each cart edit. It also made two independent cart lines
+compete before an order existed.
 
-| Sale kind | Canonical amount unit | Meaning                                                            |
-| --------- | --------------------- | ------------------------------------------------------------------ |
-| `WEIGHT`  | `MILLIGRAM`           | Bulk ingredients sold by physical weight                           |
-| `PACKAGE` | `EACH`                | Manufacturer or store packages sold as indivisible units           |
-| `KIT`     | `EACH`                | Recipe kits sold as indivisible units with an optional batch yield |
+The checkout contract needs a clear boundary instead:
 
-The API and PostgreSQL own amount validation, inventory, reservations, pricing,
-and order snapshots. The web app formats and edits those values but is not the
-authority for totals.
+- Cart edits express customer intent and must not allocate inventory.
+- A lightweight check may advise whether the current cart can proceed, but it
+  cannot promise allocation or disclose operational inventory data.
+- The final order transaction is the sole allocation point.
 
-`Product.priceMinor` is the price for `Product.priceBasisAmount`, expressed in
-the product's canonical amount unit. The authoritative line price is:
+## Decision
+
+### Amounts and sale rules
+
+Every product has a `saleKind`, canonical `amountUnit`, price basis, minimum,
+step, and nullable explicit maximum. The API owns validation and price
+calculation; the storefront formats and edits a selected amount.
+
+| Sale kind | Canonical amount   | Cart rule                                                                                                  |
+| --------- | ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `WEIGHT`  | integer milligrams | 0.1 kg (100,000 mg) steps from 0.1 kg through 100 kg, unless the product declares a lower explicit maximum |
+| `PACKAGE` | integer `EACH`     | configured integer minimum and step; no maximum is invented                                                |
+| `KIT`     | integer `EACH`     | configured integer minimum and step; no maximum is invented                                                |
+
+Each distinct weight product/cart line has its own 100 kg ceiling (or lower
+explicit product maximum). On-hand stock and another line's amount do not
+reduce that ceiling. There is no aggregate cart-weight ceiling.
+
+Prices retain the integer calculation:
 
 ```text
 roundHalfUp(priceMinor * selectedAmount / priceBasisAmount)
 ```
 
-The calculation uses integer/BigInt-safe arithmetic before narrowing to a
-validated currency-minor-unit result. Floating-point arithmetic is not used for
-money.
+No floating-point calculation is authoritative for money.
 
-## Product sale-rule contract
+### Cart is non-reserving intent
 
-Every product exposes:
+Adding, updating, removing, clearing, or reading a cart does not create,
+renew, consume, decrement, or otherwise hold stock. Cart amount validation is
+limited to the product's sale-rule lattice and product availability needed to
+accept the intent; it does not compare the amount with on-hand stock.
 
-- `saleKind`
-- `amountUnit`
-- `priceBasisAmount`
-- `minimumOrderAmount`
-- `orderStepAmount`
-- nullable `maximumOrderAmount`
-- `stockAmount`
-- nullable `packageNetWeightMg`
-- nullable `kitYieldVolumeMl`
+The cart response and public UI do not expose reservation state, reservation
+expiry, server countdown time, or inventory pointer. There is no cart-wide
+recheck endpoint or button. Exact stock disclosure in existing product/cart
+contracts remains separately owned by SEC4; readiness itself never exposes it.
 
-`priceQualifier` remains a display-compatible description during the O2Q
-migration, but it is not parsed and is never a business-rule input.
+### Advisory checkout readiness
 
-The initial rules are:
+`POST /api/v1/cart/checkout-readiness` is private and `no-store`. It is an
+advisory, non-mutating request. It neither creates a cart as a side effect nor
+changes cart lines, reservations, inventory, prices, orders, or checkout state.
 
-- Bulk products use `MILLIGRAM`, a 100,000 mg price basis, a 100,000 mg minimum,
-  and a 100,000 mg validation step. Direct entry and the UI plus/minus
-  affordance therefore use the same 0.1 kg lattice.
-- Packages and kits use `EACH` with basis, minimum, and step equal to one.
-- A nullable maximum means that stock is the current effective ceiling. When a
-  maximum exists, both the configured maximum and available stock apply.
-- Known package net weight is metadata, not the purchased amount unit. An
-  unknown pouch weight remains null and must not be guessed.
-- Kit yield is stored in integer millilitres per kit. The UI may present the
-  aggregate in familiar gallons and approximate litres; the stored quantity
-  remains a kit count.
+Its response is intentionally small:
 
-The API request field and persistence column are named `amount`. For a weight
-product it contains milligrams; for a package or kit it contains an integer
-unit count. Cart responses expose `distinctItemCount`; they do not sum
-incompatible physical dimensions into a `totalQuantity`.
-
-## Why integer milligrams
-
-Kilograms are the input unit for bulk products, while the selected summary uses
-grams below 1 kg and kilograms from 1 kg upward. Package metadata and physical
-inventory still require an exact, currency-independent base unit. Integer
-milligrams avoid decimal database and JSON ambiguities, retain exact round
-trips, and leave room for more precise catalog metadata without changing the
-contract. The UI converts explicitly:
-
-```text
-grams = milligrams / 1,000
-kilograms = milligrams / 1,000,000
+```ts
+{
+  status: 'ready' | 'empty' | 'unavailable';
+  checkedAt: string; // ISO-8601 date-time
+  lines: Array<{
+    productSlug: string;
+    requestedAmount: number;
+    outcome:
+      | 'available'
+      | 'insufficient_stock'
+      | 'product_unavailable'
+      | 'invalid_amount'
+      | 'price_unavailable';
+  }>;
+}
 ```
 
-The UI accepts kilograms and normalizes to milligrams before calling the API.
-The visible `kg` suffix makes the input unit explicit.
+`ready` has only `available` line outcomes. `empty` has no lines. `unavailable`
+has a line outcome for every retained line, including `available` results for
+lines that did not fail. The response never contains exact stock, internal
+identifiers, reservation data, provider/supplier data, delivery promises, or
+operational failure details.
 
-## Inventory, cart, and order invariants
+The browser presents a stable `Checking availability…` pending state. A ready
+response navigates to `/checkout`. An unavailable response keeps the cart and
+all controls intact, exposes `Availability needs attention`, and annotates each
+failed line accessibly:
 
-1. Stock and reservations use the same canonical amount unit as the product.
-2. A cart mutation is valid only when the amount is at least the minimum,
-   aligned to the configured step, no greater than the optional maximum, and no
-   greater than currently available stock.
-3. Reservation changes and checkout stock decrements use the exact canonical
-   amount; no gram/kilogram conversion happens inside inventory arithmetic.
-4. The server recalculates every cart and order line from the current product
-   price and basis. Client totals are informational only.
-5. An order item snapshots its sale kind, amount unit, price, price basis,
-   selected amount, qualifier, and line total. Later catalog changes cannot
-   rewrite the commercial meaning of an existing order.
-6. The cart badge counts product lines. Cart and order totals add money only,
-   never the heterogeneous amount values themselves.
+| Outcome               | Customer-facing annotation                   |
+| --------------------- | -------------------------------------------- |
+| `product_unavailable` | `This item is no longer available.`          |
+| `insufficient_stock`  | `This amount is not currently available.`    |
+| `invalid_amount`      | `Choose a valid amount for this item.`       |
+| `price_unavailable`   | `This item cannot be checked out right now.` |
 
-## Migration and compatibility
+A transport failure is recoverable and generic: `We couldn’t check
+availability. Try again.` Restoring and activating the primary checkout action
+performs a fresh one-shot check; there is no separate recheck control.
 
-The migration is append-only and transactional. Live catalog, cart,
-reservation, and order columns move from the ambiguous `quantity` and
-`stockQuantity` names to `amount` and `stockAmount`, with database constraints
-matching the new integer bounds.
+### Final order placement allocates atomically
 
-Legacy per-100g cart and reservation counts are multiplied by 100,000 mg.
-Legacy per-pound cart and reservation counts are converted using 453,592 mg per
-pound and floored to the 100,000 mg order lattice, with a 100,000 mg minimum.
-Flooring prevents a converted hold from claiming more than its legacy physical
-amount. Product stock uses the nearest-mg conversion because stock itself does
-not need to align to the customer order step. Active weight reservations are
-then reconciled deterministically in reserved-time and ID order: earlier holds
-retain priority, a later hold is reduced to the largest valid amount that fits,
-or released when less than the minimum remains. Current cart lines are updated
-with reduced holds, and the migration aborts if surviving active holds exceed
-stock or diverge from their current lines. Package and kit counts remain
-unchanged.
+Cash on Delivery is the only order-placement method in this slice. The final
+order transaction, not readiness, locks all involved products in a deterministic
+order, then revalidates product availability, selected amount, price, and stock.
+It decrements stock, creates the order and order-item snapshots, and clears the
+cart atomically. A single last-stock unit therefore has exactly one successful
+buyer; a losing buyer keeps their cart unchanged for correction or retry.
 
-Catalog seeding treats inventory as operational state. Fixture stock is used
-when a product is created, while repeated seed runs preserve `stockAmount` for
-existing products so migration output cannot mint inventory.
+Allocation occurs before payment success. Stripe and other provider
+orchestration are future work and must not be implied by this decision.
 
-Historical order rows retain their exact arithmetic meaning. A legacy order
-item is backfilled as `PACKAGE`/`EACH` with a basis of one, its previous
-quantity becomes `amount`, and its previous unit price remains `priceMinor`.
-Therefore its stored line total remains reproducible. New orders snapshot the
-structured product rules.
+### Reservation-schema cutover
 
-Existing bulk malt and adjunct fixture prices are converted from a pound basis
-to the nearest cent per 100 g using exactly 453.59237 g per pound. Existing hop
-fixtures already use a 100 g basis. Package and kit prices remain per unit.
+The reservation tables/columns are retained dormant-first to preserve history.
+The cutover migrates any live cart pointers away from active reservation state
+and adds guards that prevent future `ACTIVE` reservations and future cart
+reservation pointers. Historical rows remain auditable; no new cart or order
+path may rely on them.
 
-## Storefront behavior
+## Consequences
 
-- Weight controls show one kilogram input with a visible `kg` suffix. They
-  start at 0.1 kg, enforce 0.1 kg increments, and never silently round customer
-  input. The selected summary renders grams below 1 kg and kilograms from 1 kg
-  upward.
-- Package controls show integer packs and display net weight only when present.
-- Kit controls show integer kits and aggregate yield. Four 18,927 ml kits render
-  as approximately 20 US gal / 76 L.
-- Product details always retain the `Add to Cart` action and selection editor.
-  A repeated add atomically increments the existing cart line by the newly
-  selected canonical amount; it does not replace the line or show an `in cart`
-  quantity beside the product control. Direct line editing remains on the cart
-  screen.
-- Catalog cards, product details, and cart lines use the same sale-rule
-  formatter and generated API contract.
-- Controls expose stable accessible names, work from the keyboard, and retain
-  their meaning at narrow layouts.
+Positive consequences:
 
-The quantity controls are a user-confirmed extension of Figma nodes `9:2284`,
-`51:1944`, and `12:1759`. Their styling follows those frames, while their
-additional units, validation, and yield labels are documented product behavior
-rather than claims about the original Figma content.
+- Cart editing is stable and has no expiration race or stock-cap surprise.
+- An advisory response is safe to retry and reveals no operational inventory.
+- Only the final transaction decides allocation, making the last-stock race
+  explicit and testable.
 
-## Options rejected
+Negative consequences:
 
-| Option                                         | Reason rejected                                                                                    |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Treat every value as an item count             | A value of two cannot safely mean both 200 g and two pouches, and mixed totals become misleading.  |
-| Store decimal grams or kilograms               | It introduces scale and rounding policy into inventory, reservation, JSON, and money calculations. |
-| Parse `priceQualifier` strings                 | Display copy is not a stable schema and cannot safely drive pricing or validation.                 |
-| Create one SKU for every 100 g increment       | It makes large weights impractical and fragments stock unnecessarily.                              |
-| Guess missing pouch weights                    | It invents product facts and can mislead purchasing and fulfilment.                                |
-| Let the browser calculate authoritative totals | It permits stale or manipulated price, basis, and amount combinations at checkout.                 |
+- A ready check is not a stock promise; availability can change before order
+  placement.
+- A customer may need to correct a retained cart after readiness or a final
+  allocation conflict.
+- Historical reservation storage remains until a separately approved archival
+  decision.
+
+Supplier/backorder sourcing and fast/delayed delivery promises are explicitly
+out of scope.
+
+## Alternatives rejected
+
+| Alternative                                     | Reason rejected                                                                           |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Cart-time reservations with renewals/countdowns | Couples browsing to scarce inventory and creates expiry/recheck races.                    |
+| Clamp each cart line to on-hand stock           | Makes intent state volatile and prevents independent measured selections.                 |
+| Aggregate cart weight ceiling                   | Mixes unrelated products and has no approved product rule.                                |
+| Readiness that reserves or decrements stock     | Misrepresents a check as allocation and makes retries unsafe.                             |
+| Payment-provider work in this slice             | The ticket authorizes COD allocation only; provider orchestration needs its own boundary. |
 
 ## Verification and rollback
 
-O2Q must prove the migration and constraints against PostgreSQL, unit-test
-amount validation and integer pricing, exercise cart/reservation/checkout
-behavior through the API, and cover the weight, package, kit, badge, keyboard,
-and responsive flows in a real browser.
+Verification must cover:
 
-Before merge, rollback is the branch deletion. After deployment, rollback must
-use a reviewed compensating migration and application rollback that preserve
-order snapshots; resetting the database, forcing `db push`, deleting volumes,
-or coercing measured amounts back into generic counts is not permitted.
+- sale-rule validation, including two independent weight lines and the 100 kg
+  per-line limit;
+- private/no-store, non-mutating readiness results and safe response fields;
+- ready navigation, unavailable-line preservation, generic transport recovery,
+  pending/accessibility/keyboard/reflow behavior; and
+- disposable PostgreSQL proof that final deterministic locking admits exactly
+  one last-stock buyer, rolls back partial failure, clears only the winner's
+  cart, and does not create new active reservations or pointers.
+
+Before merge, rollback is discarding the ticket branch. After deployment,
+rollback needs a reviewed compensating migration and application rollback that
+preserve orders and historical reservation data. Database resets, force-push
+schema commands, volume deletion, or restoration of cart-time reservations are
+not permitted.

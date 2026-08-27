@@ -104,7 +104,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/cart/recheck": {
+    "/api/v1/cart/checkout-readiness": {
         parameters: {
             query?: never;
             header?: never;
@@ -114,10 +114,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Recheck and reserve all current cart lines
-         * @description Rechecks every retained line in one server-authoritative operation. Positive availability is clamped and reserved; zero-stock lines remain in the cart unreserved.
+         * Check whether the current cart is ready for checkout
+         * @description Checks every retained cart line against current product, amount, price and stock state without reserving or changing inventory. Business shortages are returned as safe line outcomes.
          */
-        post: operations["CartController_recheck"];
+        post: operations["CartController_checkoutReadiness"];
         delete?: never;
         options?: never;
         head?: never;
@@ -250,8 +250,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Create an order from the active reserved cart
-         * @description Creates a server-priced Cash on Delivery order from the authenticated user’s active cart reservation. Debit Card is finalized only by the future verified Stripe webhook boundary and cannot be finalized by this browser route.
+         * Atomically allocate inventory and create a COD order
+         * @description Atomically allocates current inventory, snapshots current server prices, creates a Cash on Delivery order and clears the authenticated user’s cart. Debit Card remains unavailable until its payment-first allocation flow is implemented.
          */
         post: operations["OrdersController_create"];
         delete?: never;
@@ -423,12 +423,6 @@ export interface components {
             priceMinor: number | null;
             /** Format: int32 */
             lineTotalMinor: number | null;
-            /** @enum {string} */
-            availability: "available" | "unavailable";
-            /** @enum {string} */
-            reservationStatus: "active" | "expired" | "unreserved";
-            /** Format: date-time */
-            reservationExpiresAt: string | null;
         };
         CartDto: {
             /** @enum {string} */
@@ -438,13 +432,23 @@ export interface components {
             distinctItemCount: number;
             /** Format: int32 */
             subtotalMinor: number;
-            checkoutEligible: boolean;
-            /** Format: date-time */
-            serverNow: string;
-            adjustmentMessage: string | null;
         };
         CartCsrfResponseDto: {
             csrfToken: string;
+        };
+        CheckoutReadinessLineDto: {
+            productSlug: string;
+            /** Format: int32 */
+            requestedAmount: number;
+            /** @enum {string} */
+            outcome: "available" | "insufficient_stock" | "product_unavailable" | "invalid_amount" | "price_unavailable";
+        };
+        CheckoutReadinessDto: {
+            /** @enum {string} */
+            status: "ready" | "empty" | "unavailable";
+            /** Format: date-time */
+            checkedAt: string;
+            lines: components["schemas"]["CheckoutReadinessLineDto"][];
         };
         AddCartItemDto: {
             productSlug: string;
@@ -507,6 +511,17 @@ export interface components {
         LogoutResponseDto: {
             /** @enum {string} */
             status: "signed-out";
+        };
+        AllocationUnavailableDto: {
+            /** @enum {string} */
+            status: "allocation-unavailable";
+            /** Format: date-time */
+            checkedAt: string;
+            lines: components["schemas"]["CheckoutReadinessLineDto"][];
+        };
+        PaymentUnavailableDto: {
+            /** @enum {string} */
+            status: "payment-unavailable";
         };
         CreateOrderItemDto: {
             productSlug: string;
@@ -840,7 +855,7 @@ export interface operations {
             };
         };
     };
-    CartController_recheck: {
+    CartController_checkoutReadiness: {
         parameters: {
             query?: never;
             header: {
@@ -857,7 +872,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CartDto"];
+                    "application/json": components["schemas"]["CheckoutReadinessDto"];
                 };
             };
             /** @description Presented cart capability is not valid */
@@ -931,7 +946,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Product, stock, amount or line limit is unavailable */
+            /** @description Product, amount or line limit is unavailable */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1075,7 +1090,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Product or stock is unavailable */
+            /** @description Product or amount is unavailable */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1357,12 +1372,14 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Cart, reservation, product, amount, stock or payment method is unavailable */
+            /** @description Cart, product, amount, price, stock or payment method is unavailable. Business allocation failures use safe per-line outcomes without exact stock. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["AllocationUnavailableDto"] | components["schemas"]["PaymentUnavailableDto"];
+                };
             };
         };
     };

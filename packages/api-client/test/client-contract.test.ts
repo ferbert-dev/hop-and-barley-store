@@ -6,6 +6,32 @@ import {
   type CatalogCompatibilityResult,
   type components,
 } from '../src/index.js';
+import type { paths } from '../src/generated/schema.js';
+
+type RemovedCartRoutes = '/api/v1/cart/recheck' extends keyof paths
+  ? false
+  : true;
+type RemovedCartFields =
+  Extract<
+    keyof components['schemas']['CartDto'],
+    'adjustmentMessage' | 'checkoutEligible' | 'serverNow'
+  > extends never
+    ? true
+    : false;
+type RemovedCartItemFields =
+  Extract<
+    keyof components['schemas']['CartItemDto'],
+    'availability' | 'reservationExpiresAt' | 'reservationStatus'
+  > extends never
+    ? true
+    : false;
+
+const cartRecheckWasRemoved: RemovedCartRoutes = true;
+const reservationDerivedCartFieldsWereRemoved: RemovedCartFields = true;
+const reservationDerivedCartItemFieldsWereRemoved: RemovedCartItemFields = true;
+void cartRecheckWasRemoved;
+void reservationDerivedCartFieldsWereRemoved;
+void reservationDerivedCartItemFieldsWereRemoved;
 
 const options: ApiClientOptions = { cache: 'no-store' };
 const optionsRemainClientOptions: Omit<ClientOptions, 'baseUrl'> = options;
@@ -112,14 +138,17 @@ const cartClear = configuredClient.DELETE('/api/v1/cart/items', {
     },
   },
 });
-const cartRecheck = configuredClient.POST('/api/v1/cart/recheck', {
-  params: {
-    header: {
-      Origin: 'http://localhost:3000',
-      'X-CSRF-Token': `cart-v1.${'A'.repeat(43)}`,
+const checkoutReadiness = configuredClient.POST(
+  '/api/v1/cart/checkout-readiness',
+  {
+    params: {
+      header: {
+        Origin: 'http://localhost:3000',
+        'X-CSRF-Token': `cart-v1.${'A'.repeat(43)}`,
+      },
     },
   },
-});
+);
 void cartRequest;
 void cartCsrfRequest;
 void firstCartAdd;
@@ -127,7 +156,7 @@ void existingCartAdd;
 void cartPatch;
 void cartDelete;
 void cartClear;
-void cartRecheck;
+void checkoutReadiness;
 
 const createOrder = configuredClient.POST('/api/v1/orders', {
   body: {
@@ -147,6 +176,25 @@ const createOrder = configuredClient.POST('/api/v1/orders', {
   },
 });
 void createOrder;
+
+type OrderUnprocessableEntity =
+  paths['/api/v1/orders']['post']['responses'][422]['content']['application/json'];
+const unavailableAllocation: OrderUnprocessableEntity = {
+  checkedAt: '2026-08-27T12:03:00.000Z',
+  lines: [
+    {
+      outcome: 'insufficient_stock',
+      productSlug: 'cascade-hops',
+      requestedAmount: 2,
+    },
+  ],
+  status: 'allocation-unavailable',
+};
+const unavailablePayment: OrderUnprocessableEntity = {
+  status: 'payment-unavailable',
+};
+void unavailableAllocation;
+void unavailablePayment;
 
 const safeOrder: components['schemas']['OrderDto'] = {
   currency: 'USD',
@@ -182,14 +230,11 @@ const safeOrder: components['schemas']['OrderDto'] = {
 void safeOrder;
 
 const safeCart: components['schemas']['CartDto'] = {
-  adjustmentMessage: null,
-  checkoutEligible: true,
   currency: 'USD',
   distinctItemCount: 1,
   items: [
     {
       amountUnit: 'EACH',
-      availability: 'available',
       kitYieldVolumeMl: null,
       maximumOrderAmount: null,
       minimumOrderAmount: 1,
@@ -204,16 +249,67 @@ const safeCart: components['schemas']['CartDto'] = {
       productId: '20000000-0000-4000-8000-000000000002',
       productSlug: 'cascade-hops',
       amount: 2,
-      reservationExpiresAt: '2026-08-25T12:15:00.000Z',
-      reservationStatus: 'active',
       saleKind: 'PACKAGE',
       stockAmount: 100,
     },
   ],
-  serverNow: '2026-08-25T12:00:00.000Z',
   subtotalMinor: 1398,
 };
 void safeCart;
+
+const safeCheckoutReadiness: components['schemas']['CheckoutReadinessDto'] = {
+  checkedAt: '2026-08-27T12:00:00.000Z',
+  lines: [
+    {
+      outcome: 'available',
+      productSlug: 'cascade-hops',
+      requestedAmount: 2,
+    },
+  ],
+  status: 'ready',
+};
+void safeCheckoutReadiness;
+
+const otherSafeCheckoutReadinessStates: components['schemas']['CheckoutReadinessDto'][] =
+  [
+    {
+      checkedAt: '2026-08-27T12:01:00.000Z',
+      lines: [],
+      status: 'empty',
+    },
+    {
+      checkedAt: '2026-08-27T12:02:00.000Z',
+      lines: [
+        {
+          outcome: 'available',
+          productSlug: 'cascade-hops',
+          requestedAmount: 2,
+        },
+        {
+          outcome: 'insufficient_stock',
+          productSlug: 'citra-hops',
+          requestedAmount: 100_000,
+        },
+        {
+          outcome: 'product_unavailable',
+          productSlug: 'mosaic-hops',
+          requestedAmount: 100_000,
+        },
+        {
+          outcome: 'invalid_amount',
+          productSlug: 'caramel-malt-60l',
+          requestedAmount: 150_000,
+        },
+        {
+          outcome: 'price_unavailable',
+          productSlug: 'house-lager',
+          requestedAmount: 1,
+        },
+      ],
+      status: 'unavailable',
+    },
+  ];
+void otherSafeCheckoutReadinessStates;
 
 const safeSession: components['schemas']['AuthSessionDto'] = {
   absoluteExpiresAt: '2026-08-29T10:00:00.000Z',

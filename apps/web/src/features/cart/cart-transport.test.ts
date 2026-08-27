@@ -6,13 +6,10 @@ import {
 } from './cart-transport';
 
 const cart = {
-  adjustmentMessage: null,
-  checkoutEligible: true,
   currency: 'USD' as const,
   distinctItemCount: 1,
   items: [
     {
-      availability: 'available' as const,
       priceMinor: 599,
       imagePath: '/assets/products/citra-hops.webp',
       kitYieldVolumeMl: null,
@@ -27,14 +24,11 @@ const cart = {
       productId: '10000000-0000-4000-8000-000000000001',
       productSlug: 'citra-hops',
       amount: 100_000,
-      reservationExpiresAt: '2026-08-25T10:15:00.000Z',
-      reservationStatus: 'active' as const,
       saleKind: 'WEIGHT' as const,
       stockAmount: 100_000_000,
       amountUnit: 'MILLIGRAM' as const,
     },
   ],
-  serverNow: '2026-08-25T10:00:00.000Z',
   subtotalMinor: 599,
 };
 
@@ -129,31 +123,57 @@ describe('generated-client cart browser transport', () => {
     expect(addRequest.headers.get('x-csrf-token')).toBeNull();
   });
 
-  it('rechecks the cart with a fresh CSRF token and private response handling', async () => {
+  it('checks checkout readiness with a fresh CSRF token and private response handling', async () => {
     const csrfToken = `v1.${'A'.repeat(43)}`;
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(response({ csrfToken }))
-      .mockResolvedValueOnce(response(cart));
+      .mockResolvedValueOnce(
+        response({
+          checkedAt: '2026-08-25T10:00:00.000Z',
+          lines: [
+            {
+              outcome: 'available',
+              productSlug: 'citra-hops',
+              requestedAmount: 100_000,
+            },
+          ],
+          status: 'ready',
+        }),
+      );
     vi.stubGlobal('fetch', fetch);
 
     const transport = createBrowserCartTransport(
       () => 'http://localhost:3000',
       'http://api:3001',
     );
-    expect(transport.recheck).toBeTypeOf('function');
+    expect(transport.checkoutReadiness).toBeTypeOf('function');
 
-    await expect(transport.recheck()).resolves.toEqual(cart);
+    await expect(transport.checkoutReadiness()).resolves.toEqual({
+      checkedAt: '2026-08-25T10:00:00.000Z',
+      lines: [
+        {
+          outcome: 'available',
+          productSlug: 'citra-hops',
+          requestedAmount: 100_000,
+        },
+      ],
+      status: 'ready',
+    });
 
-    const recheckRequest = fetch.mock.calls[1]?.[0] as Request;
-    expect(recheckRequest.method).toBe('POST');
-    expect(recheckRequest.url).toBe('http://api:3001/api/v1/cart/recheck');
-    expect(recheckRequest.cache).toBe('no-store');
-    expect(recheckRequest.credentials).toBe('include');
-    expect(recheckRequest.headers.get('origin')).toBe('http://localhost:3000');
-    expect(recheckRequest.headers.get('x-csrf-token')).toBe(csrfToken);
-    expect(recheckRequest.headers.get('content-type')).toBeNull();
-    await expect(recheckRequest.clone().text()).resolves.toBe('');
+    const readinessRequest = fetch.mock.calls[1]?.[0] as Request;
+    expect(readinessRequest.method).toBe('POST');
+    expect(readinessRequest.url).toBe(
+      'http://api:3001/api/v1/cart/checkout-readiness',
+    );
+    expect(readinessRequest.cache).toBe('no-store');
+    expect(readinessRequest.credentials).toBe('include');
+    expect(readinessRequest.headers.get('origin')).toBe(
+      'http://localhost:3000',
+    );
+    expect(readinessRequest.headers.get('x-csrf-token')).toBe(csrfToken);
+    expect(readinessRequest.headers.get('content-type')).toBeNull();
+    await expect(readinessRequest.clone().text()).resolves.toBe('');
   });
 
   it('fails closed if a private cache directive is missing', async () => {
@@ -185,62 +205,6 @@ describe('generated-client cart browser transport', () => {
           items: [{ ...cart.items[0], amount: -1 }],
         }),
       ),
-    );
-
-    await expect(
-      createBrowserCartTransport(
-        () => 'http://localhost:3000',
-        'http://api:3001',
-      ).load(),
-    ).rejects.toBeInstanceOf(CartTransportError);
-  });
-
-  it.each([
-    ['an invalid server timestamp', { ...cart, serverNow: 'not-a-date' }],
-    ['a non-string adjustment message', { ...cart, adjustmentMessage: 1 }],
-    [
-      'an unreserved item with an expiry',
-      {
-        ...cart,
-        items: [
-          {
-            ...cart.items[0],
-            reservationExpiresAt: '2026-08-25T10:15:00.000Z',
-            reservationStatus: 'unreserved',
-          },
-        ],
-      },
-    ],
-    [
-      'an active item without an expiry',
-      {
-        ...cart,
-        items: [
-          {
-            ...cart.items[0],
-            reservationExpiresAt: null,
-            reservationStatus: 'active',
-          },
-        ],
-      },
-    ],
-    [
-      'an expired item with an invalid expiry',
-      {
-        ...cart,
-        items: [
-          {
-            ...cart.items[0],
-            reservationExpiresAt: '2026-02-30T10:15:00.000Z',
-            reservationStatus: 'expired',
-          },
-        ],
-      },
-    ],
-  ])('fails closed for %s', async (_case, malformedCart) => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => response(malformedCart)),
     );
 
     await expect(

@@ -18,7 +18,6 @@ type ProductCartControlProps = Readonly<{
 }>;
 
 export function ProductCartControl({
-  availability,
   productName,
   productSlug,
   priceMinor,
@@ -47,17 +46,8 @@ export function ProductCartControl({
     );
   }
 
-  const item = cart.items.find((entry) => entry.productSlug === productSlug);
   const loading = cart.state.kind === 'loading';
   const message = cart.state.kind === 'ready' ? cart.state.message : undefined;
-  const reservationExpired = item
-    ? item.reservationStatus === 'expired' ||
-      (item.reservationStatus === 'active' &&
-        item.reservationExpiresAt !== null &&
-        cart.state.kind === 'ready' &&
-        Date.parse(item.reservationExpiresAt) <=
-          Date.parse(cart.state.cart.serverNow))
-    : false;
   const productIsPending =
     pending?.kind === 'add' ||
     ((pending?.kind === 'remove' || pending?.kind === 'update') &&
@@ -71,14 +61,11 @@ export function ProductCartControl({
         </p>
       ) : null}
       <AddToCartControl
-        availability={availability}
-        cartLineUnavailable={item?.availability === 'unavailable'}
         loading={loading}
         productName={productName}
         productSlug={productSlug}
         priceMinor={priceMinor}
         quantityMetadata={quantityMetadata}
-        reservationExpired={reservationExpired}
       />
       {productIsPending ? (
         <p className={styles.cartMessage} role="status">
@@ -90,30 +77,27 @@ export function ProductCartControl({
 }
 
 function AddToCartControl({
-  availability,
   loading,
   productName,
   productSlug,
   priceMinor,
   quantityMetadata,
-  cartLineUnavailable = false,
-  reservationExpired = false,
-}: ProductCartControlProps &
+}: Omit<ProductCartControlProps, 'availability'> &
   Readonly<{
-    cartLineUnavailable?: boolean;
     loading: boolean;
-    reservationExpired?: boolean;
   }>) {
   const { add, pending, state } = useCart();
-  const outOfStock = availability === 'out-of-stock';
-  const unavailable = outOfStock || cartLineUnavailable || reservationExpired;
 
   return (
     <>
       <QuantityForm
-        amount={quantityMetadata.minimumOrderAmount}
+        amount={
+          quantityMetadata.saleKind === 'WEIGHT'
+            ? 100_000
+            : quantityMetadata.minimumOrderAmount
+        }
         currency={state.kind === 'ready' ? state.cart.currency : 'USD'}
-        disabled={loading || unavailable || pending !== null}
+        disabled={loading || pending !== null}
         metadata={quantityMetadata}
         onSubmit={(amount) => add(productSlug, amount)}
         priceMinor={priceMinor}
@@ -122,16 +106,6 @@ function AddToCartControl({
       {loading ? (
         <p className={styles.cartMessage} role="status">
           Loading your cart…
-        </p>
-      ) : null}
-      {outOfStock || (cartLineUnavailable && !reservationExpired) ? (
-        <p className={styles.cartAvailability} role="status">
-          Out of stock
-        </p>
-      ) : null}
-      {reservationExpired ? (
-        <p className={styles.cartReservationStatus} role="status">
-          Reservation expired
         </p>
       ) : null}
     </>

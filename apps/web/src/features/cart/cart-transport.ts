@@ -8,6 +8,9 @@ const DEFAULT_API_URL = 'http://localhost:3001';
 const CART_REQUEST_TIMEOUT_MS = 1_500;
 
 export type Cart = components['schemas']['CartDto'];
+export type CheckoutReadiness = components['schemas']['CheckoutReadinessDto'];
+export type CheckoutReadinessLine =
+  components['schemas']['CheckoutReadinessLineDto'];
 
 export class CartTransportError extends Error {
   constructor(readonly status: number) {
@@ -17,9 +20,9 @@ export class CartTransportError extends Error {
 
 export type CartTransport = Readonly<{
   add(productSlug: string, amount: number): Promise<Cart>;
+  checkoutReadiness(): Promise<CheckoutReadiness>;
   clear(): Promise<Cart>;
   load(): Promise<Cart>;
-  recheck(): Promise<Cart>;
   remove(productSlug: string): Promise<Cart>;
   update(productSlug: string, amount: number): Promise<Cart>;
 }>;
@@ -96,17 +99,17 @@ export function createBrowserCartTransport(
       });
       return cartFromResponse(data, error, response);
     },
-    async recheck() {
+    async checkoutReadiness() {
       const { client, origin } = requestContext();
       const csrfToken = await requireCsrf(() => withCsrf(client));
       const { data, error, response } = await client.POST(
-        '/api/v1/cart/recheck',
+        '/api/v1/cart/checkout-readiness',
         {
           params: { header: mutationHeaders(origin, csrfToken) },
           signal: AbortSignal.timeout(CART_REQUEST_TIMEOUT_MS),
         },
       );
-      return cartFromResponse(data, error, response);
+      return checkoutReadinessFromResponse(data, error, response);
     },
     async remove(productSlug) {
       const { client, origin } = requestContext();
@@ -176,9 +179,7 @@ function isCart(value: unknown): value is Cart {
   if (
     !isRecord(value) ||
     value.currency !== 'USD' ||
-    !Array.isArray(value.items) ||
-    !isDateTime(value.serverNow) ||
-    !isNullableString(value.adjustmentMessage)
+    !Array.isArray(value.items)
   ) {
     return false;
   }
@@ -186,7 +187,6 @@ function isCart(value: unknown): value is Cart {
     isNonNegativeSafeInteger(value.distinctItemCount) &&
     value.distinctItemCount === value.items.length &&
     isNonNegativeSafeInteger(value.subtotalMinor) &&
-    typeof value.checkoutEligible === 'boolean' &&
     value.items.every(isCartItem)
   );
 }
@@ -207,17 +207,50 @@ function isCartItem(value: unknown) {
     typeof value.priceQualifier === 'string' &&
     isPositiveSafeInteger(value.amount) &&
     readQuantityMetadata(value) !== null &&
+    isNonNegativeSafeInteger(value.stockAmount) &&
     isNullableNonNegativeSafeInteger(value.priceMinor) &&
-    isNullableNonNegativeSafeInteger(value.lineTotalMinor) &&
-    (value.availability === 'available' ||
-      value.availability === 'unavailable') &&
-    isReservation(value.reservationStatus, value.reservationExpiresAt)
+    isNullableNonNegativeSafeInteger(value.lineTotalMinor)
   );
 }
 
-function isReservation(status: unknown, expiresAt: unknown) {
-  if (status === 'unreserved') return expiresAt === null;
-  return (status === 'active' || status === 'expired') && isDateTime(expiresAt);
+function checkoutReadinessFromResponse(
+  data: unknown,
+  error: unknown,
+  response: Response,
+): CheckoutReadiness {
+  assertPrivateResponse(response);
+  if (!response.ok || error !== undefined || !isCheckoutReadiness(data)) {
+    throw new CartTransportError(response.status);
+  }
+  return data;
+}
+
+function isCheckoutReadiness(value: unknown): value is CheckoutReadiness {
+  return (
+    isRecord(value) &&
+    (value.status === 'ready' ||
+      value.status === 'empty' ||
+      value.status === 'unavailable') &&
+    isDateTime(value.checkedAt) &&
+    Array.isArray(value.lines) &&
+    value.lines.every(isCheckoutReadinessLine)
+  );
+}
+
+function isCheckoutReadinessLine(
+  value: unknown,
+): value is CheckoutReadinessLine {
+  return (
+    isRecord(value) &&
+    typeof value.productSlug === 'string' &&
+    value.productSlug.length > 0 &&
+    isPositiveSafeInteger(value.requestedAmount) &&
+    (value.outcome === 'available' ||
+      value.outcome === 'insufficient_stock' ||
+      value.outcome === 'invalid_amount' ||
+      value.outcome === 'price_unavailable' ||
+      value.outcome === 'product_unavailable')
+  );
 }
 
 function isPositiveSafeInteger(value: unknown): value is number {
@@ -232,10 +265,6 @@ function isNullableNonNegativeSafeInteger(
   value: unknown,
 ): value is number | null {
   return value === null || isNonNegativeSafeInteger(value);
-}
-
-function isNullableString(value: unknown): value is string | null {
-  return value === null || typeof value === 'string';
 }
 
 function isDateTime(value: unknown): value is string {

@@ -3,7 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CartProvider } from '../cart/cart-context';
-import type { Cart, CartTransport } from '../cart/cart-transport';
+import type {
+  Cart,
+  CartTransport,
+  CheckoutReadiness,
+} from '../cart/cart-transport';
 import { ProductCartControl } from './product-cart-control';
 
 const productName = 'Citra Hops';
@@ -21,13 +25,16 @@ const quantityMetadata = {
 };
 
 const emptyCart: Cart = {
-  adjustmentMessage: null,
-  checkoutEligible: false,
   currency: 'USD',
   distinctItemCount: 0,
   items: [],
-  serverNow: '2026-08-25T10:00:00.000Z',
   subtotalMinor: 0,
+};
+
+const readyReadiness: CheckoutReadiness = {
+  checkedAt: '2026-08-25T10:00:00.000Z',
+  lines: [],
+  status: 'ready',
 };
 
 afterEach(() => cleanup());
@@ -36,13 +43,11 @@ function cartWithAmount(amount: number): Cart {
   const lineTotalMinor = (amount / 100_000) * 599;
   return {
     ...emptyCart,
-    checkoutEligible: true,
     distinctItemCount: 1,
     items: [
       {
         ...quantityMetadata,
         amount,
-        availability: 'available',
         priceMinor: 599,
         imagePath: '/assets/products/citra-hops.webp',
         lineTotalMinor,
@@ -50,8 +55,6 @@ function cartWithAmount(amount: number): Cart {
         priceQualifier: 'per 100g',
         productId: '10000000-0000-4000-8000-000000000001',
         productSlug,
-        reservationExpiresAt: '2026-08-25T10:15:00.000Z',
-        reservationStatus: 'active',
       },
     ],
     subtotalMinor: lineTotalMinor,
@@ -66,7 +69,7 @@ function createTransport(
     add: vi.fn(async () => loadedCart),
     clear: vi.fn(async () => loadedCart),
     load: vi.fn(async () => loadedCart),
-    recheck: vi.fn(async () => loadedCart),
+    checkoutReadiness: vi.fn(async () => readyReadiness),
     remove: vi.fn(async () => loadedCart),
     update: vi.fn(async () => loadedCart),
     ...overrides,
@@ -120,7 +123,7 @@ describe('ProductCartControl', () => {
     expect(screen.queryByRole('link', { name: /sign in/i })).toBeNull();
   });
 
-  it('adds the selection to an existing line and exposes unavailable state without stock details', async () => {
+  it('adds the selection to an existing line without replacing it', async () => {
     const user = userEvent.setup();
     const transport = createTransport(cartWithAmount(100_000), {
       add: vi.fn(async () => cartWithAmount(300_000)),
@@ -148,13 +151,16 @@ describe('ProductCartControl', () => {
     expect(transport.update).not.toHaveBeenCalled();
     expect(screen.queryByText(/in cart/i)).toBeNull();
 
-    cleanup();
+    expect(screen.queryByText(/in cart/i)).toBeNull();
+  });
+
+  it('keeps Add to Cart available regardless of catalog availability', async () => {
     renderControl('out-of-stock');
-    expect(await screen.findByText('Out of stock')).toBeVisible();
+
     expect(
-      screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
-    ).toBeDisabled();
-    expect(screen.queryByText(/100000|stock amount/i)).toBeNull();
+      await screen.findByRole('button', { name: 'Add Citra Hops to Cart' }),
+    ).toBeEnabled();
+    expect(screen.queryByText('Out of stock')).toBeNull();
   });
 
   it('disables the physical amount controls while an additive request is pending', async () => {
@@ -194,11 +200,8 @@ describe('ProductCartControl', () => {
     expect(screen.queryByText(/in cart/i)).toBeNull();
   });
 
-  it('refreshes after a failed add and keeps expired lines visible', async () => {
+  it('refreshes after a failed add without turning a cart state into a stock gate', async () => {
     const user = userEvent.setup();
-    const expired = cartWithAmount(100_000);
-    expired.items[0].availability = 'unavailable';
-    expired.items[0].reservationStatus = 'expired';
     const transport = createTransport(cartWithAmount(100_000), {
       load: vi
         .fn()
@@ -228,9 +231,6 @@ describe('ProductCartControl', () => {
       ).toBeVisible(),
     );
 
-    renderControl('in-stock', createTransport(expired));
-    expect(await screen.findByText('Reservation expired')).toBeVisible();
-    expect(screen.queryByText('Out of stock')).toBeNull();
-    expect(screen.getAllByLabelText('Quantity').at(-1)).toBeDisabled();
+    expect(screen.getAllByLabelText('Quantity').at(-1)).toBeEnabled();
   });
 });

@@ -13,7 +13,6 @@ const metadata = {
   packageNetWeightMg: null,
   priceBasisAmount: 100_000,
   saleKind: 'WEIGHT' as const,
-  stockAmount: 100_000_000,
 };
 
 describe('QuantityForm', () => {

@@ -4,16 +4,25 @@ import { useEffect, useRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { CartProvider, useCart } from './cart-context';
-import type { Cart, CartTransport } from './cart-transport';
+import type { Cart, CartTransport, CheckoutReadiness } from './cart-transport';
+
+const readyReadiness: CheckoutReadiness = {
+  checkedAt: '2026-08-25T10:00:00.000Z',
+  lines: [
+    {
+      outcome: 'available',
+      productSlug: 'citra-hops',
+      requestedAmount: 100_000,
+    },
+  ],
+  status: 'ready',
+};
 
 const initialCart: Cart = {
-  adjustmentMessage: null,
-  checkoutEligible: true,
   currency: 'USD' as const,
   distinctItemCount: 1,
   items: [
     {
-      availability: 'available' as const,
       priceMinor: 599,
       imagePath: '/assets/products/citra-hops.webp',
       kitYieldVolumeMl: null,
@@ -28,20 +37,16 @@ const initialCart: Cart = {
       productId: '10000000-0000-4000-8000-000000000001',
       productSlug: 'citra-hops',
       amount: 100_000,
-      reservationExpiresAt: '2026-08-25T10:15:00.000Z',
-      reservationStatus: 'active',
       saleKind: 'WEIGHT',
       stockAmount: 100_000_000,
       amountUnit: 'MILLIGRAM',
     },
   ],
-  serverNow: '2026-08-25T10:00:00.000Z',
   subtotalMinor: 599,
 };
 
 const emptyCart: Cart = {
   ...initialCart,
-  checkoutEligible: false,
   distinctItemCount: 0,
   items: [],
   subtotalMinor: 0,
@@ -65,7 +70,7 @@ describe('CartProvider', () => {
             resolveLoad = resolve;
           }),
       ),
-      recheck: vi.fn(async () => initialCart),
+      checkoutReadiness: vi.fn(async () => readyReadiness),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(async () => initialCart),
     };
@@ -89,7 +94,7 @@ describe('CartProvider', () => {
       add: vi.fn(async () => initialCart),
       clear: vi.fn(async () => initialCart),
       load: vi.fn(async () => initialCart),
-      recheck: vi.fn(async () => initialCart),
+      checkoutReadiness: vi.fn(async () => readyReadiness),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(async () => initialCart),
     };
@@ -110,7 +115,7 @@ describe('CartProvider', () => {
       add: vi.fn(async () => initialCart),
       clear: vi.fn(async () => initialCart),
       load: vi.fn().mockResolvedValue(initialCart),
-      recheck: vi.fn(async () => initialCart),
+      checkoutReadiness: vi.fn(async () => readyReadiness),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(
         () => new Promise<Cart>((resolve) => resolvers.push(resolve)),
@@ -160,7 +165,7 @@ describe('CartProvider', () => {
         .fn()
         .mockResolvedValueOnce(initialCart)
         .mockResolvedValueOnce(canonical),
-      recheck: vi.fn(async () => initialCart),
+      checkoutReadiness: vi.fn(async () => readyReadiness),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(async () => {
         throw new Error('planned failure');
@@ -192,7 +197,7 @@ describe('CartProvider', () => {
         .fn()
         .mockResolvedValueOnce(emptyCart)
         .mockResolvedValueOnce(emptyCart),
-      recheck: vi.fn(async () => emptyCart),
+      checkoutReadiness: vi.fn(async () => readyReadiness),
       remove: vi.fn(async () => emptyCart),
       update: vi.fn(async () => emptyCart),
     };
@@ -233,7 +238,7 @@ describe('CartProvider', () => {
               resolveSecond = resolve;
             }),
         ),
-      recheck: vi.fn(async () => initialCart),
+      checkoutReadiness: vi.fn(async () => readyReadiness),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(async () => initialCart),
     };
@@ -267,7 +272,7 @@ describe('CartProvider', () => {
               resolveRetry = resolve;
             }),
         ),
-      recheck: vi.fn(async () => initialCart),
+      checkoutReadiness: vi.fn(async () => readyReadiness),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(async () => initialCart),
     };
@@ -289,24 +294,19 @@ describe('CartProvider', () => {
     expect(transport.load).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps recheck server-authoritative and exposes its canonical adjustment message', async () => {
+  it('coalesces duplicate checkout-readiness requests without mutating the cart', async () => {
     const user = userEvent.setup();
-    let resolveRecheck: ((value: Cart) => void) | undefined;
-    const recheckedCart: Cart = {
-      ...initialCart,
-      adjustmentMessage: 'Citra Hops quantity was adjusted to available stock.',
-      items: [{ ...initialCart.items[0], amount: 100_000 }],
-    };
+    let resolveReadiness: ((value: CheckoutReadiness) => void) | undefined;
     const transport: CartTransport = {
       add: vi.fn(async () => initialCart),
-      clear: vi.fn(async () => initialCart),
-      load: vi.fn(async () => initialCart),
-      recheck: vi.fn(
+      checkoutReadiness: vi.fn(
         () =>
-          new Promise<Cart>((resolve) => {
-            resolveRecheck = resolve;
+          new Promise<CheckoutReadiness>((resolve) => {
+            resolveReadiness = resolve;
           }),
       ),
+      clear: vi.fn(async () => initialCart),
+      load: vi.fn(async () => initialCart),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(async () => initialCart),
     };
@@ -316,20 +316,23 @@ describe('CartProvider', () => {
       </CartProvider>,
     );
 
-    await user.click(await screen.findByRole('button', { name: 'Recheck' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Check readiness' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Check readiness' }));
 
-    expect(screen.getByTestId('pending')).toHaveTextContent('recheck');
-    expect(screen.getByTestId('totals')).toHaveTextContent('refreshing');
+    expect(screen.getByTestId('pending')).toHaveTextContent(
+      'checkout-readiness',
+    );
+    expect(screen.getByTestId('totals')).toHaveTextContent('canonical');
     expect(screen.getByTestId('quantity')).toHaveTextContent('100000');
 
-    resolveRecheck?.(recheckedCart);
+    resolveReadiness?.(readyReadiness);
 
     await waitFor(() =>
-      expect(screen.getByTestId('message')).toHaveTextContent(
-        'adjusted to available stock',
-      ),
+      expect(screen.getByTestId('pending')).toHaveTextContent(''),
     );
-    expect(transport.recheck).toHaveBeenCalledTimes(1);
+    expect(transport.checkoutReadiness).toHaveBeenCalledTimes(1);
     expect(transport.load).toHaveBeenCalledTimes(1);
   });
 
@@ -366,7 +369,7 @@ describe('CartProvider', () => {
         add: vi.fn(async () => (method === 'add' ? expectedCart : initial)),
         clear: vi.fn(async () => (method === 'clear' ? expectedCart : initial)),
         load: vi.fn(async () => initial),
-        recheck: vi.fn(async () => initial),
+        checkoutReadiness: vi.fn(async () => readyReadiness),
         remove: vi.fn(async () =>
           method === 'remove' ? expectedCart : initial,
         ),
@@ -402,7 +405,7 @@ describe('CartProvider', () => {
         .fn()
         .mockResolvedValueOnce(initialCart)
         .mockResolvedValueOnce(updatedCart),
-      recheck: vi.fn(async () => initialCart),
+      checkoutReadiness: vi.fn(async () => readyReadiness),
       remove: vi.fn(async () => initialCart),
       update: vi
         .fn()
@@ -500,8 +503,8 @@ function Probe() {
       <button onClick={() => void cart.refresh()} type="button">
         Refresh
       </button>
-      <button onClick={() => void cart.recheck()} type="button">
-        Recheck
+      <button onClick={() => void cart.checkCheckoutReadiness()} type="button">
+        Check readiness
       </button>
       <button
         onClick={() => void cart.add('citra-hops', 100_000)}

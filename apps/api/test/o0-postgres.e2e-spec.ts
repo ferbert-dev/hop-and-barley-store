@@ -169,16 +169,12 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
     ).rejects.toMatchObject({ code: 'P2002' });
   });
 
-  it('fails active/USD/stock checks before first-cart persistence and rejects expiry', async () => {
+  it('fails active/USD checks, ignores stock for cart persistence and rejects expiry', async () => {
     const server = app.getHttpServer() as App;
     const product = await prisma.product.findUniqueOrThrow({
       where: { slug: 'safale-us05-yeast' },
     });
-    for (const data of [
-      { isActive: false },
-      { currency: 'EUR' },
-      { stockAmount: 0 },
-    ]) {
+    for (const data of [{ isActive: false }, { currency: 'EUR' }]) {
       await prisma.product.update({ data, where: { id: product.id } });
       await request(server)
         .post('/api/v1/cart/items')
@@ -191,6 +187,19 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
         where: { id: product.id },
       });
     }
+
+    await prisma.product.update({
+      data: { stockAmount: 0 },
+      where: { id: product.id },
+    });
+    await request(server)
+      .post('/api/v1/cart/items')
+      .set('Origin', 'http://localhost:3000')
+      .send({ productSlug: 'safale-us05-yeast', amount: 1 })
+      .expect(200);
+    expect(await prisma.cart.count()).toBe(1);
+    expect(await prisma.cartReservation.count()).toBe(0);
+    await prisma.cart.deleteMany();
 
     const expiredToken = 'D'.repeat(43);
     await postgres.query(

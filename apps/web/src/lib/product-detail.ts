@@ -74,6 +74,7 @@ function normalizeProductDetail(value: unknown): ProductDetailProduct {
     priceMinor,
     priceQualifier,
     slug,
+    stockAmount,
     specifications,
     teaser,
   } = value;
@@ -86,6 +87,8 @@ function normalizeProductDetail(value: unknown): ProductDetailProduct {
     !isNonEmptyString(description) ||
     !Number.isSafeInteger(priceMinor) ||
     (priceMinor as number) < 0 ||
+    !Number.isSafeInteger(stockAmount) ||
+    (stockAmount as number) < 0 ||
     currency !== 'USD' ||
     !isNonEmptyString(teaser) ||
     !isNonEmptyString(priceQualifier) ||
@@ -112,6 +115,7 @@ function normalizeProductDetail(value: unknown): ProductDetailProduct {
     priceMinor: priceMinor as number,
     priceQualifier,
     slug,
+    stockAmount: stockAmount as number,
     specifications: specifications.map(
       ({ label, value: specificationValue }) => ({
         label,

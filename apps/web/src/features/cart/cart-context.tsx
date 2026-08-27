@@ -14,6 +14,7 @@ import {
   createBrowserCartTransport,
   type Cart,
   type CartTransport,
+  type CheckoutReadiness,
 } from './cart-transport';
 import { estimateLineTotalMinor } from '../quantity/quantity-model';
 
@@ -24,8 +25,8 @@ export type CartState =
 
 export type CartPendingOperation =
   | Readonly<{ kind: 'add' }>
+  | Readonly<{ kind: 'checkout-readiness' }>
   | Readonly<{ kind: 'clear' }>
-  | Readonly<{ kind: 'recheck' }>
   | Readonly<{ kind: 'remove'; productSlug: string }>
   | Readonly<{
       kind: 'update';
@@ -35,11 +36,11 @@ export type CartPendingOperation =
 
 export type CartContextValue = Readonly<{
   add(productSlug: string, amount: number): Promise<void>;
+  checkCheckoutReadiness(): Promise<CheckoutReadiness>;
   clear(): Promise<void>;
   ensureLoaded(): Promise<void>;
   items: Cart['items'];
   pending: CartPendingOperation | null;
-  recheck(): Promise<void>;
   refresh(): Promise<void>;
   remove(productSlug: string): Promise<void>;
   state: CartState;
@@ -65,6 +66,9 @@ export function CartProvider({
     Extract<CartPendingOperation, { kind: 'update' }> | undefined
   >(undefined);
   const updateMutation = useRef<Promise<void> | null>(null);
+  const checkoutReadinessMutation = useRef<Promise<CheckoutReadiness> | null>(
+    null,
+  );
 
   const loadCanonical = useCallback(
     async (showLoading: boolean) => {
@@ -222,25 +226,57 @@ export function CartProvider({
     [transport],
   );
 
+  const checkCheckoutReadiness = useCallback(() => {
+    if (checkoutReadinessMutation.current) {
+      return checkoutReadinessMutation.current;
+    }
+    if (pendingRef.current) {
+      return Promise.reject(new Error('A cart change is already in progress.'));
+    }
+
+    const nextPending = { kind: 'checkout-readiness' } as const;
+    pendingRef.current = nextPending;
+    setPending(nextPending);
+    const request = transport.checkoutReadiness().finally(() => {
+      checkoutReadinessMutation.current = null;
+      pendingRef.current = null;
+      setPending(null);
+    });
+    checkoutReadinessMutation.current = request;
+    return request;
+  }, [transport]);
+
   const value = useMemo<CartContextValue>(
     () => ({
       add: (productSlug, amount) =>
         mutate({ kind: 'add' }, () => transport.add(productSlug, amount)),
+      checkCheckoutReadiness,
       clear: () => mutate({ kind: 'clear' }, () => transport.clear()),
       ensureLoaded,
       items: projectItems(state, pending),
       pending,
-      recheck: () => mutate({ kind: 'recheck' }, () => transport.recheck()),
       refresh,
       remove: (productSlug) =>
         mutate({ kind: 'remove', productSlug }, () =>
           transport.remove(productSlug),
         ),
       state,
-      totalsAreRefreshing: state.kind === 'ready' && pending !== null,
+      totalsAreRefreshing:
+        state.kind === 'ready' &&
+        pending !== null &&
+        pending.kind !== 'checkout-readiness',
       update,
     }),
-    [ensureLoaded, mutate, pending, refresh, state, transport, update],
+    [
+      checkCheckoutReadiness,
+      ensureLoaded,
+      mutate,
+      pending,
+      refresh,
+      state,
+      transport,
+      update,
+    ],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
@@ -250,7 +286,7 @@ function readyState(cart: Cart, fallbackMessage?: string): CartState {
   return {
     cart,
     kind: 'ready',
-    message: cart.adjustmentMessage ?? fallbackMessage,
+    message: fallbackMessage,
   };
 }
 
@@ -259,7 +295,11 @@ function projectItems(
   pending: CartPendingOperation | null,
 ): Cart['items'] {
   if (state.kind !== 'ready') return [];
-  if (!pending || pending.kind === 'add' || pending.kind === 'recheck') {
+  if (
+    !pending ||
+    pending.kind === 'add' ||
+    pending.kind === 'checkout-readiness'
+  ) {
     return state.cart.items;
   }
   if (pending.kind === 'clear') return [];

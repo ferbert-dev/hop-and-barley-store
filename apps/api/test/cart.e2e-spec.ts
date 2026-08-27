@@ -20,14 +20,11 @@ const activeCart: ActiveCartCapability = {
   rawToken,
 };
 const cart: CartDto = {
-  adjustmentMessage: null,
-  checkoutEligible: true,
   currency: 'USD',
   distinctItemCount: 1,
   items: [
     {
       amountUnit: 'EACH',
-      availability: 'available',
       priceMinor: 699,
       imagePath: '/assets/products/cascade-hops.webp',
       lineTotalMinor: 1398,
@@ -42,13 +39,10 @@ const cart: CartDto = {
       productId: '20000000-0000-4000-8000-000000000002',
       productSlug: 'cascade-hops',
       amount: 2,
-      reservationExpiresAt: '2026-08-25T12:15:00.000Z',
-      reservationStatus: 'active',
       saleKind: 'PACKAGE',
       stockAmount: 100,
     },
   ],
-  serverNow: '2026-08-25T12:00:00.000Z',
   subtotalMinor: 1398,
 };
 
@@ -60,13 +54,21 @@ describe('Cart API security contract (e2e)', () => {
       Promise.resolve(candidate === rawToken ? activeCart : null),
     ),
     clear: jest.fn().mockResolvedValue({
-      adjustmentMessage: null,
-      checkoutEligible: false,
       currency: 'USD',
       distinctItemCount: 0,
       items: [],
-      serverNow: '2026-08-25T12:00:00.000Z',
       subtotalMinor: 0,
+    }),
+    checkoutReadiness: jest.fn().mockResolvedValue({
+      checkedAt: '2026-08-27T12:00:00.000Z',
+      lines: [
+        {
+          outcome: 'available',
+          productSlug: 'cascade-hops',
+          requestedAmount: 2,
+        },
+      ],
+      status: 'ready',
     }),
     createAndAdd: jest.fn().mockResolvedValue({
       cart,
@@ -74,16 +76,12 @@ describe('Cart API security contract (e2e)', () => {
       rawToken,
     }),
     empty: jest.fn().mockReturnValue({
-      adjustmentMessage: null,
-      checkoutEligible: false,
       currency: 'USD',
       distinctItemCount: 0,
       items: [],
-      serverNow: '2026-08-25T12:00:00.000Z',
       subtotalMinor: 0,
     }),
     getCart: jest.fn().mockResolvedValue(cart),
-    recheck: jest.fn().mockResolvedValue(cart),
     remove: jest.fn().mockResolvedValue(cart),
     update: jest.fn().mockResolvedValue(cart),
   };
@@ -236,7 +234,7 @@ describe('Cart API security contract (e2e)', () => {
     const csrf = app.get(CartCsrfService).issue(rawToken);
 
     await request(server)
-      .post('/api/v1/cart/recheck')
+      .post('/api/v1/cart/checkout-readiness')
       .set('Cookie', cookie)
       .set('Origin', 'http://localhost:3000')
       .expect(403);
@@ -255,26 +253,26 @@ describe('Cart API security contract (e2e)', () => {
       .expect(403);
 
     await request(server)
-      .post('/api/v1/cart/recheck')
+      .post('/api/v1/cart/checkout-readiness')
       .set('Cookie', cookie)
       .set('Origin', 'http://localhost:3000')
       .set('X-CSRF-Token', csrf)
       .expect(200);
     await request(server)
-      .post('/api/v1/cart/recheck')
+      .post('/api/v1/cart/checkout-readiness')
       .set('Cookie', cookie)
       .set('Origin', 'http://evil.example')
       .set('X-CSRF-Token', csrf)
       .expect(403);
     await request(server)
-      .post('/api/v1/cart/recheck')
+      .post('/api/v1/cart/checkout-readiness')
       .set('Cookie', cookie)
       .set('Origin', 'http://localhost:3000')
       .set('X-CSRF-Token', csrf)
       .send({})
       .expect(415);
     await request(server)
-      .post('/api/v1/cart/recheck')
+      .post('/api/v1/cart/checkout-readiness')
       .set('Cookie', cookie)
       .set('Origin', 'http://localhost:3000')
       .set('X-CSRF-Token', csrf)
@@ -309,7 +307,7 @@ describe('Cart API security contract (e2e)', () => {
       .expect(200);
 
     expect(carts.add).toHaveBeenCalled();
-    expect(carts.recheck).toHaveBeenCalled();
+    expect(carts.checkoutReadiness).toHaveBeenCalled();
     expect(carts.update).toHaveBeenCalled();
     expect(carts.remove).toHaveBeenCalled();
     expect(carts.clear).toHaveBeenCalled();
@@ -326,7 +324,7 @@ describe('Cart API security contract (e2e)', () => {
       expect.arrayContaining([
         '/api/v1/cart',
         '/api/v1/cart/csrf',
-        '/api/v1/cart/recheck',
+        '/api/v1/cart/checkout-readiness',
         '/api/v1/cart/items',
         '/api/v1/cart/items/{productSlug}',
       ]),
@@ -335,40 +333,42 @@ describe('Cart API security contract (e2e)', () => {
     expect(document.paths['/api/v1/cart/csrf']?.get?.security).toEqual([
       { cartCookie: [] },
     ]);
-    expect(document.paths['/api/v1/cart/recheck']?.post?.security).toEqual([
-      { cartCookie: [] },
-    ]);
+    expect(
+      document.paths['/api/v1/cart/checkout-readiness']?.post?.security,
+    ).toEqual([{ cartCookie: [] }]);
     const cartSchema = document.components?.schemas?.CartDto;
     const cartItemSchema = document.components?.schemas?.CartItemDto;
-    expect(cartSchema).toMatchObject({
+    expect(
+      cartSchema && 'properties' in cartSchema ? cartSchema.properties : {},
+    ).not.toHaveProperty('adjustmentMessage');
+    expect(
+      cartSchema && 'properties' in cartSchema ? cartSchema.properties : {},
+    ).not.toHaveProperty('checkoutEligible');
+    expect(
+      cartSchema && 'properties' in cartSchema ? cartSchema.properties : {},
+    ).not.toHaveProperty('serverNow');
+    expect(
+      cartItemSchema && 'properties' in cartItemSchema
+        ? cartItemSchema.properties
+        : {},
+    ).not.toHaveProperty('availability');
+    expect(
+      cartItemSchema && 'properties' in cartItemSchema
+        ? cartItemSchema.properties
+        : {},
+    ).not.toHaveProperty('reservationStatus');
+    expect(
+      cartItemSchema && 'properties' in cartItemSchema
+        ? cartItemSchema.properties
+        : {},
+    ).not.toHaveProperty('reservationExpiresAt');
+    expect(document.components?.schemas?.CheckoutReadinessDto).toMatchObject({
       properties: {
-        adjustmentMessage: { nullable: true, type: 'string' },
-        serverNow: { format: 'date-time', type: 'string' },
+        checkedAt: { format: 'date-time', type: 'string' },
+        lines: { type: 'array' },
+        status: { enum: ['ready', 'empty', 'unavailable'], type: 'string' },
       },
     });
-    expect(
-      cartSchema && 'required' in cartSchema ? cartSchema.required : undefined,
-    ).toEqual(expect.arrayContaining(['adjustmentMessage', 'serverNow']));
-    expect(cartItemSchema).toMatchObject({
-      properties: {
-        reservationExpiresAt: {
-          format: 'date-time',
-          nullable: true,
-          type: 'string',
-        },
-        reservationStatus: {
-          enum: ['active', 'expired', 'unreserved'],
-          type: 'string',
-        },
-      },
-    });
-    expect(
-      cartItemSchema && 'required' in cartItemSchema
-        ? cartItemSchema.required
-        : undefined,
-    ).toEqual(
-      expect.arrayContaining(['reservationExpiresAt', 'reservationStatus']),
-    );
     expect(
       document.paths['/api/v1/cart/items']?.post?.parameters?.map(
         (parameter) => ('name' in parameter ? parameter.name : undefined),

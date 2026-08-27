@@ -233,10 +233,10 @@ test.describe('isolated product-detail states', () => {
   }) => {
     await page.goto(`${runtime.baseUrl}/product/citra-hops`);
     await expect(page).toHaveTitle('Citra Hops | Hop & Barley');
-    await expect(page.getByText('Out of stock').first()).toBeVisible();
+    await expect(page.getByText('Out of stock')).toHaveCount(0);
     await expect(
       page.getByRole('button', { name: /^Add .+ to Cart$/ }).first(),
-    ).toBeDisabled();
+    ).toBeEnabled();
     await expect(
       page
         .locator('main [aria-live="polite"]')
@@ -316,7 +316,7 @@ test.describe('isolated product-detail states', () => {
         },
         {
           heading: 'Citra Hops',
-          label: 'ready-out-of-stock',
+          label: 'ready-zero-stock-cart-intent',
           url: `${runtime.baseUrl}/product/citra-hops`,
         },
         {
@@ -348,7 +348,7 @@ test.describe('isolated product-detail states', () => {
       },
       {
         heading: 'Citra Hops',
-        label: 'ready-out-of-stock',
+        label: 'ready-zero-stock-cart-intent',
         url: `${runtime.baseUrl}/product/citra-hops`,
       },
       {
@@ -388,11 +388,8 @@ test.describe('isolated product-detail states', () => {
         url: `${runtime.baseUrl}/product/mosaic-hops`,
       },
       {
-        label: 'ready-out-of-stock breadcrumb',
-        target: () =>
-          page
-            .getByRole('navigation', { name: 'Breadcrumb' })
-            .getByRole('link', { name: 'Products' }),
+        label: 'ready-zero-stock cart intent',
+        target: () => page.getByRole('button', { name: /^Add .+ to Cart$/ }),
         url: `${runtime.baseUrl}/product/citra-hops`,
       },
       {

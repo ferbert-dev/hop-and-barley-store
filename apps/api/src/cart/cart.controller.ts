@@ -44,7 +44,11 @@ import {
   CartProductSlugDto,
   UpdateCartItemDto,
 } from './dto/cart-mutation.dto';
-import { CartCsrfResponseDto, CartDto } from './dto/cart-response.dto';
+import {
+  CartCsrfResponseDto,
+  CartDto,
+  CheckoutReadinessDto,
+} from './dto/cart-response.dto';
 
 const UNAUTHORIZED = Object.freeze({ status: 'unauthorized' as const });
 
@@ -89,15 +93,15 @@ export class CartController {
     return { csrfToken: this.csrf.issue(requireActiveCart(request).rawToken) };
   }
 
-  @Post('recheck')
+  @Post('checkout-readiness')
   @HttpCode(200)
   @CartBodylessMutation()
   @UseGuards(CartMutationGuard)
   @ApiCookieAuth('cartCookie')
   @ApiOperation({
     description:
-      'Rechecks every retained line in one server-authoritative operation. Positive availability is clamped and reserved; zero-stock lines remain in the cart unreserved.',
-    summary: 'Recheck and reserve all current cart lines',
+      'Checks every retained cart line against current product, amount, price and stock state without reserving or changing inventory. Business shortages are returned as safe line outcomes.',
+    summary: 'Check whether the current cart is ready for checkout',
   })
   @ApiHeader({ name: 'Origin', required: true, schema: { type: 'string' } })
   @ApiHeader({
@@ -108,13 +112,15 @@ export class CartController {
       type: 'string',
     },
   })
-  @ApiOkResponse({ type: CartDto })
+  @ApiOkResponse({ type: CheckoutReadinessDto })
   @ApiUnauthorizedResponse({
     description: 'Presented cart capability is not valid',
   })
   @ApiForbiddenResponse({ description: 'Origin or CSRF is not valid' })
-  recheck(@Req() request: CartRequest): Promise<CartDto> {
-    return this.carts.recheck(requireActiveCart(request));
+  checkoutReadiness(
+    @Req() request: CartRequest,
+  ): Promise<CheckoutReadinessDto> {
+    return this.carts.checkoutReadiness(requireActiveCart(request));
   }
 
   @Post('items')
@@ -153,7 +159,7 @@ export class CartController {
   @ApiForbiddenResponse({ description: 'Origin or CSRF is not valid' })
   @ApiUnsupportedMediaTypeResponse({ description: 'JSON body required' })
   @ApiUnprocessableEntityResponse({
-    description: 'Product, stock, amount or line limit is unavailable',
+    description: 'Product, amount or line limit is unavailable',
   })
   async add(
     @Body() dto: AddCartItemDto,
@@ -200,7 +206,7 @@ export class CartController {
   @ApiForbiddenResponse({ description: 'Origin or CSRF is not valid' })
   @ApiNotFoundResponse({ description: 'Cart line not found' })
   @ApiUnprocessableEntityResponse({
-    description: 'Product or stock is unavailable',
+    description: 'Product or amount is unavailable',
   })
   update(
     @Param() { productSlug }: CartProductSlugDto,

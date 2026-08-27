@@ -19,7 +19,6 @@ const weight = {
   packageNetWeightMg: null,
   priceBasisAmount: 100_000,
   saleKind: 'WEIGHT' as const,
-  stockAmount: 100_000_000,
 };
 
 describe('measured quantity presentation', () => {
@@ -34,7 +33,7 @@ describe('measured quantity presentation', () => {
     expect(formatSaleUnit(weight)).toBe('per 100g');
   });
 
-  it('enforces the server-provided minimum, 100g increment, maximum and stock without disclosing stock', () => {
+  it('enforces the 100g-to-100kg per-line weight lattice independently of stock', () => {
     expect(validateOrderAmount(95_000, weight)).toBe(
       'Minimum order amount is 100g.',
     );
@@ -44,9 +43,10 @@ describe('measured quantity presentation', () => {
     expect(validateOrderAmount(100_005_000, weight)).toBe(
       'Maximum order amount is 100kg.',
     );
-    expect(
-      validateOrderAmount(105_000, { ...weight, stockAmount: 100_000 }),
-    ).toBe('This amount is no longer available.');
+    expect(validateOrderAmount(100_000_000, weight)).toBeNull();
+    expect(validateOrderAmount(100_100_000, weight)).toBe(
+      'Maximum order amount is 100kg.',
+    );
   });
 
   it('calculates a deterministic, rounded display estimate while leaving the server authoritative', () => {
