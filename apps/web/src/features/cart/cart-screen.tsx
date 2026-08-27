@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { Button } from '../../components/ui/button';
@@ -14,7 +15,10 @@ import {
 import { useCart, type CartContextValue, type CartState } from './cart-context';
 import type { Cart } from './cart-transport';
 import { QuantityForm } from '../quantity/quantity-form';
-import { formatSaleUnit } from '../quantity/quantity-model';
+import {
+  formatAggregateProductDetail,
+  formatSaleUnit,
+} from '../quantity/quantity-model';
 import styles from './cart.module.css';
 
 type CartScreenProps = Readonly<{ initialState?: CartState }>;
@@ -74,7 +78,6 @@ function CartScreenContent({
       cart={state.cart}
       cartItems={cartItems}
       clear={clear}
-      key={state.cart.serverNow}
       message={state.message}
       pending={pending}
       recheck={recheck}
@@ -170,10 +173,13 @@ function CartContents({
       item.reservationStatus !== 'expired',
   );
   const checkoutEligible =
-    cart.checkoutEligible &&
-    !hasUnavailableItem &&
-    !reservation.hasExpired &&
-    !totalsAreRefreshing;
+    cart.checkoutEligible && !hasUnavailableItem && !reservation.hasExpired;
+  const displayedSubtotalMinor = totalsAreRefreshing
+    ? cartItems.reduce(
+        (subtotal, item) => subtotal + (item.lineTotalMinor ?? 0),
+        0,
+      )
+    : cart.subtotalMinor;
 
   return (
     <section aria-labelledby="cart-title" className={styles.page}>
@@ -186,6 +192,7 @@ function CartContents({
           pendingLabel="Clearing cart…"
           type="button"
           variant="secondary"
+          className={styles.stableSecondary}
         >
           Clear cart
         </Button>
@@ -218,20 +225,61 @@ function CartContents({
                 Date.parse(item.reservationExpiresAt) <=
                   reservation.serverTime);
 
+            const quantityIsDisabled =
+              (pending !== null &&
+                pending !== undefined &&
+                !(
+                  pending.kind === 'update' &&
+                  pending.productSlug === item.productSlug
+                )) ||
+              item.availability === 'unavailable' ||
+              itemReservationExpired;
+            const aggregateDetail = formatAggregateProductDetail(
+              item.amount,
+              item,
+            );
+
             return (
               <Card className={styles.line} key={item.productSlug}>
-                <Image
-                  alt=""
-                  className={styles.image}
-                  height={160}
-                  sizes="(max-width: 47.999rem) 7rem, 10rem"
-                  src={item.imagePath}
-                  width={160}
-                />
+                <Link
+                  aria-label={`View ${item.name}`}
+                  className={styles.imageLink}
+                  href={`/product/${item.productSlug}`}
+                >
+                  <Image
+                    alt=""
+                    className={styles.image}
+                    height={160}
+                    sizes="(max-width: 47.999rem) 7rem, 10rem"
+                    src={item.imagePath}
+                    width={160}
+                  />
+                </Link>
                 <div className={styles.lineContent}>
-                  <div>
-                    <h2>{item.name}</h2>
-                    <p className={styles.qualifier}>{formatSaleUnit(item)}</p>
+                  <div className={styles.productInfo}>
+                    <h2>
+                      <Link href={`/product/${item.productSlug}`}>
+                        {item.name}
+                      </Link>
+                    </h2>
+                    <p className={styles.unitPrice}>
+                      {item.priceMinor === null ? (
+                        <>Price currently unavailable {formatSaleUnit(item)}</>
+                      ) : (
+                        <>
+                          <Price
+                            currency={cart.currency}
+                            minorUnits={item.priceMinor}
+                          />{' '}
+                          {formatSaleUnit(item)}
+                        </>
+                      )}
+                    </p>
+                    {aggregateDetail ? (
+                      <p className={styles.aggregateDetail}>
+                        {aggregateDetail}
+                      </p>
+                    ) : null}
                     {item.availability === 'unavailable' &&
                     item.reservationStatus !== 'expired' ? (
                       <p className={styles.availability} role="status">
@@ -245,41 +293,28 @@ function CartContents({
                     ) : null}
                   </div>
                   <div className={styles.linePrices}>
-                    {itemIsPending ? (
-                      <span aria-live="polite">
-                        Line total updating from the store…
-                      </span>
-                    ) : item.lineTotalMinor === null ? (
-                      <span>Price currently unavailable</span>
-                    ) : (
-                      <Price
-                        currency={cart.currency}
-                        minorUnits={item.lineTotalMinor}
-                      />
-                    )}
-                    {item.priceMinor === null ? null : (
-                      <span className={styles.unitPrice}>
+                    <span aria-atomic="true" aria-live="polite">
+                      {item.lineTotalMinor === null ? (
+                        <span>Price currently unavailable</span>
+                      ) : (
                         <Price
                           currency={cart.currency}
-                          minorUnits={item.priceMinor}
-                        />{' '}
-                        {formatSaleUnit(item)}
-                      </span>
-                    )}
+                          minorUnits={item.lineTotalMinor}
+                        />
+                      )}
+                    </span>
                   </div>
                   <div className={styles.lineActions}>
                     <QuantityForm
                       amount={item.amount}
+                      ariaLabel={`${item.name} quantity`}
+                      busy={itemIsPending}
                       currency={cart.currency}
-                      disabled={
-                        (pending !== null && pending !== undefined) ||
-                        item.availability === 'unavailable' ||
-                        itemReservationExpired
-                      }
+                      disabled={quantityIsDisabled}
                       metadata={item}
+                      mode="auto"
                       onSubmit={(amount) => update?.(item.productSlug, amount)}
                       priceMinor={item.priceMinor}
-                      submitLabel={`Update ${item.name}`}
                     />
                     <Button
                       aria-label={`Remove ${item.name} from cart`}
@@ -289,7 +324,7 @@ function CartContents({
                       pending={pending?.kind === 'remove' && itemIsPending}
                       pendingLabel={`Removing ${item.name}…`}
                       type="button"
-                      variant="danger"
+                      variant="secondary"
                     >
                       <span aria-hidden="true">X</span>
                       <span>Remove</span>
@@ -306,14 +341,12 @@ function CartContents({
             <div className={styles.total}>
               <dt>Total</dt>
               <dd>
-                {totalsAreRefreshing ? (
-                  <span aria-live="polite">Updating from the store…</span>
-                ) : (
+                <span aria-atomic="true" aria-live="polite">
                   <Price
                     currency={cart.currency}
-                    minorUnits={cart.subtotalMinor}
+                    minorUnits={displayedSubtotalMinor}
                   />
-                )}
+                </span>
               </dd>
             </div>
           </dl>
@@ -327,7 +360,14 @@ function CartContents({
             </p>
           ) : null}
           {checkoutEligible ? (
-            <Button className={styles.checkout} href="/checkout">
+            <Button
+              aria-disabled={totalsAreRefreshing || undefined}
+              className={styles.checkout}
+              href="/checkout"
+              onClick={(event) => {
+                if (totalsAreRefreshing) event.preventDefault();
+              }}
+            >
               Proceed to Checkout
             </Button>
           ) : null}
@@ -381,22 +421,44 @@ function ReservationStatus({
 
 function useReservationClock(cart: Cart) {
   const earliestActiveExpiry = getEarliestActiveExpiry(cart.items);
-  const [elapsedSinceResponse, setElapsedSinceResponse] = useState(0);
+  const [clock, setClock] = useState({
+    elapsedSinceResponse: 0,
+    serverNow: cart.serverNow,
+  });
+
+  if (clock.serverNow !== cart.serverNow) {
+    setClock({
+      elapsedSinceResponse: 0,
+      serverNow: cart.serverNow,
+    });
+  }
+
+  const elapsedSinceResponse =
+    clock.serverNow === cart.serverNow ? clock.elapsedSinceResponse : 0;
 
   useEffect(() => {
     if (earliestActiveExpiry === null) return;
 
-    const responseReceivedAt = Date.now();
     const remainingAtResponse = Math.max(
       0,
       earliestActiveExpiry - Date.parse(cart.serverNow),
     );
     if (remainingAtResponse === 0) return;
 
+    const responseReceivedAt = Date.now();
     const timer = window.setInterval(() => {
-      const elapsed = Date.now() - responseReceivedAt;
-      setElapsedSinceResponse(Math.min(elapsed, remainingAtResponse));
-      if (elapsed >= remainingAtResponse) window.clearInterval(timer);
+      const elapsed = Math.min(
+        Date.now() - responseReceivedAt,
+        remainingAtResponse,
+      );
+      setClock((current) =>
+        current.serverNow === cart.serverNow
+          ? { ...current, elapsedSinceResponse: elapsed }
+          : current,
+      );
+      if (elapsed >= remainingAtResponse) {
+        window.clearInterval(timer);
+      }
     }, 1_000);
 
     return () => window.clearInterval(timer);

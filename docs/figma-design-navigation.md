@@ -249,6 +249,24 @@ Page 1 (0:1)
 - The header badge counts distinct product lines. It never sums grams, packs,
   and kits into one dimensionless number.
 
+**User-confirmed immediate cart interaction extension — 2026-08-27**
+
+- Per-line plus/minus controls persist the new canonical amount immediately;
+  valid direct entry persists on Enter or blur. There is no separate `Update`
+  action.
+- The line total and cart total update optimistically with integer basis
+  pricing, then reconcile to the server response. The server remains
+  authoritative for amount, stock, reservations and money.
+- The cart does not show redundant `Selected`, `Selection price`, or visible
+  `Line total updating` rows. The localized reference price and basis sit below
+  the product name; the line total remains at the upper right.
+- Product image and name link to the product detail route. `Remove` is a grey
+  secondary action at the lower right. Checkout and clear-cart layout remain
+  stable while a line update is pending.
+- These behaviors refine the label-implied Figma quantity interaction and are
+  a product decision, not evidence that the extra states were drawn in the
+  source frame.
+
 ### Checkout — `checkout`
 
 [Open node `15:367`](https://www.figma.com/design/H7jIUNYzAGc7o8R0iABQjy/Project-M4-1--Next.js--share-?node-id=15-367)

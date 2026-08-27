@@ -80,10 +80,29 @@ describe('CartScreen', () => {
     },
   );
 
-  it('uses the confirmed cart labels and keeps checkout as a bounded handoff', () => {
+  it('uses the immediate cart contract and keeps checkout as a bounded handoff', () => {
     render(<CartScreen initialState={{ cart, kind: 'ready' }} />);
 
-    expect(screen.getByText('100g selected')).toBeVisible();
+    expect(
+      screen.getByText(
+        (_content, element) =>
+          element?.tagName === 'P' &&
+          element.textContent === 'US$5.99 per 100g',
+      ),
+    ).toBeVisible();
+    expect(screen.getByLabelText('Quantity')).toHaveValue('0.1');
+    expect(screen.queryByText(/selected$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Selection price')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Update Citra Hops' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Citra Hops' })).toHaveAttribute(
+      'href',
+      '/product/citra-hops',
+    );
+    expect(
+      screen.getByRole('link', { name: 'View Citra Hops' }),
+    ).toHaveAttribute('href', '/product/citra-hops');
     expect(screen.getByRole('button', { name: 'Clear cart' })).toBeVisible();
     expect(
       screen.getByRole('button', { name: 'Remove Citra Hops from cart' }),
@@ -208,7 +227,7 @@ describe('CartScreen', () => {
     expect(screen.getByText('Citra Hops')).toBeVisible();
   });
 
-  it('withholds changing totals until the cart API returns a canonical response', async () => {
+  it('updates line and cart totals immediately while preserving the mounted cart through reconciliation', async () => {
     const user = userEvent.setup();
     let resolveUpdate: ((value: Cart) => void) | undefined;
     const updatedCart: Cart = {
@@ -228,23 +247,33 @@ describe('CartScreen', () => {
       </CartProvider>,
     );
 
-    await user.clear(await screen.findByLabelText('Quantity'));
-    await user.type(screen.getByLabelText('Quantity'), '0.2');
-    await user.click(screen.getByRole('button', { name: 'Update Citra Hops' }));
+    const productImageLink = await screen.findByRole('link', {
+      name: 'View Citra Hops',
+    });
+    await user.click(
+      screen.getByRole('button', { name: 'Increase weight amount' }),
+    );
 
+    expect(screen.getByLabelText('Quantity')).toHaveValue('0.2');
+    expect(screen.getAllByText('US$11.98')).toHaveLength(2);
     expect(
-      screen.getByText('Line total updating from the store…'),
-    ).toBeVisible();
-    expect(screen.getAllByText('Updating from the store…')).toHaveLength(1);
+      screen.queryByText(/updating from the store/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Proceed to Checkout' }),
+    ).toHaveAttribute('aria-disabled', 'true');
 
     await act(async () => {
       resolveUpdate?.(updatedCart);
     });
 
-    expect(screen.getByText('200g selected')).toBeVisible();
+    expect(screen.getByLabelText('Quantity')).toHaveValue('0.2');
+    expect(screen.getByRole('link', { name: 'View Citra Hops' })).toBe(
+      productImageLink,
+    );
     expect(
-      screen.queryByText('Updating from the store…'),
-    ).not.toBeInTheDocument();
+      screen.getByRole('link', { name: 'Proceed to Checkout' }),
+    ).not.toHaveAttribute('aria-disabled');
   });
 });
 

@@ -14,6 +14,7 @@ import {
 } from '../../web/src/quality/acceptance-matrix';
 
 const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
+const connectedApiUrl = process.env.E2E_API_URL ?? null;
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
 test.describe('API-backed guest cart', () => {
@@ -43,11 +44,18 @@ test.describe('API-backed guest cart', () => {
       page.getByLabel('Cart summary').getByText('US$5.99'),
     ).toBeVisible();
 
+    const updateResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/v1/cart/items/') &&
+        response.request().method() === 'PATCH',
+    );
     await quantityForm(page, 'Citra Hops')
       .getByRole('button', { name: 'Increase weight amount' })
       .click();
-    await page.getByRole('button', { name: 'Update Citra Hops' }).click();
-    await expect(page.getByText('200g selected')).toBeVisible();
+    await updateResponse;
+    await expect(
+      quantityForm(page, 'Citra Hops').getByLabel('Quantity'),
+    ).toHaveValue('0.2');
     await expect(
       page.getByLabel('Cart summary').getByText('US$11.98'),
     ).toBeVisible();
@@ -98,9 +106,29 @@ test.describe('API-backed guest cart', () => {
     });
     await focusWithKeyboard(page, increase);
     await assertProjectFocusVisible(increase, 'increase cart amount');
+    const keyboardUpdateResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/v1/cart/items/') &&
+        response.request().method() === 'PATCH',
+    );
     await page.keyboard.press('Enter');
-    await page.getByRole('button', { name: 'Update Citra Hops' }).click();
-    await expect(page.getByText('200g selected')).toBeVisible();
+    await keyboardUpdateResponse;
+    await expect(
+      quantityForm(page, 'Citra Hops').getByLabel('Quantity'),
+    ).toHaveValue('0.2');
+
+    const quantityInput = quantityForm(page, 'Citra Hops').getByLabel(
+      'Quantity',
+    );
+    await quantityInput.fill('0.4');
+    const directUpdateResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/v1/cart/items/') &&
+        response.request().method() === 'PATCH',
+    );
+    await quantityInput.press('Enter');
+    await directUpdateResponse;
+    await expect(quantityInput).toHaveValue('0.4');
 
     await assertNoBlockingAxeViolations(page, 'ready cart');
   });
@@ -147,7 +175,24 @@ test.describe('F3 cart reservations', () => {
     await expect(
       page.getByRole('heading', { level: 1, name: 'Shopping Cart' }),
     ).toBeVisible();
-    await expect(page.getByText('500g selected')).toBeVisible();
+    await expect(
+      quantityForm(page, 'Citra Hops').getByLabel('Quantity'),
+    ).toHaveValue('0.5');
+    await expect(
+      page
+        .getByRole('heading', { name: 'Citra Hops' })
+        .locator('..')
+        .getByText('US$5.99 per 100g'),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Update Citra Hops' }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('link', { exact: true, name: 'Citra Hops' }),
+    ).toHaveAttribute('href', '/product/citra-hops');
+    await expect(
+      page.getByRole('link', { name: 'View Citra Hops' }),
+    ).toHaveAttribute('href', '/product/citra-hops');
     await expect(
       page.getByRole('button', { name: 'Remove Citra Hops from cart' }),
     ).toBeVisible();
@@ -250,7 +295,9 @@ test.describe('F3 cart reservations', () => {
     await page.getByRole('button', { name: 'Recheck availability' }).click();
     await recheckResponse;
 
-    await expect(page.getByText('300g selected')).toBeVisible();
+    await expect(
+      quantityForm(page, 'Citra Hops').getByLabel('Quantity'),
+    ).toHaveValue('0.3');
     await expectReservationCountdown(page);
     await expect(
       page.getByRole('status').filter({
@@ -304,8 +351,9 @@ test.describe('F3 cart reservations', () => {
     });
     await focusWithKeyboard(page, increase);
     await page.keyboard.press('Enter');
-    await page.getByRole('button', { name: 'Update Citra Hops' }).click();
-    await expect(page.getByText('200g selected')).toBeVisible();
+    await expect(
+      quantityForm(page, 'Citra Hops').getByLabel('Quantity'),
+    ).toHaveValue('0.2');
 
     const remove = page.getByRole('button', {
       name: 'Remove Citra Hops from cart',
@@ -582,32 +630,36 @@ async function expectReservationCountdown(page: Page) {
 }
 
 function quantityForm(page: Page, productName: string) {
-  return page.locator('form').filter({
-    has: page.getByRole('button', { name: `Update ${productName}` }),
+  return page.getByRole('form', {
+    name: `${productName} quantity`,
   });
 }
 
 async function seedCartLine(page: Page, productSlug: string) {
   await page.goto('/cart');
-  const response = await page.evaluate(async (slug) => {
-    const apiUrl = `http://${window.location.hostname}:3001/api/v1`;
-    const csrf = await fetch(`${apiUrl}/cart/csrf`, {
-      credentials: 'include',
-    });
-    const csrfBody = csrf.ok
-      ? ((await csrf.json()) as { csrfToken: string })
-      : null;
-    const add = await fetch(`${apiUrl}/cart/items`, {
-      body: JSON.stringify({ amount: 100_000, productSlug: slug }),
-      credentials: 'include',
-      headers: {
-        'content-type': 'application/json',
-        ...(csrfBody ? { 'x-csrf-token': csrfBody.csrfToken } : {}),
-      },
-      method: 'POST',
-    });
-    return { ok: add.ok, status: add.status };
-  }, productSlug);
+  const response = await page.evaluate(
+    async ({ apiUrl, slug }) => {
+      const resolvedApiUrl =
+        apiUrl ?? `http://${window.location.hostname}:3001/api/v1`;
+      const csrf = await fetch(`${resolvedApiUrl}/cart/csrf`, {
+        credentials: 'include',
+      });
+      const csrfBody = csrf.ok
+        ? ((await csrf.json()) as { csrfToken: string })
+        : null;
+      const add = await fetch(`${resolvedApiUrl}/cart/items`, {
+        body: JSON.stringify({ amount: 100_000, productSlug: slug }),
+        credentials: 'include',
+        headers: {
+          'content-type': 'application/json',
+          ...(csrfBody ? { 'x-csrf-token': csrfBody.csrfToken } : {}),
+        },
+        method: 'POST',
+      });
+      return { ok: add.ok, status: add.status };
+    },
+    { apiUrl: connectedApiUrl, slug: productSlug },
+  );
   expect(response).toEqual({ ok: true, status: 200 });
 }
 
@@ -674,18 +726,19 @@ async function assertReducedMotion(page: Page, label: string) {
 
 async function clearCart(page: Page) {
   await page
-    .evaluate(async () => {
-      const apiUrl = `http://${window.location.hostname}:3001/api/v1`;
-      const csrf = await fetch(`${apiUrl}/cart/csrf`, {
+    .evaluate(async (apiUrl) => {
+      const resolvedApiUrl =
+        apiUrl ?? `http://${window.location.hostname}:3001/api/v1`;
+      const csrf = await fetch(`${resolvedApiUrl}/cart/csrf`, {
         credentials: 'include',
       });
       if (!csrf.ok) return;
       const { csrfToken } = (await csrf.json()) as { csrfToken: string };
-      await fetch(`${apiUrl}/cart/items`, {
+      await fetch(`${resolvedApiUrl}/cart/items`, {
         credentials: 'include',
         headers: { 'x-csrf-token': csrfToken },
         method: 'DELETE',
       });
-    })
+    }, connectedApiUrl)
     .catch(() => undefined);
 }

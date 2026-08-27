@@ -114,16 +114,34 @@ export function formatAmount(
 
   if (metadata.saleKind === 'PACKAGE') {
     const packLabel = `${String(amount)} ${amount === 1 ? 'pack' : 'packs'}`;
-    return metadata.packageNetWeightMg === null
-      ? packLabel
-      : `${packLabel} · ${formatWeightAmount(amount * metadata.packageNetWeightMg)} total net`;
+    const detail = formatAggregateProductDetail(amount, metadata);
+    return detail === null ? packLabel : `${packLabel} · ${detail}`;
   }
 
   const kitLabel = `${String(amount)} ${amount === 1 ? 'kit' : 'kits'}`;
-  if (metadata.kitYieldVolumeMl === null) return kitLabel;
+  const detail = formatAggregateProductDetail(amount, metadata);
+  return detail === null ? kitLabel : `${kitLabel} · ${detail}`;
+}
+
+export function formatAggregateProductDetail(
+  amount: number,
+  metadata: Pick<
+    QuantityMetadata,
+    'kitYieldVolumeMl' | 'packageNetWeightMg' | 'saleKind'
+  >,
+): string | null {
+  if (!isPositiveSafeInteger(amount)) return null;
+
+  if (metadata.saleKind === 'PACKAGE' && metadata.packageNetWeightMg !== null) {
+    return `${formatWeightAmount(amount * metadata.packageNetWeightMg)} total net`;
+  }
+
+  if (metadata.saleKind !== 'KIT' || metadata.kitYieldVolumeMl === null) {
+    return null;
+  }
 
   const totalYieldMl = amount * metadata.kitYieldVolumeMl;
-  return `${kitLabel} · ${formatGallons(totalYieldMl)} / approx. ${formatVolumeMl(totalYieldMl)} total yield`;
+  return `${formatGallons(totalYieldMl)} / approx. ${formatVolumeMl(totalYieldMl)} total yield`;
 }
 
 export function formatSaleUnit(metadata: QuantityMetadata): string {

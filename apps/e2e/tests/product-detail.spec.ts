@@ -12,6 +12,7 @@ import {
 } from '../support/catalog-cache-runtime';
 
 const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
+const connectedApiUrl = process.env.E2E_API_URL ?? null;
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
 test.use({ screenshot: 'off', trace: 'off' });
@@ -158,9 +159,23 @@ test.describe('database-backed product details', () => {
 
       await page.getByRole('link', { name: 'Shopping cart, 1 item' }).click();
       await expect(page).toHaveURL(/\/cart$/);
-      await expect(page.getByText(/300\s*g/i).first()).toBeVisible();
+      await expect(
+        page
+          .getByRole('form', { name: 'Mosaic Hops quantity' })
+          .getByLabel('Quantity'),
+      ).toHaveValue('0.3');
+      await expect(
+        page.getByLabel('Cart summary').getByText('US$28.50'),
+      ).toBeVisible();
       await page.reload();
-      await expect(page.getByText(/300\s*g/i).first()).toBeVisible();
+      await expect(
+        page
+          .getByRole('form', { name: 'Mosaic Hops quantity' })
+          .getByLabel('Quantity'),
+      ).toHaveValue('0.3');
+      await expect(
+        page.getByLabel('Cart summary').getByText('US$28.50'),
+      ).toBeVisible();
     } finally {
       await clearGuestCart(page);
     }
@@ -569,19 +584,20 @@ async function assertNoBlockingAxeViolations(
 
 async function clearGuestCart(page: Page) {
   await page
-    .evaluate(async () => {
-      const apiUrl = `http://${window.location.hostname}:3001/api/v1`;
-      const csrf = await fetch(`${apiUrl}/cart/csrf`, {
+    .evaluate(async (apiUrl) => {
+      const resolvedApiUrl =
+        apiUrl ?? `http://${window.location.hostname}:3001/api/v1`;
+      const csrf = await fetch(`${resolvedApiUrl}/cart/csrf`, {
         credentials: 'include',
       });
       if (!csrf.ok) return;
       const { csrfToken } = (await csrf.json()) as { csrfToken: string };
-      await fetch(`${apiUrl}/cart/items`, {
+      await fetch(`${resolvedApiUrl}/cart/items`, {
         credentials: 'include',
         headers: { 'x-csrf-token': csrfToken },
         method: 'DELETE',
       });
-    })
+    }, connectedApiUrl)
     .catch(() => undefined);
 }
 

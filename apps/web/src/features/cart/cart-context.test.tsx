@@ -99,13 +99,13 @@ describe('CartProvider', () => {
       </CartProvider>,
     );
 
-    await screen.findByRole('button', { name: 'Update' });
+    await screen.findByRole('button', { name: 'Update 200' });
     await waitFor(() => expect(transport.load).toHaveBeenCalledTimes(1));
   });
 
-  it('projects a quantity change immediately but withholds totals until the canonical response', async () => {
+  it('projects quantity and integer line totals immediately while coalescing rapid updates', async () => {
     const user = userEvent.setup();
-    let resolveUpdate: ((value: Cart) => void) | undefined;
+    const resolvers: Array<(value: Cart) => void> = [];
     const transport: CartTransport = {
       add: vi.fn(async () => initialCart),
       clear: vi.fn(async () => initialCart),
@@ -113,10 +113,7 @@ describe('CartProvider', () => {
       recheck: vi.fn(async () => initialCart),
       remove: vi.fn(async () => initialCart),
       update: vi.fn(
-        () =>
-          new Promise<Cart>((resolve) => {
-            resolveUpdate = resolve;
-          }),
+        () => new Promise<Cart>((resolve) => resolvers.push(resolve)),
       ),
     };
     render(
@@ -125,19 +122,32 @@ describe('CartProvider', () => {
       </CartProvider>,
     );
 
-    await screen.findByRole('button', { name: 'Update' });
-    await user.click(screen.getByRole('button', { name: 'Update' }));
-    await user.click(screen.getByRole('button', { name: 'Update' }));
+    await screen.findByRole('button', { name: 'Update 200' });
+    await user.click(screen.getByRole('button', { name: 'Update 200' }));
+    await user.click(screen.getByRole('button', { name: 'Update 300' }));
+    await user.click(screen.getByRole('button', { name: 'Update 400' }));
 
-    expect(screen.getByTestId('quantity')).toHaveTextContent('200000');
+    expect(screen.getByTestId('quantity')).toHaveTextContent('400000');
+    expect(screen.getByTestId('line-total')).toHaveTextContent('2396');
     expect(screen.getByTestId('totals')).toHaveTextContent('refreshing');
     expect(transport.update).toHaveBeenCalledTimes(1);
 
-    resolveUpdate?.({ ...initialCart, subtotalMinor: 1198 });
+    resolvers[0]?.(updatedCart);
+    await waitFor(() => expect(transport.update).toHaveBeenCalledTimes(2));
+    expect(transport.update).toHaveBeenLastCalledWith('citra-hops', 400_000);
+
+    const finalCart: Cart = {
+      ...initialCart,
+      items: [
+        { ...initialCart.items[0], amount: 400_000, lineTotalMinor: 2396 },
+      ],
+      subtotalMinor: 2396,
+    };
+    resolvers[1]?.(finalCart);
     await waitFor(() =>
       expect(screen.getByTestId('totals')).toHaveTextContent('canonical'),
     );
-    expect(screen.getByTestId('subtotal')).toHaveTextContent('1198');
+    expect(screen.getByTestId('subtotal')).toHaveTextContent('2396');
   });
 
   it('rolls back to a freshly loaded canonical cart after a mutation failure', async () => {
@@ -162,7 +172,7 @@ describe('CartProvider', () => {
       </CartProvider>,
     );
 
-    await user.click(await screen.findByRole('button', { name: 'Update' }));
+    await user.click(await screen.findByRole('button', { name: 'Update 200' }));
 
     await waitFor(() =>
       expect(screen.getByTestId('quantity')).toHaveTextContent('100000'),
@@ -343,7 +353,7 @@ describe('CartProvider', () => {
       method: 'clear',
     },
     {
-      action: 'Update',
+      action: 'Update 200',
       expectedCart: updatedCart,
       initial: initialCart,
       method: 'update',
@@ -410,8 +420,8 @@ describe('CartProvider', () => {
       </CartProvider>,
     );
 
-    await screen.findByRole('button', { name: 'Update' });
-    await user.click(screen.getByRole('button', { name: 'Update' }));
+    await screen.findByRole('button', { name: 'Update 200' });
+    await user.click(screen.getByRole('button', { name: 'Update 200' }));
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
     expect(transport.load).toHaveBeenCalledTimes(1);
@@ -422,7 +432,7 @@ describe('CartProvider', () => {
       expect(screen.getByTestId('totals')).toHaveTextContent('canonical'),
     );
 
-    await user.click(screen.getByRole('button', { name: 'Update' }));
+    await user.click(screen.getByRole('button', { name: 'Update 200' }));
     await waitFor(() => expect(transport.update).toHaveBeenCalledTimes(2));
   });
 });
@@ -479,6 +489,7 @@ function Probe() {
   return (
     <>
       <output data-testid="quantity">{cart.items[0]?.amount}</output>
+      <output data-testid="line-total">{cart.items[0]?.lineTotalMinor}</output>
       <output data-testid="totals">
         {cart.totalsAreRefreshing ? 'refreshing' : 'canonical'}
       </output>
@@ -502,7 +513,19 @@ function Probe() {
         onClick={() => void cart.update('citra-hops', 200_000)}
         type="button"
       >
-        Update
+        Update 200
+      </button>
+      <button
+        onClick={() => void cart.update('citra-hops', 300_000)}
+        type="button"
+      >
+        Update 300
+      </button>
+      <button
+        onClick={() => void cart.update('citra-hops', 400_000)}
+        type="button"
+      >
+        Update 400
       </button>
       <button onClick={() => void cart.remove('citra-hops')} type="button">
         Remove

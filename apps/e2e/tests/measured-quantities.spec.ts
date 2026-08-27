@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
+const connectedApiUrl = process.env.E2E_API_URL ?? null;
 
 test.describe('measured product quantities', () => {
   test.describe.configure({ mode: 'serial' });
@@ -130,13 +131,17 @@ test.describe('measured product quantities', () => {
     await expect(
       page.getByRole('heading', { name: 'Citra Hops' }),
     ).toBeVisible();
-    await expect(page.getByText(/900\s*g/i).first()).toBeVisible();
+    await expect(
+      page.getByLabel('Citra Hops quantity').getByLabel('Quantity'),
+    ).toHaveValue('0.9');
     await expect(
       page.getByLabel('Cart summary').getByText('US$53.91'),
     ).toBeVisible();
 
     await page.reload();
-    await expect(page.getByText(/900\s*g/i).first()).toBeVisible();
+    await expect(
+      page.getByLabel('Citra Hops quantity').getByLabel('Quantity'),
+    ).toHaveValue('0.9');
     await expect(
       page.getByLabel('Cart summary').getByText('US$53.91'),
     ).toBeVisible();
@@ -226,9 +231,7 @@ test.describe('measured product quantities', () => {
     await page.goto('/product/citra-hops');
 
     const amount = amountInput(page);
-    await amount.focus();
-    await page.keyboard.press('ControlOrMeta+A');
-    await page.keyboard.type('0.9');
+    await amount.fill('0.9');
     await page.keyboard.press('Tab');
     await expect(amount).toHaveValue('0.9');
     await expect(
@@ -279,18 +282,19 @@ async function addSelectedAmount(page: Page) {
 
 async function clearGuestCart(page: Page) {
   await page
-    .evaluate(async () => {
-      const apiUrl = `http://${window.location.hostname}:3001/api/v1`;
-      const csrf = await fetch(`${apiUrl}/cart/csrf`, {
+    .evaluate(async (apiUrl) => {
+      const resolvedApiUrl =
+        apiUrl ?? `http://${window.location.hostname}:3001/api/v1`;
+      const csrf = await fetch(`${resolvedApiUrl}/cart/csrf`, {
         credentials: 'include',
       });
       if (!csrf.ok) return;
       const { csrfToken } = (await csrf.json()) as { csrfToken: string };
-      await fetch(`${apiUrl}/cart/items`, {
+      await fetch(`${resolvedApiUrl}/cart/items`, {
         credentials: 'include',
         headers: { 'x-csrf-token': csrfToken },
         method: 'DELETE',
       });
-    })
+    }, connectedApiUrl)
     .catch(() => undefined);
 }

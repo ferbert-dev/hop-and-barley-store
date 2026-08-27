@@ -122,4 +122,78 @@ describe('QuantityForm', () => {
     expect(screen.getByLabelText('Quantity')).toHaveValue('0.2');
     expect(screen.getByText('200g selected')).toBeVisible();
   });
+
+  it('auto-commits step buttons and valid direct entry without redundant summary UI', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(
+      <QuantityForm
+        amount={100_000}
+        ariaLabel="Citra Hops quantity"
+        currency="USD"
+        metadata={metadata}
+        mode="auto"
+        onSubmit={onSubmit}
+        priceMinor={599}
+      />,
+    );
+
+    const increase = screen.getByRole('button', {
+      name: 'Increase weight amount',
+    });
+    await user.click(increase);
+    expect(onSubmit).toHaveBeenLastCalledWith(200_000);
+    expect(screen.getByRole('button', { name: 'Increase weight amount' })).toBe(
+      increase,
+    );
+
+    const input = screen.getByLabelText('Quantity');
+    await user.clear(input);
+    await user.type(input, '0.9');
+    await user.keyboard('{Enter}');
+    expect(onSubmit).toHaveBeenLastCalledWith(900_000);
+    expect(onSubmit).toHaveBeenCalledTimes(2);
+
+    await user.clear(input);
+    await user.type(input, '1.1');
+    await user.tab();
+    expect(onSubmit).toHaveBeenLastCalledWith(1_100_000);
+    expect(onSubmit).toHaveBeenCalledTimes(3);
+    expect(screen.queryByText(/selected$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Selection price')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /update/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('allows an automatic amount to be retried after the canonical value rolls back', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    const renderForm = (amount: number) => (
+      <QuantityForm
+        amount={amount}
+        ariaLabel="Citra Hops quantity"
+        currency="USD"
+        metadata={metadata}
+        mode="auto"
+        onSubmit={onSubmit}
+        priceMinor={599}
+      />
+    );
+    const { rerender } = render(renderForm(100_000));
+
+    await user.click(
+      screen.getByRole('button', { name: 'Increase weight amount' }),
+    );
+    expect(onSubmit).toHaveBeenLastCalledWith(200_000);
+
+    rerender(renderForm(200_000));
+    rerender(renderForm(100_000));
+    await user.click(
+      screen.getByRole('button', { name: 'Increase weight amount' }),
+    );
+
+    expect(onSubmit).toHaveBeenCalledTimes(2);
+    expect(onSubmit).toHaveBeenLastCalledWith(200_000);
+  });
 });
