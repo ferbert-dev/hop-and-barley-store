@@ -177,6 +177,25 @@ const createOrder = configuredClient.POST('/api/v1/orders', {
 });
 void createOrder;
 
+type OrderUnprocessableEntity =
+  paths['/api/v1/orders']['post']['responses'][422]['content']['application/json'];
+const unavailableAllocation: OrderUnprocessableEntity = {
+  checkedAt: '2026-08-27T12:03:00.000Z',
+  lines: [
+    {
+      outcome: 'insufficient_stock',
+      productSlug: 'cascade-hops',
+      requestedAmount: 2,
+    },
+  ],
+  status: 'allocation-unavailable',
+};
+const unavailablePayment: OrderUnprocessableEntity = {
+  status: 'payment-unavailable',
+};
+void unavailableAllocation;
+void unavailablePayment;
+
 const safeOrder: components['schemas']['OrderDto'] = {
   currency: 'USD',
   id: '60000000-0000-4000-8000-000000000001',

@@ -13,6 +13,7 @@ import {
   ApiBody,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiExtraModels,
   ApiForbiddenResponse,
   ApiHeader,
   ApiOperation,
@@ -21,6 +22,7 @@ import {
   ApiUnprocessableEntityResponse,
   ApiUnsupportedMediaTypeResponse,
   ApiTags,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import type { AuthRequest } from '../auth/auth-request';
@@ -30,12 +32,14 @@ import type { CartRequest } from '../cart/cart-request';
 import { AllocationUnavailableDto } from './dto/allocation-unavailable.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderDto } from './dto/order-response.dto';
+import { PaymentUnavailableDto } from './dto/payment-unavailable.dto';
 import { IdempotencyKeyPipe } from './idempotency-key.pipe';
 import { OrdersService } from './orders.service';
 
 type CheckoutRequest = AuthRequest & CartRequest;
 
 @ApiTags('orders')
+@ApiExtraModels(AllocationUnavailableDto, PaymentUnavailableDto)
 @Controller('orders')
 export class OrdersController {
   constructor(
@@ -98,7 +102,12 @@ export class OrdersController {
   @ApiUnprocessableEntityResponse({
     description:
       'Cart, product, amount, price, stock or payment method is unavailable. Business allocation failures use safe per-line outcomes without exact stock.',
-    type: AllocationUnavailableDto,
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(AllocationUnavailableDto) },
+        { $ref: getSchemaPath(PaymentUnavailableDto) },
+      ],
+    },
   })
   @ApiUnsupportedMediaTypeResponse({ description: 'JSON body required' })
   async create(

@@ -512,6 +512,17 @@ export interface components {
             /** @enum {string} */
             status: "signed-out";
         };
+        AllocationUnavailableDto: {
+            /** @enum {string} */
+            status: "allocation-unavailable";
+            /** Format: date-time */
+            checkedAt: string;
+            lines: components["schemas"]["CheckoutReadinessLineDto"][];
+        };
+        PaymentUnavailableDto: {
+            /** @enum {string} */
+            status: "payment-unavailable";
+        };
         CreateOrderItemDto: {
             productSlug: string;
             /** Format: int32 */
@@ -575,13 +586,6 @@ export interface components {
             placedAt: string;
             /** Format: date-time */
             paidAt: string | null;
-        };
-        AllocationUnavailableDto: {
-            /** @enum {string} */
-            status: "allocation-unavailable";
-            /** Format: date-time */
-            checkedAt: string;
-            lines: components["schemas"]["CheckoutReadinessLineDto"][];
         };
     };
     responses: never;
@@ -1374,7 +1378,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AllocationUnavailableDto"];
+                    "application/json": components["schemas"]["AllocationUnavailableDto"] | components["schemas"]["PaymentUnavailableDto"];
                 };
             };
         };
