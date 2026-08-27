@@ -14,8 +14,7 @@ import {
 } from '../../web/src/quality/acceptance-matrix';
 
 const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
-const connectedApiUrl =
-  process.env.E2E_API_URL ?? 'http://127.0.0.1:3001/api/v1';
+const connectedApiUrl = process.env.E2E_API_URL ?? null;
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
 test.describe('API-backed guest cart', () => {
@@ -640,13 +639,15 @@ async function seedCartLine(page: Page, productSlug: string) {
   await page.goto('/cart');
   const response = await page.evaluate(
     async ({ apiUrl, slug }) => {
-      const csrf = await fetch(`${apiUrl}/cart/csrf`, {
+      const resolvedApiUrl =
+        apiUrl ?? `http://${window.location.hostname}:3001/api/v1`;
+      const csrf = await fetch(`${resolvedApiUrl}/cart/csrf`, {
         credentials: 'include',
       });
       const csrfBody = csrf.ok
         ? ((await csrf.json()) as { csrfToken: string })
         : null;
-      const add = await fetch(`${apiUrl}/cart/items`, {
+      const add = await fetch(`${resolvedApiUrl}/cart/items`, {
         body: JSON.stringify({ amount: 100_000, productSlug: slug }),
         credentials: 'include',
         headers: {
@@ -726,12 +727,14 @@ async function assertReducedMotion(page: Page, label: string) {
 async function clearCart(page: Page) {
   await page
     .evaluate(async (apiUrl) => {
-      const csrf = await fetch(`${apiUrl}/cart/csrf`, {
+      const resolvedApiUrl =
+        apiUrl ?? `http://${window.location.hostname}:3001/api/v1`;
+      const csrf = await fetch(`${resolvedApiUrl}/cart/csrf`, {
         credentials: 'include',
       });
       if (!csrf.ok) return;
       const { csrfToken } = (await csrf.json()) as { csrfToken: string };
-      await fetch(`${apiUrl}/cart/items`, {
+      await fetch(`${resolvedApiUrl}/cart/items`, {
         credentials: 'include',
         headers: { 'x-csrf-token': csrfToken },
         method: 'DELETE',

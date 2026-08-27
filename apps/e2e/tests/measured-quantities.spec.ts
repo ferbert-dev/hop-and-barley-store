@@ -1,8 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
-const connectedApiUrl =
-  process.env.E2E_API_URL ?? 'http://127.0.0.1:3001/api/v1';
+const connectedApiUrl = process.env.E2E_API_URL ?? null;
 
 test.describe('measured product quantities', () => {
   test.describe.configure({ mode: 'serial' });
@@ -284,12 +283,14 @@ async function addSelectedAmount(page: Page) {
 async function clearGuestCart(page: Page) {
   await page
     .evaluate(async (apiUrl) => {
-      const csrf = await fetch(`${apiUrl}/cart/csrf`, {
+      const resolvedApiUrl =
+        apiUrl ?? `http://${window.location.hostname}:3001/api/v1`;
+      const csrf = await fetch(`${resolvedApiUrl}/cart/csrf`, {
         credentials: 'include',
       });
       if (!csrf.ok) return;
       const { csrfToken } = (await csrf.json()) as { csrfToken: string };
-      await fetch(`${apiUrl}/cart/items`, {
+      await fetch(`${resolvedApiUrl}/cart/items`, {
         credentials: 'include',
         headers: { 'x-csrf-token': csrfToken },
         method: 'DELETE',
