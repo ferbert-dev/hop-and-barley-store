@@ -34,14 +34,18 @@ exceed 2,000,000,000. Do not work around that guard by truncating stock.
 - package and kit counts remain unchanged in `EACH`.
 
 After conversion, active WEIGHT reservations are reconciled against converted
-stock in deterministic `reservedAt`, then reservation-ID order. Earlier holds
-retain priority. A later hold that exceeds remaining stock is reduced, together
-with its current cart line, to the largest valid 100g amount that fits. If less
-than the 100g minimum remains, the reservation is marked `RELEASED`, its current
-pointer is cleared, and the cart line keeps its desired amount for explicit
-recheck. Released history and row identity are preserved. The migration aborts
-unless every surviving active hold matches its current line and aggregate
-active WEIGHT reservations are within stock.
+stock in deterministic `reservedAt`, then reservation-ID order. Before FIFO
+allocation, an `ACTIVE` row with `expiresAt <= migration time` becomes
+`EXPIRED`, its `updatedAt` advances, and its null release/consume timestamps and
+current cart pointer remain unchanged, matching O1B runtime expiry semantics.
+It reserves no stock. Earlier live holds retain priority. A later live hold that
+exceeds remaining stock is reduced, together with its current cart line, to the
+largest valid 100g amount that fits. If less than the 100g minimum remains, the
+reservation is marked `RELEASED`, its current pointer is cleared, and the cart
+line keeps its desired amount for explicit recheck. Released and expired
+history and row identity are preserved. The migration aborts unless every
+surviving live active hold matches its current line and aggregate live active
+WEIGHT reservations are within stock.
 
 Historical `OrderItem` rows are not re-priced. The migration preserves their
 stored price, amount, and line total by snapshotting the legacy `PACKAGE`,

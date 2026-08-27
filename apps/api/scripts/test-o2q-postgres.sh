@@ -77,7 +77,8 @@ create_legacy_measured_fixtures() {
         ('72000000-0000-4000-8000-000000000003', decode(repeat('33', 32), 'hex'), CURRENT_TIMESTAMP + interval '30 days', CURRENT_TIMESTAMP),
         ('72000000-0000-4000-8000-000000000004', decode(repeat('44', 32), 'hex'), CURRENT_TIMESTAMP + interval '30 days', CURRENT_TIMESTAMP),
         ('72000000-0000-4000-8000-000000000005', decode(repeat('55', 32), 'hex'), CURRENT_TIMESTAMP + interval '30 days', CURRENT_TIMESTAMP),
-        ('72000000-0000-4000-8000-000000000006', decode(repeat('66', 32), 'hex'), CURRENT_TIMESTAMP + interval '30 days', CURRENT_TIMESTAMP);
+        ('72000000-0000-4000-8000-000000000006', decode(repeat('66', 32), 'hex'), CURRENT_TIMESTAMP + interval '30 days', CURRENT_TIMESTAMP),
+        ('72000000-0000-4000-8000-000000000007', decode(repeat('77', 32), 'hex'), CURRENT_TIMESTAMP + interval '30 days', CURRENT_TIMESTAMP);
 
       INSERT INTO \"CartItem\" (\"id\", \"cartId\", \"productId\", \"quantity\", \"updatedAt\")
       VALUES
@@ -85,7 +86,8 @@ create_legacy_measured_fixtures() {
         ('73000000-0000-4000-8000-000000000002', '72000000-0000-4000-8000-000000000002', '71000000-0000-4000-8000-000000000002', 3, CURRENT_TIMESTAMP),
         ('73000000-0000-4000-8000-000000000003', '72000000-0000-4000-8000-000000000003', '71000000-0000-4000-8000-000000000003', 4, CURRENT_TIMESTAMP),
         ('73000000-0000-4000-8000-000000000004', '72000000-0000-4000-8000-000000000004', '71000000-0000-4000-8000-000000000005', 4, CURRENT_TIMESTAMP),
-        ('73000000-0000-4000-8000-000000000005', '72000000-0000-4000-8000-000000000006', '71000000-0000-4000-8000-000000000001', 1, CURRENT_TIMESTAMP);
+        ('73000000-0000-4000-8000-000000000005', '72000000-0000-4000-8000-000000000006', '71000000-0000-4000-8000-000000000001', 1, CURRENT_TIMESTAMP),
+        ('73000000-0000-4000-8000-000000000006', '72000000-0000-4000-8000-000000000007', '71000000-0000-4000-8000-000000000002', 2, CURRENT_TIMESTAMP);
 
       INSERT INTO \"CartReservation\" (
         \"id\", \"cartId\", \"cartItemId\", \"productId\", \"quantity\",
@@ -95,7 +97,8 @@ create_legacy_measured_fixtures() {
         ('74000000-0000-4000-8000-000000000002', '72000000-0000-4000-8000-000000000002', '73000000-0000-4000-8000-000000000002', '71000000-0000-4000-8000-000000000002', 3, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + interval '15 minutes', CURRENT_TIMESTAMP),
         ('74000000-0000-4000-8000-000000000003', '72000000-0000-4000-8000-000000000003', '73000000-0000-4000-8000-000000000003', '71000000-0000-4000-8000-000000000003', 4, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + interval '15 minutes', CURRENT_TIMESTAMP),
         ('74000000-0000-4000-8000-000000000004', '72000000-0000-4000-8000-000000000004', '73000000-0000-4000-8000-000000000004', '71000000-0000-4000-8000-000000000005', 4, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + interval '15 minutes', CURRENT_TIMESTAMP),
-        ('74000000-0000-4000-8000-000000000005', '72000000-0000-4000-8000-000000000006', '73000000-0000-4000-8000-000000000005', '71000000-0000-4000-8000-000000000001', 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + interval '15 minutes', CURRENT_TIMESTAMP);
+        ('74000000-0000-4000-8000-000000000005', '72000000-0000-4000-8000-000000000006', '73000000-0000-4000-8000-000000000005', '71000000-0000-4000-8000-000000000001', 1, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + interval '15 minutes', CURRENT_TIMESTAMP),
+        ('74000000-0000-4000-8000-000000000006', '72000000-0000-4000-8000-000000000007', '73000000-0000-4000-8000-000000000006', '71000000-0000-4000-8000-000000000002', 2, 'ACTIVE', CURRENT_TIMESTAMP - interval '20 minutes', CURRENT_TIMESTAMP - interval '5 minutes', CURRENT_TIMESTAMP - interval '20 minutes');
 
       UPDATE \"CartItem\" item
       SET \"currentReservationId\" = reservation.\"id\"
@@ -182,7 +185,34 @@ upgrade_shape=$(docker exec "$container_name" psql --tuples-only --no-align \
     JOIN \"CartReservation\" reservation ON reservation.\"cartItemId\" = item.\"id\"
     JOIN \"Product\" product ON product.\"id\" = item.\"productId\";
   ")
-test "$upgrade_shape" = 'caramel-malt:4900000:4900000:ACTIVE:true:4989512:66:100000:100000,caramel-malt:400000:400000:RELEASED:false:4989512:66:100000:100000,citra-hops:400000:400000:ACTIVE:true:100000000:599:100000:100000,maris-otter-malt:900000:900000:ACTIVE:true:907184:55:100000:100000,west-coast-ipa-kit:4:4:ACTIVE:true:20:4999:1:1'
+test "$upgrade_shape" = 'caramel-malt:4900000:4900000:ACTIVE:true:4989512:66:100000:100000,caramel-malt:400000:400000:RELEASED:false:4989512:66:100000:100000,citra-hops:400000:400000:ACTIVE:true:100000000:599:100000:100000,maris-otter-malt:900000:900000:ACTIVE:true:907184:55:100000:100000,maris-otter-malt:900000:900000:EXPIRED:true:907184:55:100000:100000,west-coast-ipa-kit:4:4:ACTIVE:true:20:4999:1:1'
+
+expiry_competition_shape=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname upgrade_o2q \
+  --command "
+    SELECT
+      expired.\"status\",
+      expired.\"releasedAt\" IS NULL,
+      expired.\"consumedAt\" IS NULL,
+      expired.\"updatedAt\" > expired.\"expiresAt\",
+      expired_item.\"currentReservationId\" = expired.\"id\",
+      live.\"status\",
+      live.\"amount\",
+      live_item.\"currentReservationId\" = live.\"id\",
+      (SELECT sum(\"amount\") FROM \"CartReservation\"
+       WHERE \"productId\" = live.\"productId\"
+         AND \"status\" = 'ACTIVE'
+         AND \"expiresAt\" > CURRENT_TIMESTAMP),
+      product.\"stockAmount\"
+    FROM \"CartReservation\" expired
+    JOIN \"CartItem\" expired_item ON expired_item.\"id\" = expired.\"cartItemId\"
+    CROSS JOIN \"CartReservation\" live
+    JOIN \"CartItem\" live_item ON live_item.\"id\" = live.\"cartItemId\"
+    JOIN \"Product\" product ON product.\"id\" = live.\"productId\"
+    WHERE expired.\"id\" = '74000000-0000-4000-8000-000000000006'
+      AND live.\"id\" = '74000000-0000-4000-8000-000000000002';
+  ")
+test "$expiry_competition_shape" = 'EXPIRED|t|t|t|t|ACTIVE|900000|t|900000|907184'
 
 lattice_shape=$(docker exec "$container_name" psql --tuples-only --no-align \
   --username "$database_user" --dbname upgrade_o2q \

@@ -210,14 +210,24 @@ WHERE product."id" = reservation."productId";
 -- over-reservation deterministically in FIFO order. Earlier valid holds retain
 -- priority; a later hold is reduced with its current cart line when at least
 -- one sellable step remains, otherwise it is released and its desired cart
--- amount remains available for an explicit recheck.
+-- amount remains available for an explicit recheck. Stale ACTIVE rows first
+-- transition to EXPIRED with the same semantics as the O1B runtime: their
+-- history and current cart pointer remain attached, but they reserve no stock.
 DO $$
 DECLARE
   product_row RECORD;
   reservation_row RECORD;
   remaining_amount BIGINT;
   allocated_amount INTEGER;
+  migration_at TIMESTAMP(3) := CURRENT_TIMESTAMP::TIMESTAMP(3);
 BEGIN
+  UPDATE "CartReservation"
+  SET
+    "status" = 'EXPIRED',
+    "updatedAt" = migration_at
+  WHERE "status" = 'ACTIVE'
+    AND "expiresAt" <= migration_at;
+
   FOR product_row IN
     SELECT
       "id", "minimumOrderAmount", "orderStepAmount", "stockAmount"
@@ -236,6 +246,7 @@ BEGIN
       FROM "CartReservation" reservation
       WHERE reservation."productId" = product_row."id"
         AND reservation."status" = 'ACTIVE'
+        AND reservation."expiresAt" > migration_at
       ORDER BY reservation."reservedAt", reservation."id"
       FOR UPDATE
     LOOP
@@ -294,6 +305,7 @@ BEGIN
     JOIN "CartReservation" reservation
       ON reservation."productId" = product."id"
       AND reservation."status" = 'ACTIVE'
+      AND reservation."expiresAt" > migration_at
     WHERE product."saleKind" = 'WEIGHT'
     GROUP BY product."id", product."stockAmount"
     HAVING SUM(reservation."amount"::bigint) > product."stockAmount"
@@ -307,7 +319,13 @@ BEGIN
       AND item."amount" = reservation."amount"
     WHERE product."saleKind" = 'WEIGHT'
       AND reservation."status" = 'ACTIVE'
+      AND reservation."expiresAt" > migration_at
       AND item."id" IS NULL
+  ) OR EXISTS (
+    SELECT 1
+    FROM "CartReservation"
+    WHERE "status" = 'ACTIVE'
+      AND "expiresAt" <= migration_at
   ) THEN
     RAISE EXCEPTION 'O2Q active weight reservation reconciliation failed';
   END IF;
