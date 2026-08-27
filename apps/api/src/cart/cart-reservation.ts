@@ -12,7 +12,7 @@ export type ReservationClock = Readonly<{
 export type ConsumedCartReservation = Readonly<{
   cartId: string;
   productId: string;
-  quantity: number;
+  amount: number;
   reservationId: string;
 }>;
 
@@ -22,7 +22,7 @@ type LockedReservation = Readonly<{
   expiresAt: Date;
   id: string;
   productId: string;
-  quantity: number;
+  amount: number;
   status: 'ACTIVE' | 'CONSUMED' | 'EXPIRED' | 'RELEASED';
 }>;
 
@@ -70,7 +70,7 @@ export async function expireReservations(
   });
 }
 
-export async function activeReservedQuantities(
+export async function activeReservedAmounts(
   transaction: Prisma.TransactionClient,
   productIds: readonly string[],
   now: Date,
@@ -79,7 +79,7 @@ export async function activeReservedQuantities(
   const ids = [...new Set(productIds)];
   if (ids.length === 0) return new Map();
   const reservations = await transaction.cartReservation.findMany({
-    select: { productId: true, quantity: true },
+    select: { productId: true, amount: true },
     where: {
       cartId: excludedCartId ? { not: excludedCartId } : undefined,
       expiresAt: { gt: now },
@@ -91,7 +91,7 @@ export async function activeReservedQuantities(
   for (const reservation of reservations) {
     totals.set(
       reservation.productId,
-      (totals.get(reservation.productId) ?? 0) + reservation.quantity,
+      (totals.get(reservation.productId) ?? 0) + reservation.amount,
     );
   }
   return totals;
@@ -104,7 +104,7 @@ export async function createActiveReservation(
     cartItemId: string;
     now: Date;
     productId: string;
-    quantity: number;
+    amount: number;
   }>,
 ): Promise<string> {
   const clock = reservationClock(input.now);
@@ -114,7 +114,7 @@ export async function createActiveReservation(
       cartItemId: input.cartItemId,
       expiresAt: clock.expiresAt,
       productId: input.productId,
-      quantity: input.quantity,
+      amount: input.amount,
       reservedAt: clock.reservedAt,
       status: 'ACTIVE',
     },
@@ -176,7 +176,7 @@ export async function consumeCartReservations(
     candidates.map(({ productId }) => productId),
   );
   const rows = await transaction.$queryRaw<LockedReservation[]>`
-    SELECT "id", "cartId", "productId", "quantity", "status", "expiresAt", "consumedAt"
+    SELECT "id", "cartId", "productId", "amount", "status", "expiresAt", "consumedAt"
     FROM "CartReservation"
     WHERE "id" = ANY(${ids}::uuid[])
     ORDER BY "productId", "id"
@@ -197,8 +197,8 @@ export async function consumeCartReservations(
       throw new UnprocessableEntityException(UNAVAILABLE);
     }
     const product = await transaction.product.updateMany({
-      data: { stockQuantity: { decrement: row.quantity } },
-      where: { id: row.productId, stockQuantity: { gte: row.quantity } },
+      data: { stockAmount: { decrement: row.amount } },
+      where: { id: row.productId, stockAmount: { gte: row.amount } },
     });
     if (product.count !== 1) {
       throw new UnprocessableEntityException(UNAVAILABLE);
@@ -216,7 +216,7 @@ function toConsumed(row: LockedReservation): ConsumedCartReservation {
   return {
     cartId: row.cartId,
     productId: row.productId,
-    quantity: row.quantity,
+    amount: row.amount,
     reservationId: row.id,
   };
 }

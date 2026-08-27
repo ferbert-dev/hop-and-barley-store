@@ -60,6 +60,22 @@ upgrade_backfill=$(docker exec "$container_name" psql --tuples-only --no-align \
   --command 'SELECT count(*) || '"'"':'"'"' || count(*) FILTER (WHERE NOT "isActive") || '"'"':'"'"' || (SELECT count(*) FROM "Category" WHERE "slug" = '"'"'legacy-foundation'"'"') FROM "Product";')
 test "$upgrade_backfill" = '3:3:1'
 
+# Keep an exact C1-only clone for rollback proof. The current seed/runtime is
+# exercised only after the upgrade database reaches the current schema.
+docker exec "$container_name" createdb -U "$database_user" \
+  --template upgrade_catalog rollback_catalog
+for migration in \
+  20260822013000_add_secure_registration \
+  20260822113000_add_auth_sessions \
+  20260822150000_add_guest_carts \
+  20260825090000_add_cart_reservations \
+  20260826120000_add_orders \
+  20260827100000_add_measured_product_quantities; do
+  docker exec --interactive "$container_name" psql \
+    --set ON_ERROR_STOP=1 --username "$database_user" --dbname upgrade_catalog \
+    < "$repo_root/apps/api/prisma/migrations/$migration/migration.sql"
+done
+
 docker exec --interactive "$container_name" psql \
   --set ON_ERROR_STOP=1 --username "$database_user" --dbname unknown_catalog \
   < "$repo_root/apps/api/prisma/migrations/20260814104924_init/migration.sql"
@@ -76,6 +92,7 @@ fi
 seed_twice_and_verify() {
   local database_url=$1
   local database_name=$2
+  local expected_fixture_stock_rows=$3
 
   DATABASE_URL="$database_url" pnpm --dir "$repo_root" --filter @hop-and-barley/api db:seed
   local first_ids
@@ -93,18 +110,18 @@ seed_twice_and_verify() {
   local final_state
   final_state=$(docker exec "$container_name" psql --tuples-only --no-align \
     --username "$database_user" --dbname "$database_name" \
-    --command 'SELECT (SELECT count(*) FROM "Product") || '"'"':'"'"' || (SELECT count(*) FROM "Category") || '"'"':'"'"' || (SELECT count(*) FROM "Category" WHERE "slug" = '"'"'legacy-foundation'"'"') || '"'"':'"'"' || (SELECT count(*) FROM "Product" WHERE "slug" IN ('"'"'house-lager'"'"', '"'"'citrus-pale-ale'"'"')) || '"'"':'"'"' || (SELECT count(*) FROM "Product" WHERE "currency" = '"'"'USD'"'"' AND "stockQuantity" = 100 AND "isActive");')
-  test "$final_state" = '12:5:0:0:12'
+    --command 'SELECT (SELECT count(*) FROM "Product") || '"'"':'"'"' || (SELECT count(*) FROM "Category") || '"'"':'"'"' || (SELECT count(*) FROM "Category" WHERE "slug" = '"'"'legacy-foundation'"'"') || '"'"':'"'"' || (SELECT count(*) FROM "Product" WHERE "slug" IN ('"'"'house-lager'"'"', '"'"'citrus-pale-ale'"'"')) || '"'"':'"'"' || (SELECT count(*) FROM "Product" WHERE "currency" = '"'"'USD'"'"' AND "isActive" AND (("saleKind" = '"'"'WEIGHT'"'"' AND "stockAmount" = 100000000) OR ("saleKind" IN ('"'"'PACKAGE'"'"', '"'"'KIT'"'"') AND "stockAmount" = 100)));')
+  test "$final_state" = "12:5:0:0:$expected_fixture_stock_rows"
 }
 
-seed_twice_and_verify "$upgrade_url" upgrade_catalog
+seed_twice_and_verify "$upgrade_url" upgrade_catalog 11
 upgrade_citra_id=$(docker exec "$container_name" psql --tuples-only --no-align \
   --username "$database_user" --dbname upgrade_catalog \
   --command 'SELECT "id" FROM "Product" WHERE "slug" = '"'"'citra-hops'"'"';')
 test "$upgrade_citra_id" = '20000000-0000-4000-8000-000000000001'
 
 DATABASE_URL="$fresh_url" pnpm --dir "$repo_root" --filter @hop-and-barley/api db:migrate:deploy
-seed_twice_and_verify "$fresh_url" fresh_catalog
+seed_twice_and_verify "$fresh_url" fresh_catalog 12
 
 DATABASE_URL="$fresh_url" NODE_OPTIONS='--experimental-vm-modules' \
   RUN_CATALOG_POSTGRES_INTEGRATION=1 \
@@ -117,11 +134,11 @@ rollback_path="$repo_root/apps/api/prisma/migrations/20260814153000_expand_catal
 run_rollback() {
   # Do not pass --single-transaction: rollback.sql must provide its own atomicity.
   docker exec --interactive "$container_name" psql --no-psqlrc \
-    --set ON_ERROR_STOP=1 --username "$database_user" --dbname fresh_catalog
+    --set ON_ERROR_STOP=1 --username "$database_user" --dbname rollback_catalog
 }
 
 docker exec "$container_name" psql --no-psqlrc --set ON_ERROR_STOP=1 \
-  --username "$database_user" --dbname fresh_catalog \
+  --username "$database_user" --dbname rollback_catalog \
   --command 'CREATE TABLE "RollbackDependency" ("id" INTEGER PRIMARY KEY, "categoryId" UUID NOT NULL, CONSTRAINT "RollbackDependency_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id"));' >/dev/null
 
 if run_rollback < "$rollback_path" >/dev/null 2>&1; then
@@ -130,19 +147,19 @@ if run_rollback < "$rollback_path" >/dev/null 2>&1; then
 fi
 
 rollback_failure_state=$(docker exec "$container_name" psql --no-psqlrc --tuples-only --no-align \
-  --username "$database_user" --dbname fresh_catalog \
+  --username "$database_user" --dbname rollback_catalog \
   --command 'SELECT (to_regclass('"'"'public."Category"'"'"') IS NOT NULL)::int || '"'"':'"'"' || (SELECT count(*) FROM information_schema.columns WHERE table_schema = '"'"'public'"'"' AND table_name = '"'"'Product'"'"' AND column_name IN ('"'"'teaser'"'"', '"'"'priceQualifier'"'"', '"'"'stockQuantity'"'"', '"'"'isActive'"'"', '"'"'imagePath'"'"', '"'"'specifications'"'"', '"'"'categoryId'"'"')) || '"'"':'"'"' || (SELECT count(*) FROM pg_constraint WHERE conrelid = '"'"'public."Product"'"'"'::regclass AND conname IN ('"'"'Product_categoryId_fkey'"'"', '"'"'Product_active_content_check'"'"', '"'"'Product_specifications_array_check'"'"', '"'"'Product_imagePath_local_check'"'"', '"'"'Product_currency_iso_check'"'"', '"'"'Product_stockQuantity_nonnegative_check'"'"', '"'"'Product_priceMinor_nonnegative_check'"'"', '"'"'Product_slug_format_check'"'"')) || '"'"':'"'"' || (SELECT count(*) FROM pg_indexes WHERE schemaname = '"'"'public'"'"' AND tablename = '"'"'Product'"'"' AND indexname IN ('"'"'Product_categoryId_isActive_idx'"'"', '"'"'Product_isActive_priceMinor_idx'"'"')) || '"'"':'"'"' || (SELECT count(*) FROM "Product");')
-if [[ "$rollback_failure_state" != '1:7:8:2:12' ]]; then
+if [[ "$rollback_failure_state" != '1:7:8:2:3' ]]; then
   echo "Rollback failure was not atomic; got state $rollback_failure_state" >&2
   exit 1
 fi
 
 docker exec "$container_name" psql --no-psqlrc --set ON_ERROR_STOP=1 \
-  --username "$database_user" --dbname fresh_catalog \
+  --username "$database_user" --dbname rollback_catalog \
   --command 'DROP TABLE "RollbackDependency";' >/dev/null
 
 run_rollback < "$rollback_path"
 rollback_state=$(docker exec "$container_name" psql --tuples-only --no-align \
-  --username "$database_user" --dbname fresh_catalog \
+  --username "$database_user" --dbname rollback_catalog \
   --command 'SELECT (SELECT count(*) FROM "Product") || '"'"':'"'"' || (to_regclass('"'"'public."Category"'"'"') IS NULL)::int || '"'"':'"'"' || (SELECT count(*) FROM information_schema.columns WHERE table_schema = '"'"'public'"'"' AND table_name = '"'"'Product'"'"' AND column_name IN ('"'"'teaser'"'"', '"'"'priceQualifier'"'"', '"'"'stockQuantity'"'"', '"'"'isActive'"'"', '"'"'imagePath'"'"', '"'"'specifications'"'"', '"'"'categoryId'"'"'));')
-test "$rollback_state" = '12:1:0'
+test "$rollback_state" = '3:1:0'

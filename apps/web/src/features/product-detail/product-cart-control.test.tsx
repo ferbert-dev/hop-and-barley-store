@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CartProvider } from '../cart/cart-context';
 import type { Cart, CartTransport } from '../cart/cart-transport';
@@ -8,6 +8,17 @@ import { ProductCartControl } from './product-cart-control';
 
 const productName = 'Citra Hops';
 const productSlug = 'citra-hops';
+const quantityMetadata = {
+  amountUnit: 'MILLIGRAM' as const,
+  kitYieldVolumeMl: null,
+  maximumOrderAmount: 100_000_000,
+  minimumOrderAmount: 100_000,
+  orderStepAmount: 100_000,
+  packageNetWeightMg: null,
+  priceBasisAmount: 100_000,
+  saleKind: 'WEIGHT' as const,
+  stockAmount: 100_000_000,
+};
 
 const emptyCart: Cart = {
   adjustmentMessage: null,
@@ -17,31 +28,33 @@ const emptyCart: Cart = {
   items: [],
   serverNow: '2026-08-25T10:00:00.000Z',
   subtotalMinor: 0,
-  totalQuantity: 0,
 };
 
-function cartWithQuantity(quantity: number): Cart {
+afterEach(() => cleanup());
+
+function cartWithAmount(amount: number): Cart {
+  const lineTotalMinor = (amount / 100_000) * 599;
   return {
     ...emptyCart,
     checkoutEligible: true,
     distinctItemCount: 1,
     items: [
       {
+        ...quantityMetadata,
+        amount,
         availability: 'available',
-        currentUnitPriceMinor: 599,
+        priceMinor: 599,
         imagePath: '/assets/products/citra-hops.webp',
-        lineTotalMinor: 599 * quantity,
+        lineTotalMinor,
         name: productName,
         priceQualifier: 'per 100g',
         productId: '10000000-0000-4000-8000-000000000001',
         productSlug,
-        quantity,
         reservationExpiresAt: '2026-08-25T10:15:00.000Z',
         reservationStatus: 'active',
       },
     ],
-    subtotalMinor: 599 * quantity,
-    totalQuantity: quantity,
+    subtotalMinor: lineTotalMinor,
   };
 }
 
@@ -61,184 +74,163 @@ function createTransport(
 }
 
 function renderControl(
-  product: Pick<Parameters<typeof ProductCartControl>[0], 'availability'> = {
-    availability: 'in-stock',
-  },
+  availability: 'in-stock' | 'out-of-stock' = 'in-stock',
   transport: CartTransport = createTransport(emptyCart),
 ) {
   return render(
     <CartProvider transport={transport}>
       <ProductCartControl
-        availability={product.availability}
+        availability={availability}
+        priceMinor={599}
         productName={productName}
         productSlug={productSlug}
+        quantityMetadata={quantityMetadata}
       />
     </CartProvider>,
   );
 }
 
 describe('ProductCartControl', () => {
-  it('shows Add to Cart for an absent product and adds as a guest without auth UI', async () => {
+  it('adds the selected physical weight as milligrams without authentication UI', async () => {
     const user = userEvent.setup();
-    const addedCart = cartWithQuantity(1);
     const transport = createTransport(emptyCart, {
-      add: vi.fn(async () => addedCart),
+      add: vi.fn(async () => cartWithAmount(200_000)),
     });
-    renderControl(undefined, transport);
+    renderControl('in-stock', transport);
 
-    expect(
-      await screen.findByRole('button', { name: 'Add to Cart' }),
-    ).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Add to Cart' }));
-
-    await waitFor(() => expect(screen.getByText('1 in cart')).toBeVisible());
-    expect(transport.add).toHaveBeenCalledWith(productSlug, 1);
-    expect(
-      screen.queryByRole('link', { name: /sign in/i }),
-    ).not.toBeInTheDocument();
-  });
-
-  it('updates plus and minus, then removes when quantity reaches one', async () => {
-    const user = userEvent.setup();
-    const quantityTwo = cartWithQuantity(2);
-    const quantityThree = cartWithQuantity(3);
-    const quantityOne = cartWithQuantity(1);
-    const update = vi
-      .fn()
-      .mockResolvedValueOnce(quantityThree)
-      .mockResolvedValueOnce(quantityTwo)
-      .mockResolvedValueOnce(quantityOne);
-    const remove = vi.fn(async () => emptyCart);
-    const transport = createTransport(quantityTwo, { remove, update });
-    renderControl(undefined, transport);
-
-    await user.click(
-      await screen.findByRole('button', {
-        name: 'Increase Citra Hops quantity',
-      }),
-    );
-    await waitFor(() => expect(screen.getByText('3 in cart')).toBeVisible());
-    await user.click(
-      screen.getByRole('button', { name: 'Decrease Citra Hops quantity' }),
-    );
-    await waitFor(() => expect(screen.getByText('2 in cart')).toBeVisible());
-    await user.click(
-      screen.getByRole('button', { name: 'Decrease Citra Hops quantity' }),
-    );
-    await waitFor(() => expect(screen.getByText('1 in cart')).toBeVisible());
-    await user.click(
-      screen.getByRole('button', { name: 'Decrease Citra Hops quantity' }),
-    );
+    await screen.findAllByLabelText('Quantity');
     await waitFor(() =>
-      expect(screen.queryByText('1 in cart')).not.toBeInTheDocument(),
+      expect(screen.getAllByLabelText('Quantity').at(-1)).toBeEnabled(),
     );
-
-    expect(update).toHaveBeenNthCalledWith(1, productSlug, 3);
-    expect(update).toHaveBeenNthCalledWith(2, productSlug, 2);
-    expect(update).toHaveBeenNthCalledWith(3, productSlug, 1);
-    expect(remove).toHaveBeenCalledWith(productSlug);
-  });
-
-  it('disables pending controls with honest accessible labels', async () => {
-    const user = userEvent.setup();
-    let resolveUpdate: ((value: Cart) => void) | undefined;
-    const transport = createTransport(cartWithQuantity(1), {
-      update: () =>
-        new Promise<Cart>((resolve) => {
-          resolveUpdate = resolve;
-        }),
-    });
-    renderControl(undefined, transport);
-
+    const input = screen.getAllByLabelText('Quantity').at(-1);
+    if (!input) throw new Error('Quantity input missing');
+    await user.clear(input);
+    await user.type(input, '0.2');
     await user.click(
-      await screen.findByRole('button', {
-        name: 'Increase Citra Hops quantity',
-      }),
+      screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
     );
-    expect(
-      screen.getByRole('button', { name: 'Increase Citra Hops quantity' }),
-    ).toBeDisabled();
-    expect(
-      screen.getByRole('button', { name: 'Decrease Citra Hops quantity' }),
-    ).toBeDisabled();
-    expect(
-      screen.getByText('Updating cart…').closest('[role="status"]'),
-    ).toHaveTextContent('Updating cart…');
 
-    resolveUpdate?.(cartWithQuantity(2));
-    await waitFor(() => expect(screen.getByText('2 in cart')).toBeVisible());
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
+      ).toBeEnabled(),
+    );
+    expect(transport.add).toHaveBeenCalledWith(productSlug, 200_000);
+    expect(screen.queryByText(/in cart/i)).toBeNull();
+    expect(screen.queryByRole('link', { name: /sign in/i })).toBeNull();
   });
 
-  it('rolls back after an API failure and exposes safe feedback', async () => {
+  it('adds the selection to an existing line and exposes unavailable state without stock details', async () => {
     const user = userEvent.setup();
-    const transport = createTransport(cartWithQuantity(1), {
+    const transport = createTransport(cartWithAmount(100_000), {
+      add: vi.fn(async () => cartWithAmount(300_000)),
+    });
+    renderControl('in-stock', transport);
+
+    await screen.findAllByLabelText('Quantity');
+    await waitFor(() =>
+      expect(screen.getAllByLabelText('Quantity').at(-1)).toBeEnabled(),
+    );
+    const input = screen.getAllByLabelText('Quantity').at(-1);
+    if (!input) throw new Error('Quantity input missing');
+    await user.clear(input);
+    await user.type(input, '0.2');
+    await user.click(
+      screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
+      ).toBeEnabled(),
+    );
+    expect(transport.add).toHaveBeenCalledWith(productSlug, 200_000);
+    expect(transport.update).not.toHaveBeenCalled();
+    expect(screen.queryByText(/in cart/i)).toBeNull();
+
+    cleanup();
+    renderControl('out-of-stock');
+    expect(await screen.findByText('Out of stock')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
+    ).toBeDisabled();
+    expect(screen.queryByText(/100000|stock amount/i)).toBeNull();
+  });
+
+  it('disables the physical amount controls while an additive request is pending', async () => {
+    const user = userEvent.setup();
+    let resolveAdd: ((cart: Cart) => void) | undefined;
+    const transport = createTransport(cartWithAmount(100_000), {
+      add: vi.fn(
+        () =>
+          new Promise<Cart>((resolve) => {
+            resolveAdd = resolve;
+          }),
+      ),
+    });
+    renderControl('in-stock', transport);
+
+    await waitFor(() =>
+      expect(screen.getAllByLabelText('Quantity').at(-1)).toBeEnabled(),
+    );
+    const input = screen.getAllByLabelText('Quantity').at(-1);
+    if (!input) throw new Error('Quantity input missing');
+    await user.clear(input);
+    await user.type(input, '0.2');
+    await user.click(
+      screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
+    );
+
+    expect(screen.getAllByLabelText('Quantity').at(-1)).toBeDisabled();
+    expect(screen.getByText('Updating cart…')).toBeVisible();
+
+    resolveAdd?.(cartWithAmount(300_000));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
+      ).toBeEnabled(),
+    );
+    expect(transport.add).toHaveBeenCalledWith(productSlug, 200_000);
+    expect(screen.queryByText(/in cart/i)).toBeNull();
+  });
+
+  it('refreshes after a failed add and keeps expired lines visible', async () => {
+    const user = userEvent.setup();
+    const expired = cartWithAmount(100_000);
+    expired.items[0].availability = 'unavailable';
+    expired.items[0].reservationStatus = 'expired';
+    const transport = createTransport(cartWithAmount(100_000), {
       load: vi
         .fn()
-        .mockResolvedValueOnce(cartWithQuantity(1))
-        .mockResolvedValueOnce(cartWithQuantity(1)),
-      update: vi.fn(async () => {
+        .mockResolvedValueOnce(cartWithAmount(100_000))
+        .mockResolvedValueOnce(cartWithAmount(100_000)),
+      add: vi.fn(async () => {
         throw new Error('planned failure');
       }),
     });
-    renderControl(undefined, transport);
+    renderControl('in-stock', transport);
 
+    await waitFor(() =>
+      expect(screen.getAllByLabelText('Quantity').at(-1)).toBeEnabled(),
+    );
+    const input = screen.getAllByLabelText('Quantity').at(-1);
+    if (!input) throw new Error('Quantity input missing');
+    await user.clear(input);
+    await user.type(input, '0.2');
     await user.click(
-      await screen.findByRole('button', {
-        name: 'Increase Citra Hops quantity',
-      }),
+      screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
     );
-    await waitFor(() => expect(screen.getByText('1 in cart')).toBeVisible());
-    const message = screen.getByText(
-      'Your cart was refreshed after the change could not be completed.',
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          'Your cart was refreshed after the change could not be completed.',
+        ),
+      ).toBeVisible(),
     );
-    expect(message.closest('[role="status"]')).toHaveTextContent('refreshed');
-    expect(
-      screen.queryByText(/csrf|token|stack|fetch/i),
-    ).not.toBeInTheDocument();
-  });
 
-  it('does not offer an enabled add action or raw stock/reservation details out of stock', async () => {
-    const transport = createTransport(emptyCart);
-    renderControl({ availability: 'out-of-stock' }, transport);
-
-    const add = await screen.findByRole('button', { name: 'Add to Cart' });
-    expect(add).toBeDisabled();
-    expect(screen.getByText('Out of stock')).toBeVisible();
-    expect(
-      screen.queryByText(
-        /stock quantity|reservations expire|reservation countdown/i,
-      ),
-    ).not.toBeInTheDocument();
-    expect(transport.add).not.toHaveBeenCalled();
-  });
-
-  it('keeps an expired unavailable line visible without calling it out of stock', async () => {
-    const expired = cartWithQuantity(1);
-    expired.items[0].availability = 'unavailable';
-    expired.items[0].reservationStatus = 'expired';
-    const transport = createTransport(expired);
-    renderControl(undefined, transport);
-
-    await waitFor(() => expect(screen.getByText('1 in cart')).toBeVisible());
-    expect(screen.getByText('Reservation expired')).toBeVisible();
-    expect(screen.queryByText('Out of stock')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Decrease Citra Hops quantity' }),
-    ).toBeDisabled();
-  });
-
-  it('renders the canonical adjustment message as a live status', async () => {
-    const adjustedCart = {
-      ...cartWithQuantity(1),
-      adjustmentMessage: 'Citra Hops was adjusted to available stock.',
-    };
-    renderControl(undefined, createTransport(adjustedCart));
-
-    const message = await screen.findByText(
-      'Citra Hops was adjusted to available stock.',
-    );
-    const status = message.closest('[role="status"]');
-    expect(status).not.toBeNull();
-    expect(status).toHaveAttribute('role', 'status');
+    renderControl('in-stock', createTransport(expired));
+    expect(await screen.findByText('Reservation expired')).toBeVisible();
+    expect(screen.queryByText('Out of stock')).toBeNull();
+    expect(screen.getAllByLabelText('Quantity').at(-1)).toBeDisabled();
   });
 });

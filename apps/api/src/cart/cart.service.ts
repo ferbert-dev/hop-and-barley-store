@@ -13,7 +13,7 @@ import type {
 import type { CartDto, CartItemDto } from './dto/cart-response.dto';
 import type { ActiveCartCapability } from './cart-request';
 import {
-  activeReservedQuantities,
+  activeReservedAmounts,
   createActiveReservation,
   expireReservations,
   lockProducts,
@@ -21,6 +21,12 @@ import {
 } from './cart-reservation';
 import { generateCartToken, hashCartToken } from './cart-token';
 import { runCartSerializable } from './cart-transaction';
+import {
+  addMoneyMinor,
+  calculateLineTotalMinor,
+  isValidOrderAmount,
+  type ProductAmountRules,
+} from '../catalog/product-amount';
 
 const CART_LIFETIME_MS = 30 * 24 * 60 * 60 * 1_000;
 const MAX_DISTINCT_ITEMS = 50;
@@ -33,33 +39,43 @@ const cartSelect = {
     orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
     select: {
       currentReservation: {
-        select: { expiresAt: true, quantity: true, status: true },
+        select: { expiresAt: true, amount: true, status: true },
       },
       product: {
         select: {
+          amountUnit: true,
           currency: true,
           id: true,
           imagePath: true,
           isActive: true,
+          kitYieldVolumeMl: true,
+          maximumOrderAmount: true,
+          minimumOrderAmount: true,
           name: true,
+          orderStepAmount: true,
+          packageNetWeightMg: true,
+          priceBasisAmount: true,
           priceMinor: true,
           priceQualifier: true,
+          saleKind: true,
           slug: true,
+          stockAmount: true,
         },
       },
-      quantity: true,
+      amount: true,
     },
   },
 } satisfies Prisma.CartSelect;
 
 type StoredCart = Prisma.CartGetPayload<{ select: typeof cartSelect }>;
 
-type LockedProduct = Readonly<{
-  currency: string;
-  id: string;
-  isActive: boolean;
-  stockQuantity: number;
-}>;
+type LockedProduct = ProductAmountRules &
+  Readonly<{
+    currency: string;
+    id: string;
+    isActive: boolean;
+    stockAmount: number;
+  }>;
 
 export type CreatedCart = Readonly<{
   cart: CartDto;
@@ -80,7 +96,6 @@ export class CartService {
       items: [],
       serverNow: now.toISOString(),
       subtotalMinor: 0,
-      totalQuantity: 0,
     };
   }
 
@@ -121,7 +136,7 @@ export class CartService {
           dto.productSlug,
           requestedNow,
         );
-        const quantity = canonicalPositiveQuantity(dto.quantity, available);
+        const amount = canonicalPositiveAmount(dto.amount, available, product);
         const expiresAt = new Date(now.getTime() + CART_LIFETIME_MS);
         const created = await transaction.cart.create({
           data: { expiresAt, tokenDigest: toPrismaBytes(rawToken) },
@@ -131,7 +146,7 @@ export class CartService {
           data: {
             cartId: created.id,
             productId: product.id,
-            quantity,
+            amount,
           },
           select: { id: true },
         });
@@ -140,11 +155,11 @@ export class CartService {
           cartItemId: item.id,
           now,
           productId: product.id,
-          quantity,
+          amount,
         });
         return {
           cart: await loadCart(transaction, created.id),
-          clamped: quantity < dto.quantity,
+          clamped: amount < dto.amount,
           expiresAt,
           now,
         };
@@ -183,12 +198,12 @@ export class CartService {
               select: {
                 expiresAt: true,
                 id: true,
-                quantity: true,
+                amount: true,
                 status: true,
               },
             },
             id: true,
-            quantity: true,
+            amount: true,
           },
           where: {
             cartId_productId: {
@@ -203,13 +218,17 @@ export class CartService {
             where: { cartId: capability.cartId },
           });
           if (count >= MAX_DISTINCT_ITEMS) unavailable();
-          const quantity = canonicalPositiveQuantity(dto.quantity, available);
-          clamped = quantity < dto.quantity;
+          const amount = canonicalPositiveAmount(
+            dto.amount,
+            available,
+            product,
+          );
+          clamped = amount < dto.amount;
           const item = await transaction.cartItem.create({
             data: {
               cartId: capability.cartId,
               productId: product.id,
-              quantity,
+              amount,
             },
             select: { id: true },
           });
@@ -218,36 +237,33 @@ export class CartService {
             cartItemId: item.id,
             now,
             productId: product.id,
-            quantity,
+            amount,
           });
         } else {
           const currentReservation = existing.currentReservation;
           if (
             !currentReservation ||
-            !isActiveReservationForQuantity(
+            !isActiveReservationForAmount(
               currentReservation,
-              existing.quantity,
+              existing.amount,
               now,
             )
           ) {
             unavailable();
           }
-          const requested = existing.quantity + dto.quantity;
-          const quantity = canonicalPositiveQuantity(
-            requested,
-            Math.min(99, available),
-          );
-          clamped = quantity < requested;
-          if (quantity < existing.quantity) {
+          const requested = existing.amount + dto.amount;
+          const amount = canonicalPositiveAmount(requested, available, product);
+          clamped = amount < requested;
+          if (amount < existing.amount) {
             await transaction.cartItem.update({
-              data: { quantity },
+              data: { amount },
               where: { id: existing.id },
             });
             await transaction.cartReservation.update({
-              data: { quantity },
+              data: { amount },
               where: { id: currentReservation.id },
             });
-          } else if (quantity > existing.quantity) {
+          } else if (amount > existing.amount) {
             await releaseActiveReservations(
               transaction,
               capability.cartId,
@@ -255,7 +271,7 @@ export class CartService {
               now,
             );
             await transaction.cartItem.update({
-              data: { quantity },
+              data: { amount },
               where: { id: existing.id },
             });
             await createActiveReservation(transaction, {
@@ -263,7 +279,7 @@ export class CartService {
               cartItemId: existing.id,
               now,
               productId: product.id,
-              quantity,
+              amount,
             });
           }
         }
@@ -306,7 +322,7 @@ export class CartService {
               select: {
                 expiresAt: true,
                 id: true,
-                quantity: true,
+                amount: true,
                 status: true,
               },
             },
@@ -316,38 +332,46 @@ export class CartService {
                 currency: true,
                 id: true,
                 isActive: true,
-                stockQuantity: true,
+                maximumOrderAmount: true,
+                minimumOrderAmount: true,
+                orderStepAmount: true,
+                stockAmount: true,
               },
             },
-            quantity: true,
+            amount: true,
           },
           where: { id: candidate.id },
         });
-        if (dto.quantity === item.quantity) {
+        if (dto.amount === item.amount) {
           return {
             cart: await loadCart(transaction, capability.cartId),
             clamped: false,
             now,
           };
         }
-        if (dto.quantity < item.quantity) {
+        canonicalPositiveAmount(
+          dto.amount,
+          item.product.stockAmount,
+          item.product,
+        );
+        if (dto.amount < item.amount) {
           if (
             item.currentReservation?.status === 'ACTIVE' &&
-            !isActiveReservationForQuantity(
+            !isActiveReservationForAmount(
               item.currentReservation,
-              item.quantity,
+              item.amount,
               now,
             )
           ) {
             unavailable();
           }
           await transaction.cartItem.update({
-            data: { quantity: dto.quantity },
+            data: { amount: dto.amount },
             where: { id: item.id },
           });
           if (item.currentReservation?.status === 'ACTIVE') {
             await transaction.cartReservation.update({
-              data: { quantity: dto.quantity },
+              data: { amount: dto.amount },
               where: { id: item.currentReservation.id },
             });
           }
@@ -361,17 +385,13 @@ export class CartService {
         const currentReservation = item.currentReservation;
         if (
           !currentReservation ||
-          !isActiveReservationForQuantity(
-            currentReservation,
-            item.quantity,
-            now,
-          ) ||
+          !isActiveReservationForAmount(currentReservation, item.amount, now) ||
           !item.product.isActive ||
           item.product.currency !== 'USD'
         ) {
           unavailable();
         }
-        const active = await activeReservedQuantities(
+        const active = await activeReservedAmounts(
           transaction,
           [item.product.id],
           now,
@@ -379,20 +399,24 @@ export class CartService {
         );
         const available = Math.max(
           0,
-          item.product.stockQuantity - (active.get(item.product.id) ?? 0),
+          item.product.stockAmount - (active.get(item.product.id) ?? 0),
         );
-        const quantity = canonicalPositiveQuantity(dto.quantity, available);
-        const clamped = quantity < dto.quantity;
-        if (quantity < item.quantity) {
+        const amount = canonicalPositiveAmount(
+          dto.amount,
+          available,
+          item.product,
+        );
+        const clamped = amount < dto.amount;
+        if (amount < item.amount) {
           await transaction.cartItem.update({
-            data: { quantity },
+            data: { amount },
             where: { id: item.id },
           });
           await transaction.cartReservation.update({
-            data: { quantity },
+            data: { amount },
             where: { id: currentReservation.id },
           });
-        } else if (quantity > item.quantity) {
+        } else if (amount > item.amount) {
           await releaseActiveReservations(
             transaction,
             capability.cartId,
@@ -400,7 +424,7 @@ export class CartService {
             now,
           );
           await transaction.cartItem.update({
-            data: { quantity },
+            data: { amount },
             where: { id: item.id },
           });
           await createActiveReservation(transaction, {
@@ -408,7 +432,7 @@ export class CartService {
             cartItemId: item.id,
             now,
             productId: item.product.id,
-            quantity,
+            amount,
           });
         }
         return {
@@ -492,7 +516,7 @@ export class CartService {
       const cartExpiresAt = await lockCart(transaction, capability.cartId);
       const items = await transaction.cartItem.findMany({
         orderBy: [{ productId: 'asc' }, { id: 'asc' }],
-        select: { id: true, productId: true, quantity: true },
+        select: { id: true, productId: true, amount: true },
         where: { cartId: capability.cartId },
       });
       const productIds = items.map(({ productId }) => productId);
@@ -512,11 +536,14 @@ export class CartService {
           currency: true,
           id: true,
           isActive: true,
-          stockQuantity: true,
+          maximumOrderAmount: true,
+          minimumOrderAmount: true,
+          orderStepAmount: true,
+          stockAmount: true,
         },
         where: { id: { in: productIds } },
       });
-      const reserved = await activeReservedQuantities(
+      const reserved = await activeReservedAmounts(
         transaction,
         productIds,
         now,
@@ -527,16 +554,23 @@ export class CartService {
       let unreserved = false;
       for (const item of items) {
         const product = byId.get(item.productId);
-        const available = reservableQuantity(product, reserved);
+        const available = reservableAmount(product, reserved);
         if (available <= 0) {
           unreserved = true;
           continue;
         }
-        const quantity = Math.min(item.quantity, available);
-        if (quantity < item.quantity) {
+        const amount = maximumValidAmount(
+          product,
+          Math.min(item.amount, available),
+        );
+        if (amount === null) {
+          unreserved = true;
+          continue;
+        }
+        if (amount < item.amount) {
           clamped = true;
           await transaction.cartItem.update({
-            data: { quantity },
+            data: { amount },
             where: { id: item.id },
           });
         }
@@ -545,7 +579,7 @@ export class CartService {
           cartItemId: item.id,
           now,
           productId: item.productId,
-          quantity,
+          amount,
         });
       }
       const cart = await loadCart(transaction, capability.cartId);
@@ -573,12 +607,15 @@ async function requireReservableProduct(
       currency: true,
       id: true,
       isActive: true,
-      stockQuantity: true,
+      maximumOrderAmount: true,
+      minimumOrderAmount: true,
+      orderStepAmount: true,
+      stockAmount: true,
     },
     where: { id: candidate.id },
   });
   if (!product.isActive || product.currency !== 'USD') unavailable();
-  const reserved = await activeReservedQuantities(
+  const reserved = await activeReservedAmounts(
     transaction,
     [product.id],
     now,
@@ -587,7 +624,7 @@ async function requireReservableProduct(
   return {
     available: Math.max(
       0,
-      product.stockQuantity - (reserved.get(product.id) ?? 0),
+      product.stockAmount - (reserved.get(product.id) ?? 0),
     ),
     now,
     product,
@@ -638,46 +675,73 @@ function toCartDto(
   message: string | null = null,
 ): CartDto {
   const items: CartItemDto[] = cart.items.map(
-    ({ currentReservation, product, quantity }) => {
+    ({ currentReservation, product, amount }) => {
       const reservation = effectiveReservation(currentReservation, now);
       const isUsdActive = product.isActive && product.currency === 'USD';
       const available =
         isUsdActive &&
         reservation.status === 'active' &&
-        currentReservation?.quantity === quantity;
-      const currentUnitPriceMinor = isUsdActive ? product.priceMinor : null;
+        currentReservation?.amount === amount;
+      let priceMinor = isUsdActive ? product.priceMinor : null;
+      let lineTotalMinor: number | null = null;
+      if (priceMinor !== null) {
+        try {
+          lineTotalMinor = calculateLineTotalMinor(
+            priceMinor,
+            amount,
+            product.priceBasisAmount,
+          );
+        } catch {
+          priceMinor = null;
+        }
+      }
       return {
-        availability: available ? 'available' : 'unavailable',
-        currentUnitPriceMinor,
+        amountUnit: product.amountUnit,
+        availability:
+          available && lineTotalMinor !== null ? 'available' : 'unavailable',
         imagePath: product.imagePath,
-        lineTotalMinor:
-          currentUnitPriceMinor === null
-            ? null
-            : currentUnitPriceMinor * quantity,
+        kitYieldVolumeMl: product.kitYieldVolumeMl,
+        lineTotalMinor,
+        maximumOrderAmount: product.maximumOrderAmount,
+        minimumOrderAmount: product.minimumOrderAmount,
         name: product.name,
+        orderStepAmount: product.orderStepAmount,
+        packageNetWeightMg: product.packageNetWeightMg,
+        priceBasisAmount: product.priceBasisAmount,
+        priceMinor,
         priceQualifier: product.priceQualifier,
         productId: product.id,
         productSlug: product.slug,
-        quantity,
+        amount,
         reservationExpiresAt: reservation.expiresAt,
         reservationStatus: reservation.status,
+        saleKind: product.saleKind,
+        stockAmount: product.stockAmount,
       };
     },
   );
+  let subtotalMinor = 0;
+  let subtotalOverflow = false;
+  for (const item of items) {
+    if (item.lineTotalMinor === null) continue;
+    try {
+      subtotalMinor = addMoneyMinor(subtotalMinor, item.lineTotalMinor);
+    } catch {
+      subtotalOverflow = true;
+      break;
+    }
+  }
   return {
     adjustmentMessage: message,
     checkoutEligible:
       items.length > 0 &&
+      !subtotalOverflow &&
       items.every(({ availability }) => availability === 'available'),
     currency: 'USD',
     distinctItemCount: items.length,
     items,
     serverNow: now.toISOString(),
-    subtotalMinor: items.reduce(
-      (total, { lineTotalMinor }) => total + (lineTotalMinor ?? 0),
-      0,
-    ),
-    totalQuantity: items.reduce((total, { quantity }) => total + quantity, 0),
+    subtotalMinor,
   };
 }
 
@@ -707,28 +771,28 @@ function effectiveReservation(
   return { expiresAt: null, status: 'unreserved' };
 }
 
-function isActiveReservationForQuantity(
+function isActiveReservationForAmount(
   reservation: Readonly<{
     expiresAt: Date;
-    quantity: number;
+    amount: number;
     status: string;
   }> | null,
-  quantity: number,
+  amount: number,
   now: Date,
 ): boolean {
   return (
     reservation?.status === 'ACTIVE' &&
     reservation.expiresAt.getTime() > now.getTime() &&
-    reservation.quantity === quantity
+    reservation.amount === amount
   );
 }
 
-function reservableQuantity(
+function reservableAmount(
   product: LockedProduct | undefined,
   reserved: ReadonlyMap<string, number>,
 ): number {
   if (!product || !product.isActive || product.currency !== 'USD') return 0;
-  return Math.max(0, product.stockQuantity - (reserved.get(product.id) ?? 0));
+  return Math.max(0, product.stockAmount - (reserved.get(product.id) ?? 0));
 }
 
 function adjustmentMessage(
@@ -744,12 +808,30 @@ function adjustmentMessage(
   return null;
 }
 
-function canonicalPositiveQuantity(
+function canonicalPositiveAmount(
   requested: number,
   available: number,
+  product: ProductAmountRules,
 ): number {
-  if (available <= 0) unavailable();
-  return Math.min(requested, available);
+  if (!isValidOrderAmount(requested, product) || requested > available) {
+    unavailable();
+  }
+  return requested;
+}
+
+function maximumValidAmount(
+  product: ProductAmountRules | undefined,
+  available: number,
+): number | null {
+  if (!product || available < product.minimumOrderAmount) return null;
+  const bounded = Math.min(available, product.maximumOrderAmount ?? available);
+  return (
+    product.minimumOrderAmount +
+    Math.floor(
+      (bounded - product.minimumOrderAmount) / product.orderStepAmount,
+    ) *
+      product.orderStepAmount
+  );
 }
 
 function unavailable(): never {

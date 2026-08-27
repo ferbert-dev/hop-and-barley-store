@@ -46,6 +46,17 @@ enum PaymentState {
   CANCELLED
 }
 
+enum SaleKind {
+  WEIGHT
+  PACKAGE
+  KIT
+}
+
+enum AmountUnit {
+  MILLIGRAM
+  EACH
+}
+
 model User {
   id                 String              @id(map: "User_pkey") @default(uuid()) @db.Uuid
   email              String              @db.VarChar(320)
@@ -102,25 +113,33 @@ model Category {
 }
 
 model Product {
-  id               String            @id(map: "Product_pkey") @default(uuid()) @db.Uuid
-  name             String
-  slug             String            @unique(map: "Product_slug_key")
-  teaser           String
-  description      String
-  priceMinor       Int
-  priceQualifier   String            @db.VarChar(64)
-  currency         String            @default("USD") @db.VarChar(3)
-  stockQuantity    Int               @default(0)
-  isActive         Boolean           @default(true)
-  imagePath        String            @db.VarChar(255)
-  specifications   Json              @db.JsonB
-  categoryId       String            @db.Uuid
-  category         Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Product_categoryId_fkey")
-  cartItems        CartItem[]
-  cartReservations CartReservation[]
-  orderItems       OrderItem[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id                 String            @id(map: "Product_pkey") @default(uuid()) @db.Uuid
+  name               String
+  slug               String            @unique(map: "Product_slug_key")
+  teaser             String
+  description        String
+  priceMinor         Int
+  priceQualifier     String            @db.VarChar(64)
+  currency           String            @default("USD") @db.VarChar(3)
+  saleKind           SaleKind
+  amountUnit         AmountUnit
+  priceBasisAmount   Int
+  minimumOrderAmount Int
+  orderStepAmount    Int
+  maximumOrderAmount Int?
+  stockAmount        Int               @default(0)
+  packageNetWeightMg Int?
+  kitYieldVolumeMl   Int?
+  isActive           Boolean           @default(true)
+  imagePath          String            @db.VarChar(255)
+  specifications     Json              @db.JsonB
+  categoryId         String            @db.Uuid
+  category           Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Product_categoryId_fkey")
+  cartItems          CartItem[]
+  cartReservations   CartReservation[]
+  orderItems         OrderItem[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
   @@index([categoryId, isActive], map: "Product_categoryId_isActive_idx")
   @@index([isActive, priceMinor], map: "Product_isActive_priceMinor_idx")
@@ -145,7 +164,7 @@ model CartItem {
   cartId               String            @db.Uuid
   productId            String            @db.Uuid
   currentReservationId String?           @unique(map: "CartItem_currentReservationId_key") @db.Uuid
-  quantity             Int               @db.SmallInt
+  amount               Int
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   cart                 Cart              @relation(fields: [cartId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "CartItem_cartId_fkey")
@@ -163,7 +182,7 @@ model CartReservation {
   cartId     String                @db.Uuid
   cartItemId String?               @db.Uuid
   productId  String                @db.Uuid
-  quantity   Int                   @db.SmallInt
+  amount     Int
   status     CartReservationStatus @default(ACTIVE)
   reservedAt DateTime
   expiresAt  DateTime
@@ -217,18 +236,21 @@ model Order {
 }
 
 model OrderItem {
-  id             String   @id(map: "OrderItem_pkey") @default(uuid()) @db.Uuid
-  orderId        String   @db.Uuid
-  productId      String   @db.Uuid
-  productSlug    String
-  productName    String
-  priceQualifier String   @db.VarChar(64)
-  unitPriceMinor Int
-  quantity       Int      @db.SmallInt
-  lineTotalMinor Int
-  createdAt      DateTime @default(now())
-  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "OrderItem_orderId_fkey")
-  product        Product  @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "OrderItem_productId_fkey")
+  id               String     @id(map: "OrderItem_pkey") @default(uuid()) @db.Uuid
+  orderId          String     @db.Uuid
+  productId        String     @db.Uuid
+  productSlug      String
+  productName      String
+  priceQualifier   String     @db.VarChar(64)
+  saleKind         SaleKind
+  amountUnit       AmountUnit
+  priceMinor       Int
+  priceBasisAmount Int
+  amount           Int
+  lineTotalMinor   Int
+  createdAt        DateTime   @default(now())
+  order            Order      @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "OrderItem_orderId_fkey")
+  product          Product    @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "OrderItem_productId_fkey")
 
   @@unique([orderId, productId], map: "OrderItem_orderId_productId_key")
   @@index([productId], map: "OrderItem_productId_idx")

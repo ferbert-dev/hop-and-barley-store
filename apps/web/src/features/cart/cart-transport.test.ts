@@ -13,21 +13,29 @@ const cart = {
   items: [
     {
       availability: 'available' as const,
-      currentUnitPriceMinor: 599,
+      priceMinor: 599,
       imagePath: '/assets/products/citra-hops.webp',
+      kitYieldVolumeMl: null,
       lineTotalMinor: 599,
+      maximumOrderAmount: 100_000_000,
+      minimumOrderAmount: 100_000,
       name: 'Citra Hops',
+      orderStepAmount: 100_000,
+      packageNetWeightMg: null,
+      priceBasisAmount: 100_000,
       priceQualifier: 'per 100g',
       productId: '10000000-0000-4000-8000-000000000001',
       productSlug: 'citra-hops',
-      quantity: 1,
+      amount: 100_000,
       reservationExpiresAt: '2026-08-25T10:15:00.000Z',
       reservationStatus: 'active' as const,
+      saleKind: 'WEIGHT' as const,
+      stockAmount: 100_000_000,
+      amountUnit: 'MILLIGRAM' as const,
     },
   ],
   serverNow: '2026-08-25T10:00:00.000Z',
   subtotalMinor: 599,
-  totalQuantity: 1,
 };
 
 const privateHeaders = {
@@ -98,7 +106,7 @@ describe('generated-client cart browser transport', () => {
     expect(updateRequest.headers.get('origin')).toBe('http://localhost:3000');
     expect(updateRequest.headers.get('x-csrf-token')).toBe(csrfToken);
     await expect(updateRequest.clone().json()).resolves.toEqual({
-      quantity: 2,
+      amount: 2,
     });
   });
 
@@ -174,7 +182,7 @@ describe('generated-client cart browser transport', () => {
       vi.fn(async () =>
         response({
           ...cart,
-          items: [{ ...cart.items[0], quantity: -1 }],
+          items: [{ ...cart.items[0], amount: -1 }],
         }),
       ),
     );

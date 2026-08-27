@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { ProductCard } from '../../components/ui/card';
 import { Price } from '../../components/ui/price';
 import { productAssetsBySlug } from '../../design-system/assets';
+import { formatSaleUnit } from '../quantity/quantity-model';
 import styles from './catalog.module.css';
 
 export function PagedCatalogCard({
@@ -38,7 +39,7 @@ export function PagedCatalogCard({
       price={
         <span className={styles.priceLine}>
           <Price currency="USD" minorUnits={product.priceMinor} />
-          <span>{product.priceQualifier}</span>
+          <span>{formatSaleUnit(product)}</span>
         </span>
       }
     />

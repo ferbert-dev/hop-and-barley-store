@@ -62,9 +62,10 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
         imagePath: true,
         isActive: true,
         priceMinor: true,
+        saleKind: true,
         slug: true,
         specifications: true,
-        stockQuantity: true,
+        stockAmount: true,
       },
     });
 
@@ -76,10 +77,18 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
         .sort((left, right) => left.id.localeCompare(right.id)),
     );
     expect(
-      products.every(
-        ({ currency, isActive, stockQuantity }) =>
-          currency === 'USD' && isActive && stockQuantity === 100,
-      ),
+      products.every(({ currency, isActive, saleKind, slug, stockAmount }) => {
+        const fixture = catalogProducts.find(
+          (candidate) => candidate.slug === slug,
+        );
+        return (
+          fixture !== undefined &&
+          currency === 'USD' &&
+          isActive &&
+          saleKind === fixture.saleKind &&
+          stockAmount === fixture.stockAmount
+        );
+      }),
     ).toBe(true);
 
     const kit = products.find(({ slug }) => slug === 'west-coast-ipa-kit');
@@ -99,31 +108,49 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
     const body = JSON.parse(response.text) as ProductDetailDto;
 
     expect(body).toEqual({
+      amountUnit: expected.amountUnit,
       availability: 'in-stock',
       category: { name: 'Hops', slug: 'hops' },
       currency: 'USD',
       description: expected.description,
       id: expected.id,
       imagePath: expected.imagePath,
+      kitYieldVolumeMl: expected.kitYieldVolumeMl,
+      maximumOrderAmount: expected.maximumOrderAmount,
+      minimumOrderAmount: expected.minimumOrderAmount,
       name: expected.name,
+      orderStepAmount: expected.orderStepAmount,
+      packageNetWeightMg: expected.packageNetWeightMg,
+      priceBasisAmount: expected.priceBasisAmount,
       priceMinor: expected.priceMinor,
       priceQualifier: expected.priceQualifier,
+      saleKind: expected.saleKind,
       slug: expected.slug,
       specifications: expected.specifications,
+      stockAmount: expected.stockAmount,
       teaser: expected.teaser,
     });
     expect(Object.keys(body).sort()).toEqual([
+      'amountUnit',
       'availability',
       'category',
       'currency',
       'description',
       'id',
       'imagePath',
+      'kitYieldVolumeMl',
+      'maximumOrderAmount',
+      'minimumOrderAmount',
       'name',
+      'orderStepAmount',
+      'packageNetWeightMg',
+      'priceBasisAmount',
       'priceMinor',
       'priceQualifier',
+      'saleKind',
       'slug',
       'specifications',
+      'stockAmount',
       'teaser',
     ]);
   });
@@ -366,7 +393,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
           [categoryId],
         );
         await postgres.query(
-          `INSERT INTO "Product" ("id", "name", "slug", "teaser", "description", "priceMinor", "priceQualifier", "currency", "stockQuantity", "isActive", "imagePath", "specifications", "categoryId", "updatedAt") VALUES ($1, 'Snapshot product', 'snapshot-product', 'Snapshot product', 'Snapshot product', 1, 'fixture', 'USD', 1, true, '/assets/products/snapshot-product.webp', '[]'::jsonb, $2, CURRENT_TIMESTAMP)`,
+          `INSERT INTO "Product" ("id", "name", "slug", "teaser", "description", "priceMinor", "priceQualifier", "currency", "saleKind", "amountUnit", "priceBasisAmount", "minimumOrderAmount", "orderStepAmount", "stockAmount", "isActive", "imagePath", "specifications", "categoryId", "updatedAt") VALUES ($1, 'Snapshot product', 'snapshot-product', 'Snapshot product', 'Snapshot product', 1, 'fixture', 'USD', 'PACKAGE', 'EACH', 1, 1, 1, 1, true, '/assets/products/snapshot-product.webp', '[]'::jsonb, $2, CURRENT_TIMESTAMP)`,
           [productId, categoryId],
         );
       })();
@@ -472,8 +499,8 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
       overrides: { priceMinor: -1 },
     },
     {
-      constraint: 'Product_stockQuantity_nonnegative_check',
-      overrides: { stockQuantity: -1 },
+      constraint: 'Product_stockAmount_nonnegative_check',
+      overrides: { stockAmount: -1 },
     },
     {
       constraint: 'Product_currency_iso_check',
@@ -518,9 +545,14 @@ function invalidProductInsert(
     name: 'Constraint fixture',
     priceMinor: 1,
     priceQualifier: 'fixture',
+    saleKind: 'PACKAGE',
+    amountUnit: 'EACH',
+    priceBasisAmount: 1,
+    minimumOrderAmount: 1,
+    orderStepAmount: 1,
     slug: `constraint-fixture-${sequence}`,
     specifications: '[]',
-    stockQuantity: 0,
+    stockAmount: 0,
     teaser: 'Constraint fixture',
     ...overrides,
   };
@@ -528,13 +560,17 @@ function invalidProductInsert(
   return `
     INSERT INTO "Product" (
       "id", "name", "slug", "teaser", "description", "priceMinor",
-      "priceQualifier", "currency", "stockQuantity", "isActive",
+      "priceQualifier", "currency", "saleKind", "amountUnit",
+      "priceBasisAmount", "minimumOrderAmount", "orderStepAmount",
+      "stockAmount", "isActive",
       "imagePath", "specifications", "categoryId", "updatedAt"
     ) VALUES (
       ${literal(values.id)}, ${literal(values.name)}, ${literal(values.slug)},
       ${literal(values.teaser)}, ${literal(values.description)}, ${values.priceMinor},
       ${literal(values.priceQualifier)}, ${literal(values.currency)},
-      ${values.stockQuantity}, true, ${literal(values.imagePath)},
+      ${literal(values.saleKind)}::"SaleKind", ${literal(values.amountUnit)}::"AmountUnit",
+      ${values.priceBasisAmount}, ${values.minimumOrderAmount}, ${values.orderStepAmount},
+      ${values.stockAmount}, true, ${literal(values.imagePath)},
       ${literal(values.specifications)}::jsonb, ${literal(values.categoryId)}::uuid,
       CURRENT_TIMESTAMP
     )`;
@@ -545,15 +581,22 @@ function productFixture(
     Pick<Prisma.ProductCreateManyInput, 'categoryId' | 'id' | 'slug'>,
 ): Prisma.ProductCreateManyInput {
   return {
+    amountUnit: 'EACH',
     currency: 'USD',
     description: 'Integration fixture for grounded hops discovery',
     imagePath: `/assets/products/${overrides.slug}.webp`,
     isActive: true,
+    maximumOrderAmount: null,
+    minimumOrderAmount: 1,
     name: 'Integration fixture',
+    orderStepAmount: 1,
+    packageNetWeightMg: null,
+    priceBasisAmount: 1,
     priceMinor: 1,
     priceQualifier: 'fixture',
+    saleKind: 'PACKAGE',
     specifications: [],
-    stockQuantity: 1,
+    stockAmount: 1,
     teaser: 'Integration hops fixture',
     ...overrides,
   };

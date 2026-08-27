@@ -2,7 +2,10 @@
 
 Hop & Barley is a full-stack ecommerce portfolio project built as a professional TypeScript monorepo. The repository contains a dependency-aware storefront workspace, REST API, PostgreSQL database, generated API client, and browser test suite.
 
-> **Current status:** the executable platform foundation, catalog discovery and product-detail vertical slices work locally. The complete shop described in the product brief is still being built; planned features are labelled explicitly below.
+> **Current status:** the executable platform foundation, catalog/product-detail,
+> authentication, measured guest-cart reservations, and transactional order API
+> work locally. The complete shop described in the product brief is still being
+> built; planned features are labelled explicitly below.
 
 ## What Works Today
 
@@ -15,6 +18,9 @@ Hop & Barley is a full-stack ecommerce portfolio project built as a professional
 - a backend service console at `http://localhost:3001`;
 - Swagger UI and an OpenAPI document for the versioned public API endpoints;
 - an OpenAPI-generated TypeScript client package;
+- measured bulk, package, and kit quantities with server-owned cart totals and
+  reservations;
+- email/password authentication and a transactional cash-on-delivery order API;
 - a web unit-test baseline, API unit/e2e tests, and a full-stack Playwright smoke test;
 - pull-request CI for clean generation, quality/build, PostgreSQL migrations and rollback, and connected/unavailable browser flows;
 - one Docker Compose command that starts PostgreSQL, migrations/seed, API, and storefront.
@@ -162,13 +168,18 @@ Implemented now:
 - database-backed storefront status and catalog rendering;
 - canonical URL-backed discovery with search, filters, sorting, pagination,
   loading, empty, invalid, and API-unavailable states;
+- guest carts with expiring stock reservations and server-owned totals;
+- transactional cash-on-delivery order creation with immutable commercial
+  snapshots;
+- measured sale rules for bulk weight, packages, and kits, including kg entry,
+  known package net weight, and aggregate kit yield;
+- Nest-owned email/password registration, login, and opaque sessions;
 - developer console, Swagger UI, generated client, and baseline tests.
 
 Planned product work:
 
-- cart and checkout;
-- order creation with backend-owned totals and inventory correctness;
-- authentication, account, and order history;
+- checkout submission and payment UI on top of the existing order boundary;
+- password recovery, account, and order history;
 - admin catalog/inventory/order flows;
 - a production deployment pipeline after a provider decision.
 

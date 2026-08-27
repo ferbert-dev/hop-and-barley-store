@@ -26,22 +26,30 @@ const cart: CartDto = {
   distinctItemCount: 1,
   items: [
     {
+      amountUnit: 'EACH',
       availability: 'available',
-      currentUnitPriceMinor: 699,
+      priceMinor: 699,
       imagePath: '/assets/products/cascade-hops.webp',
       lineTotalMinor: 1398,
+      kitYieldVolumeMl: null,
+      maximumOrderAmount: null,
+      minimumOrderAmount: 1,
       name: 'Cascade Hops',
+      orderStepAmount: 1,
+      packageNetWeightMg: null,
+      priceBasisAmount: 1,
       priceQualifier: 'per pound',
       productId: '20000000-0000-4000-8000-000000000002',
       productSlug: 'cascade-hops',
-      quantity: 2,
+      amount: 2,
       reservationExpiresAt: '2026-08-25T12:15:00.000Z',
       reservationStatus: 'active',
+      saleKind: 'PACKAGE',
+      stockAmount: 100,
     },
   ],
   serverNow: '2026-08-25T12:00:00.000Z',
   subtotalMinor: 1398,
-  totalQuantity: 2,
 };
 
 describe('Cart API security contract (e2e)', () => {
@@ -59,7 +67,6 @@ describe('Cart API security contract (e2e)', () => {
       items: [],
       serverNow: '2026-08-25T12:00:00.000Z',
       subtotalMinor: 0,
-      totalQuantity: 0,
     }),
     createAndAdd: jest.fn().mockResolvedValue({
       cart,
@@ -74,7 +81,6 @@ describe('Cart API security contract (e2e)', () => {
       items: [],
       serverNow: '2026-08-25T12:00:00.000Z',
       subtotalMinor: 0,
-      totalQuantity: 0,
     }),
     getCart: jest.fn().mockResolvedValue(cart),
     recheck: jest.fn().mockResolvedValue(cart),
@@ -148,18 +154,16 @@ describe('Cart API security contract (e2e)', () => {
     const response = await request(app.getHttpServer() as App)
       .post('/api/v1/cart/items')
       .set('Origin', 'http://localhost:3000')
-      .send({ productSlug: 'cascade-hops', quantity: 2 })
+      .send({ productSlug: 'cascade-hops', amount: 2 })
       .expect(200);
     expect(carts.createAndAdd).toHaveBeenCalledWith({
       productSlug: 'cascade-hops',
-      quantity: 2,
+      amount: 2,
     });
     expect(response.headers['set-cookie']?.[0]).toMatch(
       /^hb_cart=[A-Za-z0-9_-]{43}; Max-Age=2592000; Expires=.+; Path=\/; HttpOnly; SameSite=Lax$/,
     );
-    expect(JSON.stringify(response.body)).not.toMatch(
-      /cartId|token|digest|stockQuantity/i,
-    );
+    expect(JSON.stringify(response.body)).not.toMatch(/cartId|token|digest/i);
     expectPrivate(response.headers);
   });
 
@@ -170,18 +174,18 @@ describe('Cart API security contract (e2e)', () => {
     const response = await request(app.getHttpServer() as App)
       .post('/api/v1/cart/items')
       .set('Origin', 'http://localhost:3000')
-      .send({ productSlug: 'inactive-product', quantity: 2 })
+      .send({ productSlug: 'inactive-product', amount: 2 })
       .expect(422);
     expect(response.body).toEqual({ status: 'unavailable' });
     expect(response.headers['set-cookie']).toBeUndefined();
   });
 
-  it('rejects wrong Origin, non-JSON, unknown fields and invalid quantities', async () => {
+  it('rejects wrong Origin, non-JSON, unknown fields and invalid amounts', async () => {
     const server = app.getHttpServer() as App;
     await request(server)
       .post('/api/v1/cart/items')
       .set('Origin', 'http://evil.example')
-      .send({ productSlug: 'cascade-hops', quantity: 1 })
+      .send({ productSlug: 'cascade-hops', amount: 1 })
       .expect(403);
     await request(server)
       .post('/api/v1/cart/items')
@@ -196,9 +200,9 @@ describe('Cart API security contract (e2e)', () => {
       .send('no')
       .expect(415);
     for (const body of [
-      { productSlug: 'cascade-hops', quantity: 0 },
-      { productSlug: 'cascade-hops', quantity: 100 },
-      { productSlug: 'cascade-hops', quantity: 1, priceMinor: 1 },
+      { productSlug: 'cascade-hops', amount: 0 },
+      { productSlug: 'cascade-hops', amount: 2_000_000_001 },
+      { productSlug: 'cascade-hops', amount: 1, priceMinor: 1 },
     ]) {
       await request(server)
         .post('/api/v1/cart/items')
@@ -218,7 +222,7 @@ describe('Cart API security contract (e2e)', () => {
         .post('/api/v1/cart/items')
         .set('Cookie', cookie)
         .set('Origin', 'http://localhost:3000')
-        .send({ productSlug: 'cascade-hops', quantity: 1 })
+        .send({ productSlug: 'cascade-hops', amount: 1 })
         .expect(401);
       expect(response.body).toEqual({ status: 'unauthorized' });
       expect(response.headers['set-cookie']).toBeUndefined();
@@ -240,14 +244,14 @@ describe('Cart API security contract (e2e)', () => {
       .post('/api/v1/cart/items')
       .set('Cookie', cookie)
       .set('Origin', 'http://localhost:3000')
-      .send({ productSlug: 'cascade-hops', quantity: 1 })
+      .send({ productSlug: 'cascade-hops', amount: 1 })
       .expect(403);
     await request(server)
       .post('/api/v1/cart/items')
       .set('Cookie', cookie)
       .set('Origin', 'http://localhost:3000')
       .set('X-CSRF-Token', app.get(CartCsrfService).issue(unknownToken))
-      .send({ productSlug: 'cascade-hops', quantity: 1 })
+      .send({ productSlug: 'cascade-hops', amount: 1 })
       .expect(403);
 
     await request(server)
@@ -282,14 +286,14 @@ describe('Cart API security contract (e2e)', () => {
       .set('Cookie', cookie)
       .set('Origin', 'http://localhost:3000')
       .set('X-CSRF-Token', csrf)
-      .send({ productSlug: 'cascade-hops', quantity: 1 })
+      .send({ productSlug: 'cascade-hops', amount: 1 })
       .expect(200);
     await request(server)
       .patch('/api/v1/cart/items/cascade-hops')
       .set('Cookie', cookie)
       .set('Origin', 'http://localhost:3000')
       .set('X-CSRF-Token', csrf)
-      .send({ quantity: 3 })
+      .send({ amount: 3 })
       .expect(200);
     await request(server)
       .delete('/api/v1/cart/items/cascade-hops')

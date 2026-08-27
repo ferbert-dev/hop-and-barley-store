@@ -29,7 +29,6 @@ describe('CartService reservation invariants', () => {
       items: [],
       serverNow: '2026-08-25T12:00:00.000Z',
       subtotalMinor: 0,
-      totalQuantity: 0,
     });
   });
 
@@ -39,7 +38,7 @@ describe('CartService reservation invariants', () => {
         findFirst: jest.fn().mockResolvedValue(
           storedCart(2, {
             expiresAt,
-            quantity: 2,
+            amount: 2,
             status: 'ACTIVE',
           }),
         ),
@@ -64,7 +63,7 @@ describe('CartService reservation invariants', () => {
       reservationStatus: 'expired',
     });
     expect(JSON.stringify(expired)).not.toMatch(
-      /cartId|reservationId|token|digest|stockQuantity/i,
+      /cartId|reservationId|token|digest/i,
     );
   });
 
@@ -80,12 +79,12 @@ describe('CartService reservation invariants', () => {
       id: reservationId,
     });
     transaction.cart.findUniqueOrThrow.mockResolvedValue(
-      storedCart(2, { expiresAt, quantity: 2, status: 'ACTIVE' }),
+      storedCart(2, { expiresAt, amount: 2, status: 'ACTIVE' }),
     );
     const service = new CartService(prismaMock(transaction));
 
     const created = await service.createAndAdd(
-      { productSlug: 'cascade-hops', quantity: 2 },
+      { productSlug: 'cascade-hops', amount: 2 },
       now,
     );
 
@@ -95,7 +94,7 @@ describe('CartService reservation invariants', () => {
         cartItemId: itemId,
         expiresAt,
         productId,
-        quantity: 2,
+        amount: 2,
         reservedAt: now,
         status: 'ACTIVE',
       },
@@ -109,7 +108,7 @@ describe('CartService reservation invariants', () => {
     expect(created.cart.items[0].reservationStatus).toBe('active');
   });
 
-  it('decreases the held quantity without changing the reservation clock', async () => {
+  it('decreases the held amount without changing the reservation clock', async () => {
     const transaction = transactionMock();
     transaction.$queryRaw
       .mockResolvedValueOnce([{ expiresAt: capability.expiresAt, id: cartId }])
@@ -119,27 +118,27 @@ describe('CartService reservation invariants', () => {
       currentReservation: {
         expiresAt,
         id: reservationId,
-        quantity: 4,
+        amount: 4,
         status: 'ACTIVE',
       },
       id: itemId,
       product: product(),
-      quantity: 4,
+      amount: 4,
     });
     transaction.cart.findUniqueOrThrow.mockResolvedValue(
-      storedCart(2, { expiresAt, quantity: 2, status: 'ACTIVE' }),
+      storedCart(2, { expiresAt, amount: 2, status: 'ACTIVE' }),
     );
     const service = new CartService(prismaMock(transaction));
 
     const cart = await service.update(
       capability,
       'cascade-hops',
-      { quantity: 2 },
+      { amount: 2 },
       now,
     );
 
     expect(transaction.cartReservation.update).toHaveBeenCalledWith({
-      data: { quantity: 2 },
+      data: { amount: 2 },
       where: { id: reservationId },
     });
     expect(transaction.cartReservation.create).not.toHaveBeenCalled();
@@ -156,12 +155,12 @@ describe('CartService reservation invariants', () => {
       currentReservation: {
         expiresAt,
         id: reservationId,
-        quantity: 2,
+        amount: 2,
         status: 'ACTIVE',
       },
       id: itemId,
       product: product(),
-      quantity: 2,
+      amount: 2,
     });
     transaction.cartReservation.findMany.mockResolvedValue([]);
     transaction.cartReservation.create.mockResolvedValue({
@@ -172,7 +171,7 @@ describe('CartService reservation invariants', () => {
     transaction.cart.findUniqueOrThrow.mockResolvedValue(
       storedCart(4, {
         expiresAt: renewedExpiry,
-        quantity: 4,
+        amount: 4,
         status: 'ACTIVE',
       }),
     );
@@ -181,7 +180,7 @@ describe('CartService reservation invariants', () => {
     const cart = await service.update(
       capability,
       'cascade-hops',
-      { quantity: 4 },
+      { amount: 4 },
       renewedAt,
     );
 
@@ -199,7 +198,7 @@ describe('CartService reservation invariants', () => {
         cartItemId: itemId,
         expiresAt: renewedExpiry,
         productId,
-        quantity: 4,
+        amount: 4,
         reservedAt: renewedAt,
         status: 'ACTIVE',
       },
@@ -216,15 +215,18 @@ function product() {
     currency: 'USD',
     id: productId,
     isActive: true,
-    stockQuantity: 10,
+    maximumOrderAmount: null,
+    minimumOrderAmount: 1,
+    orderStepAmount: 1,
+    stockAmount: 10,
   };
 }
 
 function storedCart(
-  quantity: number,
+  amount: number,
   currentReservation: {
     expiresAt: Date;
-    quantity: number;
+    amount: number;
     status: 'ACTIVE' | 'CONSUMED' | 'EXPIRED' | 'RELEASED';
   } | null,
 ) {
@@ -233,16 +235,25 @@ function storedCart(
       {
         currentReservation,
         product: {
+          amountUnit: 'EACH',
           currency: 'USD',
           id: productId,
           imagePath: '/assets/products/cascade-hops.webp',
           isActive: true,
+          kitYieldVolumeMl: null,
+          maximumOrderAmount: null,
+          minimumOrderAmount: 1,
           name: 'Cascade Hops',
+          orderStepAmount: 1,
+          packageNetWeightMg: null,
+          priceBasisAmount: 1,
           priceMinor: 699,
           priceQualifier: 'per pound',
+          saleKind: 'PACKAGE',
           slug: 'cascade-hops',
+          stockAmount: 10,
         },
-        quantity,
+        amount,
       },
     ],
   };

@@ -13,6 +13,8 @@ import {
 } from '../../components/ui/status';
 import { useCart, type CartContextValue, type CartState } from './cart-context';
 import type { Cart } from './cart-transport';
+import { QuantityForm } from '../quantity/quantity-form';
+import { formatSaleUnit } from '../quantity/quantity-model';
 import styles from './cart.module.css';
 
 type CartScreenProps = Readonly<{ initialState?: CartState }>;
@@ -178,7 +180,7 @@ function CartContents({
       <div className={styles.heading}>
         <h1 id="cart-title">Shopping Cart</h1>
         <Button
-          disabled={pending !== null}
+          disabled={pending !== null && pending !== undefined}
           onClick={() => void clear?.()}
           pending={pending?.kind === 'clear'}
           pendingLabel="Clearing cart…"
@@ -229,7 +231,7 @@ function CartContents({
                 <div className={styles.lineContent}>
                   <div>
                     <h2>{item.name}</h2>
-                    <p className={styles.qualifier}>{item.priceQualifier}</p>
+                    <p className={styles.qualifier}>{formatSaleUnit(item)}</p>
                     {item.availability === 'unavailable' &&
                     item.reservationStatus !== 'expired' ? (
                       <p className={styles.availability} role="status">
@@ -255,62 +257,34 @@ function CartContents({
                         minorUnits={item.lineTotalMinor}
                       />
                     )}
-                    {item.currentUnitPriceMinor === null ? null : (
+                    {item.priceMinor === null ? null : (
                       <span className={styles.unitPrice}>
                         <Price
                           currency={cart.currency}
-                          minorUnits={item.currentUnitPriceMinor}
+                          minorUnits={item.priceMinor}
                         />{' '}
-                        {item.priceQualifier}
+                        {formatSaleUnit(item)}
                       </span>
                     )}
                   </div>
                   <div className={styles.lineActions}>
-                    <div
-                      aria-label={`Quantity for ${item.name}`}
-                      className={styles.quantity}
-                    >
-                      <Button
-                        aria-label={`Decrease ${item.name} quantity`}
-                        disabled={
-                          pending !== null ||
-                          item.availability === 'unavailable' ||
-                          itemReservationExpired
-                        }
-                        onClick={() =>
-                          void (item.quantity === 1
-                            ? remove?.(item.productSlug)
-                            : update?.(item.productSlug, item.quantity - 1))
-                        }
-                        type="button"
-                        variant="secondary"
-                      >
-                        −
-                      </Button>
-                      <output aria-live="polite">
-                        {item.quantity} in cart
-                      </output>
-                      <Button
-                        aria-label={`Increase ${item.name} quantity`}
-                        disabled={
-                          pending !== null ||
-                          item.availability === 'unavailable' ||
-                          itemReservationExpired ||
-                          item.quantity >= 99
-                        }
-                        onClick={() =>
-                          void update?.(item.productSlug, item.quantity + 1)
-                        }
-                        type="button"
-                        variant="secondary"
-                      >
-                        +
-                      </Button>
-                    </div>
+                    <QuantityForm
+                      amount={item.amount}
+                      currency={cart.currency}
+                      disabled={
+                        (pending !== null && pending !== undefined) ||
+                        item.availability === 'unavailable' ||
+                        itemReservationExpired
+                      }
+                      metadata={item}
+                      onSubmit={(amount) => update?.(item.productSlug, amount)}
+                      priceMinor={item.priceMinor}
+                      submitLabel={`Update ${item.name}`}
+                    />
                     <Button
                       aria-label={`Remove ${item.name} from cart`}
                       className={styles.remove}
-                      disabled={pending !== null}
+                      disabled={pending !== null && pending !== undefined}
                       onClick={() => void remove?.(item.productSlug)}
                       pending={pending?.kind === 'remove' && itemIsPending}
                       pendingLabel={`Removing ${item.name}…`}
@@ -382,7 +356,7 @@ function ReservationStatus({
         </p>
         {recheck ? (
           <Button
-            disabled={pending !== null}
+            disabled={pending !== null && pending !== undefined}
             onClick={() => void recheck()}
             pending={pending?.kind === 'recheck'}
             pendingLabel="Checking availability…"
@@ -474,6 +448,7 @@ function isPendingForProduct(
 ) {
   return (
     pending !== null &&
+    pending !== undefined &&
     pending !== undefined &&
     'productSlug' in pending &&
     pending.productSlug === productSlug

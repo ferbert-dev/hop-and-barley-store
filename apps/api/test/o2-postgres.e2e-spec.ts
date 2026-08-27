@@ -24,7 +24,7 @@ const describePostgres =
   process.env.RUN_O2_POSTGRES_INTEGRATION === '1' ? describe : describe.skip;
 
 const baseNow = new Date(Math.floor(Date.now() / 1_000) * 1_000);
-const productSlug = 'cascade-hops';
+const productSlug = 'safale-us05-yeast';
 
 describePostgres('O2 orders with disposable PostgreSQL', () => {
   let app: INestApplication;
@@ -54,7 +54,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     await prisma.cart.deleteMany();
     await prisma.user.deleteMany();
     await prisma.product.updateMany({
-      data: { isActive: true, stockQuantity: 100 },
+      data: { isActive: true, stockAmount: 100 },
     });
   });
 
@@ -69,8 +69,8 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
         'Order_payment_outcome_check',
         'Order_userId_fkey',
         'Order_cartId_fkey',
-        'OrderItem_quantity_check',
-        'OrderItem_amounts_check',
+        'OrderItem_amount_check',
+        'OrderItem_pricing_check',
         'OrderItem_snapshot_check',
         'CartReservation_order_state_check',
         'CartReservation_orderId_fkey'
@@ -101,7 +101,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     const userId = await createUser('cod@example.com');
     const { cartId, checkout } = await reservedCheckout(2);
     const product = await prisma.product.findUniqueOrThrow({
-      select: { priceMinor: true, stockQuantity: true },
+      select: { priceMinor: true, stockAmount: true },
       where: { slug: productSlug },
     });
     const context = {
@@ -130,7 +130,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     expect(await prisma.order.count()).toBe(1);
     expect(
       await prisma.product.findUniqueOrThrow({ where: { slug: productSlug } }),
-    ).toMatchObject({ stockQuantity: product.stockQuantity - 2 });
+    ).toMatchObject({ stockAmount: product.stockAmount - 2 });
     expect(
       await prisma.cartReservation.findFirstOrThrow({ where: { cartId } }),
     ).toMatchObject({ orderId: created.id, status: 'CONSUMED' });
@@ -153,7 +153,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     const created = await orders.create(context, checkout, atMinutes(1));
     expect(created.items[0]).toMatchObject({
       lineTotalMinor: updated.priceMinor,
-      unitPriceMinor: updated.priceMinor,
+      priceMinor: updated.priceMinor,
     });
 
     await expect(
@@ -170,7 +170,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     const userId = await createUser('rollback@example.com');
     const { cartId, checkout } = await reservedCheckout(2);
     const before = await prisma.product.findUniqueOrThrow({
-      select: { stockQuantity: true },
+      select: { stockAmount: true },
       where: { slug: productSlug },
     });
     await postgres.query(`
@@ -206,7 +206,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     ).toMatchObject({ orderId: null, status: 'ACTIVE' });
     expect(
       await prisma.product.findUniqueOrThrow({ where: { slug: productSlug } }),
-    ).toMatchObject({ stockQuantity: before.stockQuantity });
+    ).toMatchObject({ stockAmount: before.stockAmount });
   });
 
   it('fails expired, hidden, mismatched and depleted carts without partial state', async () => {
@@ -223,12 +223,12 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
         return { checkout, now: atMinutes(1) };
       },
       (checkout: ReturnType<typeof checkoutBody>) => ({
-        checkout: { ...checkout, items: [{ productSlug, quantity: 2 }] },
+        checkout: { ...checkout, items: [{ productSlug, amount: 2 }] },
         now: atMinutes(1),
       }),
       async (checkout: ReturnType<typeof checkoutBody>) => {
         await prisma.product.update({
-          data: { stockQuantity: 0 },
+          data: { stockAmount: 0 },
           where: { slug: productSlug },
         });
         return { checkout, now: atMinutes(1) };
@@ -240,7 +240,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
       await prisma.order.deleteMany();
       await prisma.cart.deleteMany();
       await prisma.product.update({
-        data: { isActive: true, stockQuantity: 100 },
+        data: { isActive: true, stockAmount: 100 },
         where: { slug: productSlug },
       });
       const userId =
@@ -276,7 +276,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     const userId = await createUser('lock-expiry@example.com');
     const { cartId, checkout } = await reservedCheckout(1);
     const before = await prisma.product.findUniqueOrThrow({
-      select: { stockQuantity: true },
+      select: { stockAmount: true },
       where: { slug: productSlug },
     });
 
@@ -313,14 +313,14 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     ).toMatchObject({ orderId: null, status: 'ACTIVE' });
     expect(
       await prisma.product.findUniqueOrThrow({ where: { slug: productSlug } }),
-    ).toMatchObject({ stockQuantity: before.stockQuantity });
+    ).toMatchObject({ stockAmount: before.stockAmount });
   });
 
   it('coalesces concurrent same-cart retries into one order and stock decrement', async () => {
     const userId = await createUser('concurrent@example.com');
     const { cartId, checkout } = await reservedCheckout(3);
     const before = await prisma.product.findUniqueOrThrow({
-      select: { stockQuantity: true },
+      select: { stockAmount: true },
       where: { slug: productSlug },
     });
     const results = await Promise.all([
@@ -340,7 +340,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     expect(await prisma.order.count()).toBe(1);
     expect(
       await prisma.product.findUniqueOrThrow({ where: { slug: productSlug } }),
-    ).toMatchObject({ stockQuantity: before.stockQuantity - 3 });
+    ).toMatchObject({ stockAmount: before.stockAmount - 3 });
   });
 
   it('rejects an old-cart mutation already waiting when checkout commits', async () => {
@@ -349,7 +349,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     const capability = await carts.authenticate(rawCartToken, baseNow);
     if (!capability) throw new Error('Expected active cart capability');
     const before = await prisma.product.findUniqueOrThrow({
-      select: { stockQuantity: true },
+      select: { stockAmount: true },
       where: { slug: productSlug },
     });
     const advisoryKey = 2_026_082_602;
@@ -381,7 +381,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
         await waitForWaitingLock('advisory');
         mutation = carts.add(
           capability,
-          { productSlug, quantity: 1 },
+          { productSlug, amount: 1 },
           atMinutes(1),
         );
         await waitForWaitingLock('transactionid');
@@ -411,7 +411,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     ).toBe(0);
     expect(
       await prisma.product.findUniqueOrThrow({ where: { slug: productSlug } }),
-    ).toMatchObject({ stockQuantity: before.stockQuantity - 2 });
+    ).toMatchObject({ stockAmount: before.stockAmount - 2 });
   });
 
   it('finalizes paid Stripe only through the trusted service boundary', async () => {
@@ -529,7 +529,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
       .set('Cookie', [sessionCookie, cartCookie])
       .set('Origin', 'http://localhost:3000')
       .set('X-CSRF-Token', cartCsrf)
-      .send({ productSlug, quantity: 1 })
+      .send({ productSlug, amount: 1 })
       .expect(422);
     expect(
       await prisma.cartReservation.count({
@@ -541,7 +541,7 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
       .post('/api/v1/cart/items')
       .set('Cookie', sessionCookie)
       .set('Origin', 'http://localhost:3000')
-      .send({ productSlug, quantity: 1 })
+      .send({ productSlug, amount: 1 })
       .expect(200);
     const nextCartSetCookies = nextCart.headers['set-cookie'];
     expect(nextCartSetCookies).toHaveLength(1);
@@ -577,17 +577,14 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
     return user.id;
   }
 
-  async function reservedCheckout(quantity: number) {
-    const created = await carts.createAndAdd(
-      { productSlug, quantity },
-      baseNow,
-    );
+  async function reservedCheckout(amount: number) {
+    const created = await carts.createAndAdd({ productSlug, amount }, baseNow);
     const capability = await carts.authenticate(created.rawToken, baseNow);
     if (!capability) throw new Error('Expected active cart capability');
     return {
       cartExpiresAt: created.expiresAt,
       cartId: capability.cartId,
-      checkout: checkoutBody(quantity),
+      checkout: checkoutBody(amount),
       rawCartToken: created.rawToken,
     };
   }
@@ -605,11 +602,11 @@ describePostgres('O2 orders with disposable PostgreSQL', () => {
   }
 });
 
-function checkoutBody(quantity: number) {
+function checkoutBody(amount: number) {
   return {
     city: 'Portland',
     fullName: 'Ada Brewer',
-    items: [{ productSlug, quantity }],
+    items: [{ productSlug, amount }],
     paymentMethod: CheckoutPaymentMethod.CASH_ON_DELIVERY,
     phoneNumber: '+1 555 0100',
     shippingAddress: '10 Brewery Lane',

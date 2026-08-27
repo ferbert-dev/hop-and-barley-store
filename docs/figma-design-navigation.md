@@ -182,6 +182,24 @@ Page 1 (0:1)
 
 - Initial accordion state, review submission flow, authentication requirement, unavailable/out-of-stock state, and what opens after selecting the cart icon.
 
+**User-confirmed quantity extension — 2026-08-27**
+
+- Bulk ingredients are sold by weight. The storefront uses one kilogram input,
+  prices against an explicit 100 g basis, starts at 0.1 kg, and accepts direct
+  values aligned to 0.1 kg. The selected summary uses grams below 1 kg and
+  kilograms from 1 kg upward.
+- Packaged products remain an integer pack count. Show package net weight only
+  when catalog data supplies it; do not infer a pouch weight.
+- Recipe kits remain an integer kit count and show the aggregate batch yield for
+  the selected count in gallons and approximate litres.
+- Product details always keep the `Add to Cart` action. When the product already
+  has a cart line, another add increments that line by the newly selected amount
+  instead of replacing it. The product page does not show a separate `in cart`
+  quantity; line editing remains on the shopping-cart screen.
+- These controls extend the approved Figma visual language. They are a product
+  decision, not evidence that the additional labels or states were drawn in the
+  source frame.
+
 ### Added-to-cart quantity state — `added`
 
 [Open node `51:1944`](https://www.figma.com/design/H7jIUNYzAGc7o8R0iABQjy/Project-M4-1--Next.js--share-?node-id=51-1944)
@@ -193,7 +211,17 @@ Page 1 (0:1)
 
 **Unclear — ask the user**
 
-- Minimum/maximum quantity, zero behavior, disabled state, stock enforcement, update latency, and error feedback.
+- Zero behavior, disabled state, stock-conflict update latency, and error feedback.
+
+**User-confirmed quantity extension — 2026-08-27**
+
+- The displayed value is the physical amount, not a generic item count: for
+  example `200 g`, `10 kg`, `2 packs`, or `4 kits`.
+- Weight plus/minus and direct entry use the same 100 g lattice. Product sale
+  rules and current stock define the maximum.
+- The 2026-08-27 product decision supersedes this product-detail component
+  state: the detail page retains `Add to Cart` and does not render `1 in cart`.
+  Quantity editing is still available on the shopping-cart screen.
 
 ### Shopping cart — `cart`
 
@@ -209,6 +237,17 @@ Page 1 (0:1)
 **Unclear — ask the user**
 
 - Empty cart, removal undo/confirmation, stock conflicts, recalculation/loading/error behavior, taxes, shipping, discounts, and currency rules.
+
+**User-confirmed quantity extension — 2026-08-27**
+
+- Each line shows its sale kind, exact selected physical amount, price basis, and
+  server-calculated line total.
+- Weight input uses kilograms while the selected physical amount is formatted
+  in grams below 1 kg and kilograms from 1 kg upward. Package and kit lines use
+  integer counts. A kit line also shows aggregate yield, for example four
+  5-gallon kits as 20 gal and approximately 76 L.
+- The header badge counts distinct product lines. It never sums grams, packs,
+  and kits into one dimensionless number.
 
 ### Checkout — `checkout`
 

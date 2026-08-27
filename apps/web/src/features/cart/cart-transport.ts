@@ -2,6 +2,7 @@
 
 import { createApiClient, type components } from '@hop-and-barley/api-client';
 import { resolveBrowserApiUrl } from '../../lib/browser-api-url';
+import { readQuantityMetadata } from '../quantity/quantity-model';
 
 const DEFAULT_API_URL = 'http://localhost:3001';
 const CART_REQUEST_TIMEOUT_MS = 1_500;
@@ -15,12 +16,12 @@ export class CartTransportError extends Error {
 }
 
 export type CartTransport = Readonly<{
-  add(productSlug: string, quantity: number): Promise<Cart>;
+  add(productSlug: string, amount: number): Promise<Cart>;
   clear(): Promise<Cart>;
   load(): Promise<Cart>;
   recheck(): Promise<Cart>;
   remove(productSlug: string): Promise<Cart>;
-  update(productSlug: string, quantity: number): Promise<Cart>;
+  update(productSlug: string, amount: number): Promise<Cart>;
 }>;
 
 export function createBrowserCartTransport(
@@ -59,13 +60,13 @@ export function createBrowserCartTransport(
   });
 
   return {
-    async add(productSlug, quantity) {
+    async add(productSlug, amount) {
       const { client, origin } = requestContext();
       const csrfToken = await withCsrf(client);
       const { data, error, response } = await client.POST(
         '/api/v1/cart/items',
         {
-          body: { productSlug, quantity },
+          body: { amount, productSlug },
           params: {
             header: csrfToken
               ? mutationHeaders(origin, csrfToken)
@@ -122,13 +123,13 @@ export function createBrowserCartTransport(
       );
       return cartFromResponse(data, error, response);
     },
-    async update(productSlug, quantity) {
+    async update(productSlug, amount) {
       const { client, origin } = requestContext();
       const csrfToken = await requireCsrf(() => withCsrf(client));
       const { data, error, response } = await client.PATCH(
         '/api/v1/cart/items/{productSlug}',
         {
-          body: { quantity },
+          body: { amount },
           params: {
             header: mutationHeaders(origin, csrfToken),
             path: { productSlug },
@@ -184,7 +185,6 @@ function isCart(value: unknown): value is Cart {
   return (
     isNonNegativeSafeInteger(value.distinctItemCount) &&
     value.distinctItemCount === value.items.length &&
-    isNonNegativeSafeInteger(value.totalQuantity) &&
     isNonNegativeSafeInteger(value.subtotalMinor) &&
     typeof value.checkoutEligible === 'boolean' &&
     value.items.every(isCartItem)
@@ -205,9 +205,9 @@ function isCartItem(value: unknown) {
     typeof value.imagePath === 'string' &&
     value.imagePath.startsWith('/assets/products/') &&
     typeof value.priceQualifier === 'string' &&
-    isPositiveSafeInteger(value.quantity) &&
-    value.quantity <= 99 &&
-    isNullableNonNegativeSafeInteger(value.currentUnitPriceMinor) &&
+    isPositiveSafeInteger(value.amount) &&
+    readQuantityMetadata(value) !== null &&
+    isNullableNonNegativeSafeInteger(value.priceMinor) &&
     isNullableNonNegativeSafeInteger(value.lineTotalMinor) &&
     (value.availability === 'available' ||
       value.availability === 'unavailable') &&

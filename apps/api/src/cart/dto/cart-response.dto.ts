@@ -16,8 +16,66 @@ export class CartItemDto {
   @ApiProperty({ type: String })
   priceQualifier!: string;
 
-  @ApiProperty({ format: 'int32', maximum: 99, minimum: 1, type: 'integer' })
-  quantity!: number;
+  @ApiProperty({
+    format: 'int32',
+    maximum: 2_000_000_000,
+    minimum: 1,
+    type: 'integer',
+  })
+  amount!: number;
+
+  @ApiProperty({ enum: ['WEIGHT', 'PACKAGE', 'KIT'], type: String })
+  saleKind!: 'WEIGHT' | 'PACKAGE' | 'KIT';
+
+  @ApiProperty({ enum: ['MILLIGRAM', 'EACH'], type: String })
+  amountUnit!: 'MILLIGRAM' | 'EACH';
+
+  @ApiProperty({
+    format: 'int32',
+    maximum: 2_000_000_000,
+    minimum: 1,
+    type: 'integer',
+  })
+  priceBasisAmount!: number;
+
+  @ApiProperty({
+    format: 'int32',
+    maximum: 2_000_000_000,
+    minimum: 1,
+    type: 'integer',
+  })
+  minimumOrderAmount!: number;
+
+  @ApiProperty({
+    format: 'int32',
+    maximum: 2_000_000_000,
+    minimum: 1,
+    type: 'integer',
+  })
+  orderStepAmount!: number;
+
+  @ApiProperty({
+    format: 'int32',
+    maximum: 2_000_000_000,
+    minimum: 1,
+    nullable: true,
+    type: 'integer',
+  })
+  maximumOrderAmount!: number | null;
+
+  @ApiProperty({
+    format: 'int32',
+    maximum: 2_000_000_000,
+    minimum: 0,
+    type: 'integer',
+  })
+  stockAmount!: number;
+
+  @ApiProperty({ format: 'int32', minimum: 1, nullable: true, type: 'integer' })
+  packageNetWeightMg!: number | null;
+
+  @ApiProperty({ format: 'int32', minimum: 1, nullable: true, type: 'integer' })
+  kitYieldVolumeMl!: number | null;
 
   @ApiProperty({
     format: 'int32',
@@ -25,7 +83,7 @@ export class CartItemDto {
     nullable: true,
     type: 'integer',
   })
-  currentUnitPriceMinor!: number | null;
+  priceMinor!: number | null;
 
   @ApiProperty({
     format: 'int32',
@@ -61,9 +119,6 @@ export class CartDto {
 
   @ApiProperty({ format: 'int32', minimum: 0, type: 'integer' })
   distinctItemCount!: number;
-
-  @ApiProperty({ format: 'int32', minimum: 0, type: 'integer' })
-  totalQuantity!: number;
 
   @ApiProperty({ format: 'int32', minimum: 0, type: 'integer' })
   subtotalMinor!: number;

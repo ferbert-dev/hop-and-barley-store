@@ -1,0 +1,71 @@
+.form {
+  display: grid;
+  gap: var(--hb-space-3);
+  justify-items: start;
+  max-inline-size: 30rem;
+}
+
+.control {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hb-space-2);
+}
+
+.inputLabel,
+.unitLabel {
+  display: grid;
+  gap: var(--hb-space-1);
+  font-weight: 700;
+}
+
+.inputLabel input {
+  background: var(--hb-color-surface);
+  border: 1px solid var(--hb-color-border-strong);
+  border-radius: var(--hb-radius-md);
+  color: var(--hb-color-ink);
+  font: inherit;
+  min-block-size: 2.75rem;
+  padding-inline: var(--hb-space-3);
+}
+
+.inputLabel input {
+  inline-size: min(9rem, 35vw);
+}
+
+.unitLabel {
+  align-items: center;
+  min-block-size: 2.75rem;
+}
+
+.selectedAmount,
+.supportingText,
+.estimate,
+.error {
+  margin: 0;
+}
+
+.selectedAmount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.supportingText {
+  color: var(--hb-color-text-muted);
+}
+
+.estimate data {
+  font-weight: 700;
+}
+
+.error {
+  color: var(--hb-color-danger);
+  font-weight: 700;
+}
+
+@media (max-width: 30rem) {
+  .control > button {
+    min-inline-size: 2.75rem;
+    padding-inline: var(--hb-space-3);
+  }
+}

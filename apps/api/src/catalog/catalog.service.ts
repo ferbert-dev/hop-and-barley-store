@@ -9,16 +9,24 @@ import type {
 } from './dto/product-detail.dto';
 
 const productSelect = {
+  amountUnit: true,
   category: { select: { name: true, slug: true } },
   currency: true,
   description: true,
   id: true,
   imagePath: true,
+  kitYieldVolumeMl: true,
+  maximumOrderAmount: true,
+  minimumOrderAmount: true,
   name: true,
+  orderStepAmount: true,
+  packageNetWeightMg: true,
+  priceBasisAmount: true,
   priceMinor: true,
   priceQualifier: true,
+  saleKind: true,
   slug: true,
-  stockQuantity: true,
+  stockAmount: true,
   teaser: true,
 } satisfies Prisma.ProductSelect;
 
@@ -55,11 +63,14 @@ export class CatalogService {
 
     if (!product) throw new NotFoundException('Product not found');
 
-    const { specifications, stockQuantity, ...publicProduct } = product;
+    const { specifications, ...publicProduct } = product;
 
     return {
       ...publicProduct,
-      availability: stockQuantity > 0 ? 'in-stock' : 'out-of-stock',
+      availability:
+        product.stockAmount >= product.minimumOrderAmount
+          ? 'in-stock'
+          : 'out-of-stock',
       currency: 'USD',
       specifications: parseProductSpecifications(specifications),
     };
@@ -89,9 +100,12 @@ export class CatalogService {
       totalItems === 0 ? 0 : Math.min(200, Math.ceil(totalItems / query.limit));
 
     return {
-      items: products.map(({ stockQuantity, ...product }) => ({
+      items: products.map((product) => ({
         ...product,
-        availability: stockQuantity > 0 ? 'in-stock' : 'out-of-stock',
+        availability:
+          product.stockAmount >= product.minimumOrderAmount
+            ? 'in-stock'
+            : 'out-of-stock',
         currency: 'USD',
       })),
       meta: {

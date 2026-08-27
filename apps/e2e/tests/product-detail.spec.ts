@@ -66,7 +66,7 @@ test.describe('database-backed product details', () => {
         );
       specificationTermCount += await page.getByRole('term').count();
       await expect(
-        page.getByRole('button', { name: 'Add to Cart' }),
+        page.getByRole('button', { name: /^Add .+ to Cart$/ }),
       ).toHaveCount(1);
       await expect(page.getByRole('heading', { name: /reviews/i })).toHaveCount(
         0,
@@ -84,7 +84,7 @@ test.describe('database-backed product details', () => {
     await expect(page).toHaveTitle('Citra Hops | Hop & Barley');
     await expect(page.getByText('In stock')).toHaveCount(0);
     await expect(
-      page.getByRole('button', { name: 'Add to Cart' }),
+      page.getByRole('button', { name: /^Add .+ to Cart$/ }),
     ).toBeVisible();
     await expect(
       page.getByRole('main').getByText('US$5.99', { exact: true }).first(),
@@ -110,7 +110,7 @@ test.describe('database-backed product details', () => {
     ).toHaveAttribute('href', '/');
   });
 
-  test('adds as a guest, updates quantity, and preserves the cart after reload', async ({
+  test('adds repeatedly as a guest, accumulates the canonical amount, and keeps the same action', async ({
     page,
   }) => {
     await clearGuestCart(page);
@@ -122,33 +122,45 @@ test.describe('database-backed product details', () => {
           request.url().endsWith('/api/v1/cart/items') &&
           request.method() === 'POST',
       );
-      await page.getByRole('button', { name: 'Add to Cart' }).click();
+      await page.getByRole('button', { name: /^Add .+ to Cart$/ }).click();
       const request = await addRequest;
       expect(request.postDataJSON()).toEqual({
+        amount: 100_000,
         productSlug: 'mosaic-hops',
-        quantity: 1,
       });
-      await expect(
-        page.getByLabel('Quantity for Mosaic Hops').getByRole('status'),
-      ).toHaveText('1 in cart');
       await expect(
         page.getByRole('link', { name: 'Shopping cart, 1 item' }),
       ).toHaveAttribute('href', '/cart');
+      await expect(
+        page.getByRole('button', { name: 'Add Mosaic Hops to Cart' }),
+      ).toBeVisible();
+      await expect(page.getByText(/in cart/i)).toHaveCount(0);
 
       await page
-        .getByRole('button', { name: 'Increase Mosaic Hops quantity' })
+        .getByRole('button', { name: 'Increase weight amount' })
         .click();
+      const secondAddRequest = page.waitForRequest(
+        (candidate) =>
+          candidate.url().endsWith('/api/v1/cart/items') &&
+          candidate.method() === 'POST',
+      );
+      await page
+        .getByRole('button', { name: 'Add Mosaic Hops to Cart' })
+        .click();
+      expect((await secondAddRequest).postDataJSON()).toEqual({
+        amount: 200_000,
+        productSlug: 'mosaic-hops',
+      });
       await expect(
-        page.getByLabel('Quantity for Mosaic Hops').getByRole('status'),
-      ).toHaveText('2 in cart');
-      await expect(
-        page.getByRole('link', { name: 'Shopping cart, 2 items' }),
+        page.getByRole('link', { name: 'Shopping cart, 1 item' }),
       ).toBeVisible();
+      await expect(page.getByText(/in cart/i)).toHaveCount(0);
 
+      await page.getByRole('link', { name: 'Shopping cart, 1 item' }).click();
+      await expect(page).toHaveURL(/\/cart$/);
+      await expect(page.getByText(/300\s*g/i).first()).toBeVisible();
       await page.reload();
-      await expect(
-        page.getByLabel('Quantity for Mosaic Hops').getByRole('status'),
-      ).toHaveText('2 in cart');
+      await expect(page.getByText(/300\s*g/i).first()).toBeVisible();
     } finally {
       await clearGuestCart(page);
     }
@@ -208,14 +220,14 @@ test.describe('isolated product-detail states', () => {
     await expect(page).toHaveTitle('Citra Hops | Hop & Barley');
     await expect(page.getByText('Out of stock').first()).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Add to Cart' }).first(),
+      page.getByRole('button', { name: /^Add .+ to Cart$/ }).first(),
     ).toBeDisabled();
     await expect(
       page
         .locator('main [aria-live="polite"]')
         .filter({ hasText: 'Viewing Citra Hops' }),
     ).toHaveText('Viewing Citra Hops');
-    await expect(page.getByText(/stock quantity/i)).toHaveCount(0);
+    await expect(page.getByText(/stock (?:quantity|amount)/i)).toHaveCount(0);
 
     await page.goto(`${runtime.baseUrl}/product/missing-product`);
     await expect(page).toHaveTitle('Product not found | Hop & Barley');
@@ -357,7 +369,7 @@ test.describe('isolated product-detail states', () => {
       },
       {
         label: 'ready-in-stock add to cart',
-        target: () => page.getByRole('button', { name: 'Add to Cart' }),
+        target: () => page.getByRole('button', { name: /^Add .+ to Cart$/ }),
         url: `${runtime.baseUrl}/product/mosaic-hops`,
       },
       {
@@ -610,7 +622,6 @@ async function interceptEmptyCart(page: Page) {
           items: [],
           serverNow: new Date().toISOString(),
           subtotalMinor: 0,
-          totalQuantity: 0,
         }),
         contentType: 'application/json',
         headers: {

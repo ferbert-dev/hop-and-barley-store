@@ -84,10 +84,31 @@ docker exec --interactive "$container_name" psql \
   --set ON_ERROR_STOP=1 --username "$database_user" --dbname verified_o2 \
   < "$migration_path"
 
-verified_database_url=$(database_url verified_o2)
-DATABASE_URL="$verified_database_url" pnpm --dir "$repo_root" \
+stage_shape=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname verified_o2 \
+  --command "
+    SELECT
+      to_regclass('public.\"Order\"') IS NOT NULL,
+      to_regclass('public.\"OrderItem\"') IS NOT NULL,
+      EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'OrderItem'
+          AND column_name = 'quantity'
+      ),
+      EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'OrderItem_amounts_check'
+      );
+  ")
+test "$stage_shape" = 't|t|t|t'
+
+docker exec "$container_name" createdb -U "$database_user" runtime_o2
+runtime_database_url=$(database_url runtime_o2)
+DATABASE_URL="$runtime_database_url" pnpm --dir "$repo_root" \
+  --filter @hop-and-barley/api db:migrate:deploy
+DATABASE_URL="$runtime_database_url" pnpm --dir "$repo_root" \
   --filter @hop-and-barley/api db:seed
-RUN_O2_POSTGRES_INTEGRATION=1 DATABASE_URL="$verified_database_url" \
+RUN_O2_POSTGRES_INTEGRATION=1 DATABASE_URL="$runtime_database_url" \
   NODE_OPTIONS='--experimental-vm-modules' \
   pnpm --dir "$repo_root" --filter @hop-and-barley/api test:e2e \
   --testPathPatterns=o2-postgres

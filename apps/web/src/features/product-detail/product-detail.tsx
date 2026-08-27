@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { Price } from '../../components/ui/price';
 import { productAssetsBySlug } from '../../design-system/assets';
+import { formatSaleUnit } from '../quantity/quantity-model';
 import type { ProductDetailProduct } from '../../lib/product-detail';
 import { ProductCartControl } from './product-cart-control';
 import styles from './product-detail.module.css';
@@ -56,7 +57,7 @@ export function ProductDetail({ product }: { product: ProductDetailProduct }) {
               currency="USD"
               minorUnits={product.priceMinor}
             />
-            <span className={styles.qualifier}>{product.priceQualifier}</span>
+            <span className={styles.qualifier}>{formatSaleUnit(product)}</span>
           </div>
           <div aria-label="Product description" className={styles.description}>
             {paragraphs.map((paragraph, index) => (
@@ -67,6 +68,8 @@ export function ProductDetail({ product }: { product: ProductDetailProduct }) {
             availability={product.availability}
             productName={product.name}
             productSlug={product.slug}
+            priceMinor={product.priceMinor}
+            quantityMetadata={product}
           />
         </div>
       </div>

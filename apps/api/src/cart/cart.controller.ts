@@ -124,7 +124,7 @@ export class CartController {
   @ApiOperation({
     description:
       'With no configured cart cookie, exact Origin bootstraps the first cart after validation succeeds. Any presented cart cookie disables bootstrap and requires a valid cart-bound CSRF token.',
-    summary: 'Add a product quantity to the guest cart',
+    summary: 'Add a sellable product amount to the guest cart',
   })
   @ApiBody({ required: true, type: AddCartItemDto })
   @ApiHeader({ name: 'Origin', required: true, schema: { type: 'string' } })
@@ -153,7 +153,7 @@ export class CartController {
   @ApiForbiddenResponse({ description: 'Origin or CSRF is not valid' })
   @ApiUnsupportedMediaTypeResponse({ description: 'JSON body required' })
   @ApiUnprocessableEntityResponse({
-    description: 'Product, stock, quantity or line limit is unavailable',
+    description: 'Product, stock, amount or line limit is unavailable',
   })
   async add(
     @Body() dto: AddCartItemDto,

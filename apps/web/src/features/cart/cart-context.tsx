@@ -29,11 +29,11 @@ export type CartPendingOperation =
   | Readonly<{
       kind: 'update';
       productSlug: string;
-      quantity: number;
+      amount: number;
     }>;
 
 export type CartContextValue = Readonly<{
-  add(productSlug: string, quantity: number): Promise<void>;
+  add(productSlug: string, amount: number): Promise<void>;
   clear(): Promise<void>;
   ensureLoaded(): Promise<void>;
   items: Cart['items'];
@@ -43,7 +43,7 @@ export type CartContextValue = Readonly<{
   remove(productSlug: string): Promise<void>;
   state: CartState;
   totalsAreRefreshing: boolean;
-  update(productSlug: string, quantity: number): Promise<void>;
+  update(productSlug: string, amount: number): Promise<void>;
 }>;
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -147,8 +147,8 @@ export function CartProvider({
 
   const value = useMemo<CartContextValue>(
     () => ({
-      add: (productSlug, quantity) =>
-        mutate({ kind: 'add' }, () => transport.add(productSlug, quantity)),
+      add: (productSlug, amount) =>
+        mutate({ kind: 'add' }, () => transport.add(productSlug, amount)),
       clear: () => mutate({ kind: 'clear' }, () => transport.clear()),
       ensureLoaded,
       items: projectItems(state, pending),
@@ -161,9 +161,9 @@ export function CartProvider({
         ),
       state,
       totalsAreRefreshing: state.kind === 'ready' && pending !== null,
-      update: (productSlug, quantity) =>
-        mutate({ kind: 'update', productSlug, quantity }, () =>
-          transport.update(productSlug, quantity),
+      update: (productSlug, amount) =>
+        mutate({ kind: 'update', productSlug, amount }, () =>
+          transport.update(productSlug, amount),
         ),
     }),
     [ensureLoaded, mutate, pending, refresh, state, transport],
@@ -196,7 +196,7 @@ function projectItems(
   }
   return state.cart.items.map((item) =>
     item.productSlug === pending.productSlug
-      ? { ...item, quantity: pending.quantity }
+      ? { ...item, amount: pending.amount }
       : item,
   );
 }

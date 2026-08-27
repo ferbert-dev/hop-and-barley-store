@@ -22,21 +22,29 @@ const cart: Cart = {
   items: [
     {
       availability: 'available',
-      currentUnitPriceMinor: 599,
+      priceMinor: 599,
       imagePath: '/assets/products/citra-hops.webp',
+      kitYieldVolumeMl: null,
       lineTotalMinor: 599,
+      maximumOrderAmount: 100_000_000,
+      minimumOrderAmount: 100_000,
       name: 'Citra Hops',
+      orderStepAmount: 100_000,
+      packageNetWeightMg: null,
+      priceBasisAmount: 100_000,
       priceQualifier: 'per 100g',
       productId: '10000000-0000-4000-8000-000000000001',
       productSlug: 'citra-hops',
-      quantity: 1,
+      amount: 100_000,
       reservationExpiresAt: '2026-08-25T12:15:00.000Z',
       reservationStatus: 'active',
+      saleKind: 'WEIGHT',
+      stockAmount: 100_000_000,
+      amountUnit: 'MILLIGRAM',
     },
   ],
   serverNow: '2026-08-25T12:00:00.000Z',
   subtotalMinor: 599,
-  totalQuantity: 1,
 };
 
 const routeStates: readonly (readonly [string, CartState])[] = [
@@ -51,7 +59,6 @@ const routeStates: readonly (readonly [string, CartState])[] = [
         distinctItemCount: 0,
         items: [],
         subtotalMinor: 0,
-        totalQuantity: 0,
       },
       kind: 'ready',
     },
@@ -76,7 +83,7 @@ describe('CartScreen', () => {
   it('uses the confirmed cart labels and keeps checkout as a bounded handoff', () => {
     render(<CartScreen initialState={{ cart, kind: 'ready' }} />);
 
-    expect(screen.getByText('1 in cart')).toBeVisible();
+    expect(screen.getByText('100g selected')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Clear cart' })).toBeVisible();
     expect(
       screen.getByRole('button', { name: 'Remove Citra Hops from cart' }),
@@ -138,10 +145,10 @@ describe('CartScreen', () => {
       screen.getByText('Recheck availability before checkout.'),
     ).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Decrease Citra Hops quantity' }),
+      screen.getByRole('button', { name: 'Decrease weight amount' }),
     ).toBeDisabled();
     expect(
-      screen.getByRole('button', { name: 'Increase Citra Hops quantity' }),
+      screen.getByRole('button', { name: 'Increase weight amount' }),
     ).toBeDisabled();
   });
 
@@ -165,7 +172,7 @@ describe('CartScreen', () => {
         {
           ...expiredCart.items[0],
           availability: 'unavailable',
-          currentUnitPriceMinor: null,
+          priceMinor: null,
           lineTotalMinor: null,
           reservationExpiresAt: null,
           reservationStatus: 'unreserved',
@@ -206,9 +213,8 @@ describe('CartScreen', () => {
     let resolveUpdate: ((value: Cart) => void) | undefined;
     const updatedCart: Cart = {
       ...cart,
-      items: [{ ...cart.items[0], lineTotalMinor: 1198, quantity: 2 }],
+      items: [{ ...cart.items[0], lineTotalMinor: 1198, amount: 200_000 }],
       subtotalMinor: 1198,
-      totalQuantity: 2,
     };
     const transport = createTransport(cart, {
       update: () =>
@@ -222,10 +228,9 @@ describe('CartScreen', () => {
       </CartProvider>,
     );
 
-    await screen.findByRole('button', { name: 'Increase Citra Hops quantity' });
-    await user.click(
-      screen.getByRole('button', { name: 'Increase Citra Hops quantity' }),
-    );
+    await user.clear(await screen.findByLabelText('Quantity'));
+    await user.type(screen.getByLabelText('Quantity'), '0.2');
+    await user.click(screen.getByRole('button', { name: 'Update Citra Hops' }));
 
     expect(
       screen.getByText('Line total updating from the store…'),
@@ -236,7 +241,7 @@ describe('CartScreen', () => {
       resolveUpdate?.(updatedCart);
     });
 
-    expect(screen.getByText('2 in cart')).toBeVisible();
+    expect(screen.getByText('200g selected')).toBeVisible();
     expect(
       screen.queryByText('Updating from the store…'),
     ).not.toBeInTheDocument();

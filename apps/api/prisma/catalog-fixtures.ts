@@ -28,18 +28,26 @@ export type CatalogCategoryFixture = {
 };
 
 export type CatalogProductFixture = {
+  amountUnit: 'EACH' | 'MILLIGRAM';
   categorySlug: CatalogCategorySlug;
   currency: 'USD';
   description: string;
   id: string;
   imagePath: `/assets/products/${string}.webp`;
   isActive: true;
+  kitYieldVolumeMl: number | null;
+  maximumOrderAmount: number | null;
+  minimumOrderAmount: number;
   name: string;
+  orderStepAmount: number;
+  packageNetWeightMg: number | null;
+  priceBasisAmount: number;
   priceMinor: number;
   priceQualifier: string;
+  saleKind: 'KIT' | 'PACKAGE' | 'WEIGHT';
   slug: CatalogProductSlug;
   specifications: CatalogSpecification[];
-  stockQuantity: 100;
+  stockAmount: number;
   teaser: string;
 };
 
@@ -117,8 +125,8 @@ export const catalogProducts: CatalogProductFixture[] = [
     id: '20000000-0000-4000-8000-000000000002',
     imagePath: '/assets/products/maris-otter-malt.webp',
     name: 'Maris Otter Pale Malt',
-    priceMinor: 250,
-    priceQualifier: 'per 1 lb',
+    priceMinor: 55,
+    priceQualifier: 'per 100g',
     slug: 'maris-otter-malt',
     specifications: [
       { label: 'Origin', value: 'United Kingdom' },
@@ -208,8 +216,8 @@ export const catalogProducts: CatalogProductFixture[] = [
     id: '20000000-0000-4000-8000-000000000005',
     imagePath: '/assets/products/caramel-malt.webp',
     name: 'Caramel Malt 60L',
-    priceMinor: 300,
-    priceQualifier: 'per 1 lb',
+    priceMinor: 66,
+    priceQualifier: 'per 100g',
     slug: 'caramel-malt',
     specifications: [
       { label: 'Origin', value: 'USA / Belgium' },
@@ -271,8 +279,8 @@ export const catalogProducts: CatalogProductFixture[] = [
     id: '20000000-0000-4000-8000-000000000007',
     imagePath: '/assets/products/pilsner-malt.webp',
     name: 'Pilsner Malt',
-    priceMinor: 220,
-    priceQualifier: 'per 1 lb',
+    priceMinor: 49,
+    priceQualifier: 'per 100g',
     slug: 'pilsner-malt',
     specifications: [
       { label: 'Origin', value: 'Germany / Belgium' },
@@ -432,8 +440,8 @@ export const catalogProducts: CatalogProductFixture[] = [
     id: '20000000-0000-4000-8000-000000000012',
     imagePath: '/assets/products/unmalted-wheat.webp',
     name: 'Unmalted Wheat',
-    priceMinor: 180,
-    priceQualifier: 'per 1 lb',
+    priceMinor: 40,
+    priceQualifier: 'per 100g',
     slug: 'unmalted-wheat',
     specifications: [
       { label: 'Origin', value: 'Belgium / USA' },
@@ -465,14 +473,92 @@ export const catalogProducts: CatalogProductFixture[] = [
 function defineProduct(
   input: Omit<
     CatalogProductFixture,
-    'currency' | 'description' | 'isActive' | 'stockQuantity'
+    | 'amountUnit'
+    | 'currency'
+    | 'description'
+    | 'isActive'
+    | 'kitYieldVolumeMl'
+    | 'maximumOrderAmount'
+    | 'minimumOrderAmount'
+    | 'orderStepAmount'
+    | 'packageNetWeightMg'
+    | 'priceBasisAmount'
+    | 'saleKind'
+    | 'stockAmount'
   > & { description: [string, string, string] },
 ): CatalogProductFixture {
   return {
     ...input,
+    ...saleRulesFor(input.slug),
     currency: 'USD',
     description: input.description.join('\n\n'),
     isActive: true,
-    stockQuantity: 100,
+  };
+}
+
+type CatalogSaleRules = Pick<
+  CatalogProductFixture,
+  | 'amountUnit'
+  | 'kitYieldVolumeMl'
+  | 'maximumOrderAmount'
+  | 'minimumOrderAmount'
+  | 'orderStepAmount'
+  | 'packageNetWeightMg'
+  | 'priceBasisAmount'
+  | 'saleKind'
+  | 'stockAmount'
+>;
+
+function saleRulesFor(slug: CatalogProductSlug): CatalogSaleRules {
+  if (
+    [
+      'caramel-malt',
+      'cascade-hops',
+      'centennial-hops',
+      'citra-hops',
+      'maris-otter-malt',
+      'mosaic-hops',
+      'pilsner-malt',
+      'saaz-hops',
+      'unmalted-wheat',
+    ].includes(slug)
+  ) {
+    return {
+      amountUnit: 'MILLIGRAM',
+      kitYieldVolumeMl: null,
+      maximumOrderAmount: null,
+      minimumOrderAmount: 100_000,
+      orderStepAmount: 100_000,
+      packageNetWeightMg: null,
+      priceBasisAmount: 100_000,
+      saleKind: 'WEIGHT',
+      stockAmount: 100_000_000,
+    };
+  }
+
+  if (slug === 'west-coast-ipa-kit') {
+    return {
+      amountUnit: 'EACH',
+      kitYieldVolumeMl: 18_927,
+      maximumOrderAmount: null,
+      minimumOrderAmount: 1,
+      orderStepAmount: 1,
+      packageNetWeightMg: null,
+      priceBasisAmount: 1,
+      saleKind: 'KIT',
+      stockAmount: 100,
+    };
+  }
+
+  return {
+    amountUnit: 'EACH',
+    kitYieldVolumeMl: null,
+    maximumOrderAmount: null,
+    minimumOrderAmount: 1,
+    orderStepAmount: 1,
+    packageNetWeightMg: slug === 'safale-us05-yeast' ? 11_500 : null,
+    priceBasisAmount: 1,
+    saleKind: 'PACKAGE',
+    stockAmount: 100,
   };
 }
