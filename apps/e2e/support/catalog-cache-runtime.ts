@@ -352,6 +352,7 @@ function respondWithProductDetail(slug: string, response: ServerResponse) {
   }
 
   const product = {
+    amountUnit: 'MILLIGRAM',
     availability: slug === 'citra-hops' ? 'out-of-stock' : 'in-stock',
     category: { name: 'Hops', slug: 'hops' },
     currency: 'USD',
@@ -362,15 +363,23 @@ function respondWithProductDetail(slug: string, response: ServerResponse) {
         ? '20000000-0000-4000-8000-000000000001'
         : '20000000-0000-4000-8000-000000000003',
     imagePath: `/assets/products/${slug}.webp`,
+    kitYieldVolumeMl: null,
+    maximumOrderAmount: null,
+    minimumOrderAmount: 100_000,
     name: slug === 'citra-hops' ? 'Citra Hops' : 'Mosaic Hops',
+    orderStepAmount: 5_000,
+    packageNetWeightMg: null,
+    priceBasisAmount: 100_000,
     priceMinor: slug === 'citra-hops' ? 599 : 689,
     priceQualifier: 'per 100g',
+    saleKind: 'WEIGHT',
     slug,
     specifications: [
       { label: 'Origin', value: 'USA' },
       { label: 'Uses', value: ['Late additions', 'Dry hopping'] },
     ],
     teaser: 'Runtime-backed product detail',
+    stockAmount: 100_000_000,
   };
 
   const send = () => {

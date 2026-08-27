@@ -1,6 +1,7 @@
 import { createApiClient, type components } from '@hop-and-barley/api-client';
 import { cache } from 'react';
 
+import { readQuantityMetadata } from '../features/quantity/quantity-model';
 import { resolveApiOrigin } from './catalog';
 
 const DEFAULT_API_URL = 'http://127.0.0.1:3001/api/v1';
@@ -76,6 +77,7 @@ function normalizeProductDetail(value: unknown): ProductDetailProduct {
     specifications,
     teaser,
   } = value;
+  const quantityMetadata = readQuantityMetadata(value);
 
   if (
     !isNonEmptyString(id) ||
@@ -93,7 +95,8 @@ function normalizeProductDetail(value: unknown): ProductDetailProduct {
     !isCategory(category) ||
     !Array.isArray(specifications) ||
     specifications.length === 0 ||
-    !specifications.every(isSpecification)
+    !specifications.every(isSpecification) ||
+    quantityMetadata === null
   ) {
     throw new TypeError('Invalid product detail response');
   }
@@ -118,6 +121,7 @@ function normalizeProductDetail(value: unknown): ProductDetailProduct {
       }),
     ),
     teaser,
+    ...quantityMetadata,
   };
 }
 

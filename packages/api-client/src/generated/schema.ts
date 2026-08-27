@@ -134,7 +134,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Add a product quantity to the guest cart
+         * Add a sellable product amount to the guest cart
          * @description With no configured cart cookie, exact Origin bootstraps the first cart after validation succeeds. Any presented cart cookie disables bootstrap and requires a valid cart-bound CSRF token.
          */
         post: operations["CartController_add"];
@@ -287,6 +287,24 @@ export interface components {
              */
             priceMinor: number;
             /** @enum {string} */
+            saleKind: "WEIGHT" | "PACKAGE" | "KIT";
+            /** @enum {string} */
+            amountUnit: "MILLIGRAM" | "EACH";
+            /** Format: int32 */
+            priceBasisAmount: number;
+            /** Format: int32 */
+            minimumOrderAmount: number;
+            /** Format: int32 */
+            orderStepAmount: number;
+            /** Format: int32 */
+            maximumOrderAmount: number | null;
+            /** Format: int32 */
+            stockAmount: number;
+            /** Format: int32 */
+            packageNetWeightMg: number | null;
+            /** Format: int32 */
+            kitYieldVolumeMl: number | null;
+            /** @enum {string} */
             currency: "USD";
             teaser: string;
             priceQualifier: string;
@@ -346,6 +364,24 @@ export interface components {
              */
             priceMinor: number;
             /** @enum {string} */
+            saleKind: "WEIGHT" | "PACKAGE" | "KIT";
+            /** @enum {string} */
+            amountUnit: "MILLIGRAM" | "EACH";
+            /** Format: int32 */
+            priceBasisAmount: number;
+            /** Format: int32 */
+            minimumOrderAmount: number;
+            /** Format: int32 */
+            orderStepAmount: number;
+            /** Format: int32 */
+            maximumOrderAmount: number | null;
+            /** Format: int32 */
+            stockAmount: number;
+            /** Format: int32 */
+            packageNetWeightMg: number | null;
+            /** Format: int32 */
+            kitYieldVolumeMl: number | null;
+            /** @enum {string} */
             currency: "USD";
             teaser: string;
             priceQualifier: string;
@@ -364,9 +400,27 @@ export interface components {
             imagePath: string;
             priceQualifier: string;
             /** Format: int32 */
-            quantity: number;
+            amount: number;
+            /** @enum {string} */
+            saleKind: "WEIGHT" | "PACKAGE" | "KIT";
+            /** @enum {string} */
+            amountUnit: "MILLIGRAM" | "EACH";
             /** Format: int32 */
-            currentUnitPriceMinor: number | null;
+            priceBasisAmount: number;
+            /** Format: int32 */
+            minimumOrderAmount: number;
+            /** Format: int32 */
+            orderStepAmount: number;
+            /** Format: int32 */
+            maximumOrderAmount: number | null;
+            /** Format: int32 */
+            stockAmount: number;
+            /** Format: int32 */
+            packageNetWeightMg: number | null;
+            /** Format: int32 */
+            kitYieldVolumeMl: number | null;
+            /** Format: int32 */
+            priceMinor: number | null;
             /** Format: int32 */
             lineTotalMinor: number | null;
             /** @enum {string} */
@@ -383,8 +437,6 @@ export interface components {
             /** Format: int32 */
             distinctItemCount: number;
             /** Format: int32 */
-            totalQuantity: number;
-            /** Format: int32 */
             subtotalMinor: number;
             checkoutEligible: boolean;
             /** Format: date-time */
@@ -397,11 +449,11 @@ export interface components {
         AddCartItemDto: {
             productSlug: string;
             /** Format: int32 */
-            quantity: number;
+            amount: number;
         };
         UpdateCartItemDto: {
             /** Format: int32 */
-            quantity: number;
+            amount: number;
         };
         RegisterDto: {
             /**
@@ -459,7 +511,7 @@ export interface components {
         CreateOrderItemDto: {
             productSlug: string;
             /** Format: int32 */
-            quantity: number;
+            amount: number;
         };
         CreateOrderDto: {
             fullName: string;
@@ -475,9 +527,15 @@ export interface components {
             productName: string;
             priceQualifier: string;
             /** Format: int32 */
-            unitPriceMinor: number;
+            priceMinor: number;
+            /** @enum {string} */
+            saleKind: "WEIGHT" | "PACKAGE" | "KIT";
+            /** @enum {string} */
+            amountUnit: "MILLIGRAM" | "EACH";
             /** Format: int32 */
-            quantity: number;
+            priceBasisAmount: number;
+            /** Format: int32 */
+            amount: number;
             /** Format: int32 */
             lineTotalMinor: number;
         };
@@ -873,7 +931,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Product, stock, quantity or line limit is unavailable */
+            /** @description Product, stock, amount or line limit is unavailable */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1299,7 +1357,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Cart, reservation, product, quantity, stock or payment method is unavailable */
+            /** @description Cart, reservation, product, amount, stock or payment method is unavailable */
             422: {
                 headers: {
                     [name: string]: unknown;

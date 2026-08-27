@@ -27,10 +27,19 @@ const product = {
   description: 'First paragraph.\n\nSecond paragraph.\n\nThird paragraph.',
   id: '20000000-0000-4000-8000-000000000001',
   imagePath: '/assets/products/citra-hops.webp',
+  kitYieldVolumeMl: null,
+  maximumOrderAmount: 100_000_000,
+  minimumOrderAmount: 100_000,
   name: 'Citra Hops',
+  orderStepAmount: 5_000,
+  packageNetWeightMg: null,
+  priceBasisAmount: 100_000,
   priceMinor: 599,
   priceQualifier: 'per 100g',
   slug: 'citra-hops',
+  saleKind: 'WEIGHT' as const,
+  stockAmount: 100_000_000,
+  amountUnit: 'MILLIGRAM' as const,
   specifications: [
     { label: 'Origin', value: 'USA' },
     { label: 'Uses', value: ['Late additions', 'Dry hopping'] },
@@ -46,7 +55,6 @@ const emptyCart: Cart = {
   items: [],
   serverNow: '2026-08-25T10:00:00.000Z',
   subtotalMinor: 0,
-  totalQuantity: 0,
 };
 
 function createTransport(): CartTransport {
@@ -76,7 +84,7 @@ describe('ProductDetail', () => {
     renderProductDetail();
 
     expect(screen.getByRole('heading', { name: 'Citra Hops' })).toBeVisible();
-    expect(screen.getByText('US$5.99')).toBeVisible();
+    expect(screen.getAllByText('US$5.99')).not.toHaveLength(0);
     expect(screen.getByText('per 100g')).toBeVisible();
     expect(screen.getByText('Viewing Citra Hops')).toHaveAttribute(
       'aria-live',
@@ -108,7 +116,7 @@ describe('ProductDetail', () => {
     expect(specifications).toBeVisible();
     expect(specifications.parentElement).toHaveAttribute('open', '');
     expect(
-      await screen.findByRole('button', { name: 'Add to Cart' }),
+      await screen.findByRole('button', { name: 'Add Citra Hops to Cart' }),
     ).toBeEnabled();
     expect(screen.queryByRole('heading', { name: /reviews/i })).toBeNull();
   });
@@ -125,7 +133,9 @@ describe('ProductDetail', () => {
       </CartProvider>,
     );
     expect(await screen.findByText('Out of stock')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Add to Cart' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
+    ).toBeDisabled();
     expect(screen.getByText('Viewing Citra Hops')).toHaveAttribute(
       'aria-live',
       'polite',

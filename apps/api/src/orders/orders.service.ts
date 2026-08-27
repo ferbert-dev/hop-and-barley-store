@@ -22,9 +22,13 @@ import {
 } from './dto/create-order.dto';
 import type { OrderDto } from './dto/order-response.dto';
 import { runOrderSerializable } from './order-transaction';
+import {
+  addMoneyMinor,
+  calculateLineTotalMinor,
+  isValidOrderAmount,
+} from '../catalog/product-amount';
 
 const SHIPPING_MINOR = 500;
-const MAX_INT32 = 2_147_483_647;
 const UNAVAILABLE = Object.freeze({ status: 'unavailable' as const });
 const PAYMENT_UNAVAILABLE = Object.freeze({
   status: 'payment-unavailable' as const,
@@ -43,12 +47,15 @@ const orderSelect = {
   items: {
     orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
     select: {
+      amount: true,
+      amountUnit: true,
       lineTotalMinor: true,
+      priceBasisAmount: true,
+      priceMinor: true,
       priceQualifier: true,
       productName: true,
       productSlug: true,
-      quantity: true,
-      unitPriceMinor: true,
+      saleKind: true,
     },
   },
   paidAt: true,
@@ -69,7 +76,7 @@ type StoredOrder = Prisma.OrderGetPayload<{ select: typeof orderSelect }>;
 type CanonicalCheckout = Readonly<{
   city: string;
   fullName: string;
-  items: ReadonlyArray<Readonly<{ productSlug: string; quantity: number }>>;
+  items: ReadonlyArray<Readonly<{ productSlug: string; amount: number }>>;
   paymentMethod: CheckoutPaymentMethod;
   phoneNumber: string;
   shippingAddress: string;
@@ -217,42 +224,60 @@ export class OrdersService {
                 expiresAt: true,
                 id: true,
                 productId: true,
-                quantity: true,
+                amount: true,
                 status: true,
               },
             },
             id: true,
             product: {
               select: {
+                amountUnit: true,
                 currency: true,
                 id: true,
                 isActive: true,
+                maximumOrderAmount: true,
+                minimumOrderAmount: true,
                 name: true,
+                orderStepAmount: true,
+                priceBasisAmount: true,
                 priceMinor: true,
                 priceQualifier: true,
+                saleKind: true,
                 slug: true,
               },
             },
-            quantity: true,
+            amount: true,
           },
           where: { cartId: context.cartId },
         });
         requireMatchingCheckout(lines, checkout, context.cartId, now);
 
-        const itemSubtotalMinor = lines.reduce((subtotal, line) => {
-          const lineTotal = line.product.priceMinor * line.quantity;
-          if (!Number.isSafeInteger(lineTotal) || lineTotal > MAX_INT32) {
+        const pricedLines = lines.map((line) => {
+          try {
+            return {
+              ...line,
+              lineTotalMinor: calculateLineTotalMinor(
+                line.product.priceMinor,
+                line.amount,
+                line.product.priceBasisAmount,
+              ),
+            };
+          } catch {
             unavailable();
           }
-          const next = subtotal + lineTotal;
-          if (
-            !Number.isSafeInteger(next) ||
-            next > MAX_INT32 - SHIPPING_MINOR
-          ) {
-            unavailable();
+        });
+        let itemSubtotalMinor = 0;
+        try {
+          for (const line of pricedLines) {
+            itemSubtotalMinor = addMoneyMinor(
+              itemSubtotalMinor,
+              line.lineTotalMinor,
+            );
           }
-          return next;
-        }, 0);
+          addMoneyMinor(itemSubtotalMinor, SHIPPING_MINOR);
+        } catch {
+          unavailable();
+        }
         const reservationIds = lines.map((line) =>
           requiredReservationId(line.currentReservation?.id),
         );
@@ -266,14 +291,17 @@ export class OrdersService {
             idempotencyKey: context.idempotencyKey,
             itemSubtotalMinor,
             items: {
-              create: lines.map((line) => ({
-                lineTotalMinor: line.product.priceMinor * line.quantity,
+              create: pricedLines.map((line) => ({
+                amount: line.amount,
+                amountUnit: line.product.amountUnit,
+                lineTotalMinor: line.lineTotalMinor,
+                priceBasisAmount: line.product.priceBasisAmount,
+                priceMinor: line.product.priceMinor,
                 priceQualifier: line.product.priceQualifier,
                 productId: line.product.id,
                 productName: line.product.name,
                 productSlug: line.product.slug,
-                quantity: line.quantity,
-                unitPriceMinor: line.product.priceMinor,
+                saleKind: line.product.saleKind,
               })),
             },
             paidAt: payment.paidAt,
@@ -319,20 +347,26 @@ type CheckoutLine = Readonly<{
     expiresAt: Date;
     id: string;
     productId: string;
-    quantity: number;
+    amount: number;
     status: string;
   }> | null;
   id: string;
   product: Readonly<{
+    amountUnit: 'EACH' | 'MILLIGRAM';
     currency: string;
     id: string;
     isActive: boolean;
+    maximumOrderAmount: number | null;
+    minimumOrderAmount: number;
     name: string;
+    orderStepAmount: number;
+    priceBasisAmount: number;
     priceMinor: number;
     priceQualifier: string;
+    saleKind: 'KIT' | 'PACKAGE' | 'WEIGHT';
     slug: string;
   }>;
-  quantity: number;
+  amount: number;
 }>;
 
 function requireMatchingCheckout(
@@ -342,7 +376,7 @@ function requireMatchingCheckout(
   now: Date,
 ): void {
   const requested = new Map(
-    checkout.items.map(({ productSlug, quantity }) => [productSlug, quantity]),
+    checkout.items.map(({ productSlug, amount }) => [productSlug, amount]),
   );
   if (
     requested.size !== checkout.items.length ||
@@ -353,14 +387,15 @@ function requireMatchingCheckout(
   for (const line of lines) {
     const reservation = line.currentReservation;
     if (
-      requested.get(line.product.slug) !== line.quantity ||
+      requested.get(line.product.slug) !== line.amount ||
       !line.product.isActive ||
       line.product.currency !== 'USD' ||
       line.product.priceMinor < 0 ||
+      !isValidOrderAmount(line.amount, line.product) ||
       !reservation ||
       reservation.cartId !== cartId ||
       reservation.productId !== line.product.id ||
-      reservation.quantity !== line.quantity ||
+      reservation.amount !== line.amount ||
       reservation.status !== 'ACTIVE' ||
       reservation.expiresAt.getTime() <= now.getTime()
     ) {
@@ -407,7 +442,7 @@ function canonicalCheckout(checkout: CreateOrderDto): CanonicalCheckout {
     city: checkout.city.trim(),
     fullName: checkout.fullName.trim(),
     items: checkout.items
-      .map(({ productSlug, quantity }) => ({ productSlug, quantity }))
+      .map(({ productSlug, amount }) => ({ productSlug, amount }))
       .sort((left, right) => left.productSlug.localeCompare(right.productSlug)),
     paymentMethod: checkout.paymentMethod,
     phoneNumber: checkout.phoneNumber.trim(),

@@ -14,21 +14,29 @@ const initialCart: Cart = {
   items: [
     {
       availability: 'available' as const,
-      currentUnitPriceMinor: 599,
+      priceMinor: 599,
       imagePath: '/assets/products/citra-hops.webp',
+      kitYieldVolumeMl: null,
       lineTotalMinor: 599,
+      maximumOrderAmount: 100_000_000,
+      minimumOrderAmount: 100_000,
       name: 'Citra Hops',
+      orderStepAmount: 5_000,
+      packageNetWeightMg: null,
+      priceBasisAmount: 100_000,
       priceQualifier: 'per 100g',
       productId: '10000000-0000-4000-8000-000000000001',
       productSlug: 'citra-hops',
-      quantity: 1,
+      amount: 100_000,
       reservationExpiresAt: '2026-08-25T10:15:00.000Z',
       reservationStatus: 'active',
+      saleKind: 'WEIGHT',
+      stockAmount: 100_000_000,
+      amountUnit: 'MILLIGRAM',
     },
   ],
   serverNow: '2026-08-25T10:00:00.000Z',
   subtotalMinor: 599,
-  totalQuantity: 1,
 };
 
 const emptyCart: Cart = {
@@ -37,14 +45,12 @@ const emptyCart: Cart = {
   distinctItemCount: 0,
   items: [],
   subtotalMinor: 0,
-  totalQuantity: 0,
 };
 
 const updatedCart: Cart = {
   ...initialCart,
-  items: [{ ...initialCart.items[0], lineTotalMinor: 1198, quantity: 2 }],
+  items: [{ ...initialCart.items[0], lineTotalMinor: 1198, amount: 200_000 }],
   subtotalMinor: 1198,
-  totalQuantity: 2,
 };
 
 describe('CartProvider', () => {
@@ -123,11 +129,11 @@ describe('CartProvider', () => {
     await user.click(screen.getByRole('button', { name: 'Update' }));
     await user.click(screen.getByRole('button', { name: 'Update' }));
 
-    expect(screen.getByTestId('quantity')).toHaveTextContent('2');
+    expect(screen.getByTestId('quantity')).toHaveTextContent('200000');
     expect(screen.getByTestId('totals')).toHaveTextContent('refreshing');
     expect(transport.update).toHaveBeenCalledTimes(1);
 
-    resolveUpdate?.({ ...initialCart, subtotalMinor: 1198, totalQuantity: 2 });
+    resolveUpdate?.({ ...initialCart, subtotalMinor: 1198 });
     await waitFor(() =>
       expect(screen.getByTestId('totals')).toHaveTextContent('canonical'),
     );
@@ -136,7 +142,7 @@ describe('CartProvider', () => {
 
   it('rolls back to a freshly loaded canonical cart after a mutation failure', async () => {
     const user = userEvent.setup();
-    const canonical = { ...initialCart, subtotalMinor: 599, totalQuantity: 1 };
+    const canonical = { ...initialCart, subtotalMinor: 599 };
     const transport: CartTransport = {
       add: vi.fn(async () => initialCart),
       clear: vi.fn(async () => initialCart),
@@ -159,7 +165,7 @@ describe('CartProvider', () => {
     await user.click(await screen.findByRole('button', { name: 'Update' }));
 
     await waitFor(() =>
-      expect(screen.getByTestId('quantity')).toHaveTextContent('1'),
+      expect(screen.getByTestId('quantity')).toHaveTextContent('100000'),
     );
     expect(transport.load).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId('message')).toHaveTextContent('refreshed');
@@ -191,7 +197,7 @@ describe('CartProvider', () => {
     await waitFor(() =>
       expect(screen.getByTestId('item-count')).toHaveTextContent('0'),
     );
-    expect(transport.add).toHaveBeenCalledWith('citra-hops', 1);
+    expect(transport.add).toHaveBeenCalledWith('citra-hops', 100_000);
     expect(transport.load).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId('message')).toHaveTextContent('refreshed');
   });
@@ -279,7 +285,7 @@ describe('CartProvider', () => {
     const recheckedCart: Cart = {
       ...initialCart,
       adjustmentMessage: 'Citra Hops quantity was adjusted to available stock.',
-      items: [{ ...initialCart.items[0], quantity: 1 }],
+      items: [{ ...initialCart.items[0], amount: 100_000 }],
     };
     const transport: CartTransport = {
       add: vi.fn(async () => initialCart),
@@ -304,7 +310,7 @@ describe('CartProvider', () => {
 
     expect(screen.getByTestId('pending')).toHaveTextContent('recheck');
     expect(screen.getByTestId('totals')).toHaveTextContent('refreshing');
-    expect(screen.getByTestId('quantity')).toHaveTextContent('1');
+    expect(screen.getByTestId('quantity')).toHaveTextContent('100000');
 
     resolveRecheck?.(recheckedCart);
 
@@ -472,7 +478,7 @@ function Probe() {
   }
   return (
     <>
-      <output data-testid="quantity">{cart.items[0]?.quantity}</output>
+      <output data-testid="quantity">{cart.items[0]?.amount}</output>
       <output data-testid="totals">
         {cart.totalsAreRefreshing ? 'refreshing' : 'canonical'}
       </output>
@@ -486,10 +492,16 @@ function Probe() {
       <button onClick={() => void cart.recheck()} type="button">
         Recheck
       </button>
-      <button onClick={() => void cart.add('citra-hops', 1)} type="button">
+      <button
+        onClick={() => void cart.add('citra-hops', 100_000)}
+        type="button"
+      >
         Add
       </button>
-      <button onClick={() => void cart.update('citra-hops', 2)} type="button">
+      <button
+        onClick={() => void cart.update('citra-hops', 200_000)}
+        type="button"
+      >
         Update
       </button>
       <button onClick={() => void cart.remove('citra-hops')} type="button">

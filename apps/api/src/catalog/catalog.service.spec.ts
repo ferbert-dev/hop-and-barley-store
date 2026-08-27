@@ -8,18 +8,37 @@ jest.mock('../database/prisma.service', () => ({
 }));
 
 const productSelect = {
+  amountUnit: true,
   category: { select: { name: true, slug: true } },
   currency: true,
   description: true,
   id: true,
   imagePath: true,
+  kitYieldVolumeMl: true,
+  maximumOrderAmount: true,
+  minimumOrderAmount: true,
   name: true,
+  orderStepAmount: true,
+  packageNetWeightMg: true,
+  priceBasisAmount: true,
   priceMinor: true,
   priceQualifier: true,
+  saleKind: true,
   slug: true,
-  stockQuantity: true,
+  stockAmount: true,
   teaser: true,
 };
+
+const saleRuleValues = {
+  amountUnit: 'MILLIGRAM',
+  kitYieldVolumeMl: null,
+  maximumOrderAmount: null,
+  minimumOrderAmount: 100_000,
+  orderStepAmount: 5_000,
+  packageNetWeightMg: null,
+  priceBasisAmount: 100_000,
+  saleKind: 'WEIGHT',
+} as const;
 
 const productDetailSelect = {
   ...productSelect,
@@ -78,6 +97,7 @@ describe('CatalogService', () => {
     findCategories.mockResolvedValue([{ name: 'Hops', slug: 'hops' }]);
     findProducts.mockResolvedValue([
       {
+        ...saleRuleValues,
         category: { name: 'Hops', slug: 'hops' },
         currency: 'USD',
         description: 'Bright whole-cone hops',
@@ -87,11 +107,12 @@ describe('CatalogService', () => {
         priceMinor: 699,
         priceQualifier: 'per pound',
         slug: 'cascade-hops',
-        stockQuantity: 0,
+        stockAmount: 0,
         teaser: 'Citrus and floral whole-cone hops.',
       },
     ]);
     rootProductFindFirst.mockResolvedValue({
+      ...saleRuleValues,
       category: { name: 'Hops', slug: 'hops' },
       currency: 'USD',
       description: 'Bright whole-cone hops',
@@ -105,13 +126,14 @@ describe('CatalogService', () => {
         { label: 'Origin', value: 'USA' },
         { label: 'Uses', value: ['Late additions', 'Dry hopping'] },
       ],
-      stockQuantity: 0,
+      stockAmount: 0,
       teaser: 'Citrus and floral whole-cone hops.',
     });
   });
 
   it('returns one active USD detail with ordered specifications and derived availability', async () => {
     await expect(service.getProduct('cascade-hops')).resolves.toEqual({
+      ...saleRuleValues,
       availability: 'out-of-stock',
       category: { name: 'Hops', slug: 'hops' },
       currency: 'USD',
@@ -126,6 +148,7 @@ describe('CatalogService', () => {
         { label: 'Origin', value: 'USA' },
         { label: 'Uses', value: ['Late additions', 'Dry hopping'] },
       ],
+      stockAmount: 0,
       teaser: 'Citrus and floral whole-cone hops.',
     });
     expect(rootProductFindFirst).toHaveBeenCalledWith({
@@ -153,6 +176,7 @@ describe('CatalogService', () => {
     'fails closed when stored specifications are malformed: %j',
     async (specifications) => {
       rootProductFindFirst.mockResolvedValue({
+        ...saleRuleValues,
         category: { name: 'Hops', slug: 'hops' },
         currency: 'USD',
         description: 'Bright whole-cone hops',
@@ -163,7 +187,7 @@ describe('CatalogService', () => {
         priceQualifier: 'per pound',
         slug: 'cascade-hops',
         specifications,
-        stockQuantity: 1,
+        stockAmount: 1,
         teaser: 'Citrus and floral whole-cone hops.',
       });
 
@@ -199,6 +223,7 @@ describe('CatalogService', () => {
     expect(result).toEqual({
       items: [
         {
+          ...saleRuleValues,
           availability: 'out-of-stock',
           category: { name: 'Hops', slug: 'hops' },
           currency: 'USD',
@@ -209,6 +234,7 @@ describe('CatalogService', () => {
           priceMinor: 699,
           priceQualifier: 'per pound',
           slug: 'cascade-hops',
+          stockAmount: 0,
           teaser: 'Citrus and floral whole-cone hops.',
         },
       ],

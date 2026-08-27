@@ -5,18 +5,27 @@ import { useEffect } from 'react';
 import { Button } from '../../components/ui/button';
 import { ErrorState } from '../../components/ui/status';
 import { useCart } from '../cart/cart-context';
+import { QuantityForm } from '../quantity/quantity-form';
+import {
+  formatAmount,
+  type QuantityMetadata,
+} from '../quantity/quantity-model';
 import styles from './product-detail.module.css';
 
 type ProductCartControlProps = Readonly<{
   availability: 'in-stock' | 'out-of-stock';
   productName: string;
   productSlug: string;
+  priceMinor: number;
+  quantityMetadata: QuantityMetadata;
 }>;
 
 export function ProductCartControl({
   availability,
   productName,
   productSlug,
+  priceMinor,
+  quantityMetadata,
 }: ProductCartControlProps) {
   const cart = useCart();
   const { ensureLoaded, pending } = cart;
@@ -68,6 +77,8 @@ export function ProductCartControl({
           loading={loading}
           productName={productName}
           productSlug={productSlug}
+          priceMinor={priceMinor}
+          quantityMetadata={quantityMetadata}
         />
       )}
       {productIsPending ? (
@@ -84,20 +95,23 @@ function AddToCartControl({
   loading,
   productName,
   productSlug,
+  priceMinor,
+  quantityMetadata,
 }: ProductCartControlProps & Readonly<{ loading: boolean }>) {
-  const { add, pending } = useCart();
+  const { add, pending, state } = useCart();
   const outOfStock = availability === 'out-of-stock';
 
   return (
     <>
-      <Button
+      <QuantityForm
+        amount={quantityMetadata.minimumOrderAmount}
+        currency={state.kind === 'ready' ? state.cart.currency : 'USD'}
         disabled={loading || outOfStock || pending !== null}
-        onClick={() => void add(productSlug, 1)}
-        pending={pending?.kind === 'add'}
-        pendingLabel={`Adding ${productName}…`}
-      >
-        Add to Cart
-      </Button>
+        metadata={quantityMetadata}
+        onSubmit={(amount) => add(productSlug, amount)}
+        priceMinor={priceMinor}
+        submitLabel={`Add ${productName} to Cart`}
+      />
       {loading ? (
         <p className={styles.cartMessage} role="status">
           Loading your cart…
@@ -121,7 +135,7 @@ function CartQuantityControl({
   productName: string;
   productSlug: string;
 }>) {
-  const { pending, remove, state, update } = useCart();
+  const { pending, state, update } = useCart();
   const reservationExpired =
     item.reservationStatus === 'expired' ||
     (item.reservationStatus === 'active' &&
@@ -133,32 +147,18 @@ function CartQuantityControl({
 
   return (
     <>
-      <div
-        aria-label={`Quantity for ${productName}`}
-        className={styles.cartQuantity}
-      >
-        <Button
-          aria-label={`Decrease ${productName} quantity`}
-          disabled={pending !== null || unavailable}
-          onClick={() =>
-            void (item.quantity === 1
-              ? remove(productSlug)
-              : update(productSlug, item.quantity - 1))
-          }
-          variant="secondary"
-        >
-          −
-        </Button>
-        <output aria-live="polite">{item.quantity} in cart</output>
-        <Button
-          aria-label={`Increase ${productName} quantity`}
-          disabled={pending !== null || unavailable || item.quantity >= 99}
-          onClick={() => void update(productSlug, item.quantity + 1)}
-          variant="secondary"
-        >
-          +
-        </Button>
-      </div>
+      <QuantityForm
+        amount={item.amount}
+        currency={state.kind === 'ready' ? state.cart.currency : 'USD'}
+        disabled={pending !== null || unavailable}
+        metadata={item}
+        onSubmit={(amount) => update(productSlug, amount)}
+        priceMinor={item.priceMinor}
+        submitLabel={`Update ${productName} cart amount`}
+      />
+      <p className={styles.cartQuantity} aria-live="polite">
+        {formatAmount(item.amount, item)} in cart
+      </p>
       {item.availability === 'unavailable' && !reservationExpired ? (
         <p className={styles.cartAvailability} role="status">
           Out of stock

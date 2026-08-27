@@ -19,6 +19,7 @@ const LEGACY_PROHIBITED_KEYS = new Set([
   'imagePath',
   'isActive',
   'priceQualifier',
+  'stockAmount',
   'stockQuantity',
   'teaser',
 ]);
@@ -103,17 +104,40 @@ function projectPagedProduct(value: unknown): PagedCatalogProduct {
     typeof value.priceQualifier !== 'string' ||
     typeof value.imagePath !== 'string' ||
     !IMAGE_PATH.test(value.imagePath) ||
-    (value.availability !== 'in-stock' && value.availability !== 'out-of-stock')
+    (value.availability !== 'in-stock' &&
+      value.availability !== 'out-of-stock') ||
+    (value.saleKind !== 'WEIGHT' &&
+      value.saleKind !== 'PACKAGE' &&
+      value.saleKind !== 'KIT') ||
+    (value.amountUnit !== 'MILLIGRAM' && value.amountUnit !== 'EACH') ||
+    !isPositiveCommerceAmount(value.priceBasisAmount) ||
+    !isPositiveCommerceAmount(value.minimumOrderAmount) ||
+    !isPositiveCommerceAmount(value.orderStepAmount) ||
+    !isNullablePositiveCommerceAmount(value.maximumOrderAmount) ||
+    !isBoundedInteger(value.stockAmount, 0, 2_000_000_000) ||
+    !isNullablePositiveInt32(value.packageNetWeightMg) ||
+    !isNullablePositiveInt32(value.kitYieldVolumeMl) ||
+    (value.saleKind === 'WEIGHT' && value.amountUnit !== 'MILLIGRAM') ||
+    (value.saleKind !== 'WEIGHT' && value.amountUnit !== 'EACH')
   ) {
     fail();
   }
 
   return {
     ...common,
+    amountUnit: value.amountUnit,
     availability: value.availability,
     category: projectCategory(value.category),
     imagePath: value.imagePath,
+    kitYieldVolumeMl: value.kitYieldVolumeMl,
+    maximumOrderAmount: value.maximumOrderAmount,
+    minimumOrderAmount: value.minimumOrderAmount,
+    orderStepAmount: value.orderStepAmount,
+    packageNetWeightMg: value.packageNetWeightMg,
+    priceBasisAmount: value.priceBasisAmount,
     priceQualifier: value.priceQualifier,
+    saleKind: value.saleKind,
+    stockAmount: value.stockAmount,
     teaser: value.teaser,
   };
 }
@@ -254,6 +278,20 @@ function isNullableCategory(value: unknown): value is string | null {
 
 function isNullableInt32(value: unknown): value is number | null {
   return value === null || isInt32(value);
+}
+
+function isPositiveCommerceAmount(value: unknown): value is number {
+  return isBoundedInteger(value, 1, 2_000_000_000);
+}
+
+function isNullablePositiveCommerceAmount(
+  value: unknown,
+): value is number | null {
+  return value === null || isPositiveCommerceAmount(value);
+}
+
+function isNullablePositiveInt32(value: unknown): value is number | null {
+  return value === null || isBoundedInteger(value, 1, MAX_INT32);
 }
 
 function isInt32(value: unknown): value is number {

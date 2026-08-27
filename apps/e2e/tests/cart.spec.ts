@@ -43,12 +43,11 @@ test.describe('API-backed guest cart', () => {
       page.getByLabel('Cart summary').getByText('US$5.99'),
     ).toBeVisible();
 
-    await page
-      .getByRole('button', { name: 'Increase Citra Hops quantity' })
+    await quantityForm(page, 'Citra Hops')
+      .getByRole('button', { name: 'Increase weight amount' })
       .click();
-    await expect(
-      page.getByLabel('Quantity for Citra Hops').getByRole('status'),
-    ).toHaveText('2 in cart');
+    await page.getByRole('button', { name: 'Update Citra Hops' }).click();
+    await expect(page.getByText('200g selected')).toBeVisible();
     await expect(
       page.getByLabel('Cart summary').getByText('US$11.98'),
     ).toBeVisible();
@@ -94,15 +93,14 @@ test.describe('API-backed guest cart', () => {
     await page.setViewportSize({ height: 800, width: 360 });
     await page.goto('/cart');
     await assertReducedMotion(page, 'ready cart');
-    const increase = page.getByRole('button', {
-      name: 'Increase Citra Hops quantity',
+    const increase = quantityForm(page, 'Citra Hops').getByRole('button', {
+      name: 'Increase weight amount',
     });
     await focusWithKeyboard(page, increase);
-    await assertProjectFocusVisible(increase, 'increase cart quantity');
+    await assertProjectFocusVisible(increase, 'increase cart amount');
     await page.keyboard.press('Enter');
-    await expect(
-      page.getByLabel('Quantity for Citra Hops').getByRole('status'),
-    ).toHaveText('2 in cart');
+    await page.getByRole('button', { name: 'Update Citra Hops' }).click();
+    await expect(page.getByText('200g selected')).toBeVisible();
 
     await assertNoBlockingAxeViolations(page, 'ready cart');
   });
@@ -135,7 +133,7 @@ test.describe('F3 cart reservations', () => {
   }) => {
     const activeCart = cartFixture({
       items: [
-        cartLine({ name: 'Citra Hops', quantity: 5 }),
+        cartLine({ name: 'Citra Hops', amount: 500_000 }),
         cartLine({
           name: 'Caramel Malt 60L',
           productSlug: 'caramel-malt-60l',
@@ -149,9 +147,7 @@ test.describe('F3 cart reservations', () => {
     await expect(
       page.getByRole('heading', { level: 1, name: 'Shopping Cart' }),
     ).toBeVisible();
-    await expect(
-      page.getByLabel('Quantity for Citra Hops').getByRole('status'),
-    ).toHaveText('5 in cart');
+    await expect(page.getByText('500g selected')).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Remove Citra Hops from cart' }),
     ).toBeVisible();
@@ -167,7 +163,11 @@ test.describe('F3 cart reservations', () => {
     const expiredCart = cartFixture({
       checkoutEligible: false,
       items: [
-        cartLine({ name: 'Citra Hops', quantity: 5, reservation: 'expired' }),
+        cartLine({
+          name: 'Citra Hops',
+          amount: 500_000,
+          reservation: 'expired',
+        }),
         cartLine({
           name: 'Caramel Malt 60L',
           productSlug: 'caramel-malt-60l',
@@ -213,7 +213,11 @@ test.describe('F3 cart reservations', () => {
     const expiredCart = cartFixture({
       checkoutEligible: false,
       items: [
-        cartLine({ name: 'Citra Hops', quantity: 5, reservation: 'expired' }),
+        cartLine({
+          name: 'Citra Hops',
+          amount: 500_000,
+          reservation: 'expired',
+        }),
         cartLine({
           name: 'Caramel Malt 60L',
           productSlug: 'caramel-malt-60l',
@@ -226,7 +230,7 @@ test.describe('F3 cart reservations', () => {
         'Citra Hops was adjusted to 3. Caramel Malt 60L is out of stock.',
       checkoutEligible: false,
       items: [
-        cartLine({ name: 'Citra Hops', quantity: 3 }),
+        cartLine({ name: 'Citra Hops', amount: 300_000 }),
         cartLine({
           availability: 'unavailable',
           name: 'Caramel Malt 60L',
@@ -246,9 +250,7 @@ test.describe('F3 cart reservations', () => {
     await page.getByRole('button', { name: 'Recheck availability' }).click();
     await recheckResponse;
 
-    await expect(
-      page.getByLabel('Quantity for Citra Hops').getByRole('status'),
-    ).toHaveText('3 in cart');
+    await expect(page.getByText('300g selected')).toBeVisible();
     await expectReservationCountdown(page);
     await expect(
       page.getByRole('status').filter({
@@ -270,7 +272,7 @@ test.describe('F3 cart reservations', () => {
     ).toHaveCount(0);
   });
 
-  test('keeps quantity, remove, and clear controls keyboard-operable with canonical responses', async ({
+  test('keeps amount, remove, and clear controls keyboard-operable with canonical responses', async ({
     page,
   }) => {
     const initialCart = cartFixture({
@@ -281,7 +283,7 @@ test.describe('F3 cart reservations', () => {
     });
     const increasedCart = cartFixture({
       items: [
-        cartLine({ name: 'Citra Hops', quantity: 2 }),
+        cartLine({ name: 'Citra Hops', amount: 200_000 }),
         cartLine({ name: 'Mosaic Hops', productSlug: 'mosaic-hops' }),
       ],
     });
@@ -297,14 +299,13 @@ test.describe('F3 cart reservations', () => {
 
     await page.goto('/cart');
 
-    const increase = page.getByRole('button', {
-      name: 'Increase Citra Hops quantity',
+    const increase = quantityForm(page, 'Citra Hops').getByRole('button', {
+      name: 'Increase weight amount',
     });
     await focusWithKeyboard(page, increase);
     await page.keyboard.press('Enter');
-    await expect(
-      page.getByLabel('Quantity for Citra Hops').getByRole('status'),
-    ).toHaveText('2 in cart');
+    await page.getByRole('button', { name: 'Update Citra Hops' }).click();
+    await expect(page.getByText('200g selected')).toBeVisible();
 
     const remove = page.getByRole('button', {
       name: 'Remove Citra Hops from cart',
@@ -354,19 +355,27 @@ type CartFixture = Readonly<{
   items: CartFixtureItem[];
   serverNow: string;
   subtotalMinor: number;
-  totalQuantity: number;
 }>;
 
 type CartFixtureItem = Readonly<{
   availability: 'available' | 'unavailable';
-  currentUnitPriceMinor: number | null;
   imagePath: string;
   lineTotalMinor: number | null;
   name: string;
+  amount: number;
+  amountUnit: 'MILLIGRAM' | 'EACH';
+  saleKind: 'WEIGHT' | 'PACKAGE' | 'KIT';
+  priceBasisAmount: number;
+  minimumOrderAmount: number;
+  orderStepAmount: number;
+  maximumOrderAmount: number | null;
+  stockAmount: number;
+  packageNetWeightMg: number | null;
+  kitYieldVolumeMl: number | null;
+  priceMinor: number | null;
   priceQualifier: string;
   productId: string;
   productSlug: string;
-  quantity: number;
   reservationExpiresAt: string | null;
   reservationStatus: 'active' | 'expired' | 'unreserved';
 }>;
@@ -401,21 +410,20 @@ function cartFixture({
       (sum, item) => sum + (item.lineTotalMinor ?? 0),
       0,
     ),
-    totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
   };
 }
 
 function cartLine({
   availability,
+  amount = 100_000,
   name,
   productSlug = name.toLowerCase().replaceAll(' ', '-'),
-  quantity = 1,
   reservation = 'active',
 }: Readonly<{
   availability?: 'available' | 'unavailable';
+  amount?: number;
   name: string;
   productSlug?: string;
-  quantity?: number;
   reservation?: 'active' | 'expired' | 'unreserved';
 }>): CartFixtureItem {
   const reservationExpiresAt =
@@ -426,18 +434,32 @@ function cartLine({
         ).toISOString();
   const resolvedAvailability =
     availability ?? (reservation === 'active' ? 'available' : 'unavailable');
-  const currentUnitPriceMinor = 599;
+  const priceMinor = 599;
+  const priceBasisAmount = 100_000;
   return {
     availability: resolvedAvailability,
-    currentUnitPriceMinor,
     imagePath: `/assets/products/${productSlug}.jpg`,
     lineTotalMinor:
-      currentUnitPriceMinor === null ? null : currentUnitPriceMinor * quantity,
+      priceMinor === null
+        ? null
+        : Math.floor(
+            (priceMinor * amount + priceBasisAmount / 2) / priceBasisAmount,
+          ),
     name,
+    amount,
+    amountUnit: 'MILLIGRAM',
+    saleKind: 'WEIGHT',
+    priceBasisAmount,
+    minimumOrderAmount: 100_000,
+    orderStepAmount: 5_000,
+    maximumOrderAmount: null,
+    stockAmount: 100_000_000,
+    packageNetWeightMg: null,
+    kitYieldVolumeMl: null,
+    priceMinor,
     priceQualifier: 'per 100g',
     productId: fixtureProductId(productSlug),
     productSlug,
-    quantity,
     reservationExpiresAt,
     reservationStatus: reservation,
   };
@@ -559,6 +581,12 @@ async function expectReservationCountdown(page: Page) {
   await expect(countdown).toBeVisible();
 }
 
+function quantityForm(page: Page, productName: string) {
+  return page.locator('form').filter({
+    has: page.getByRole('button', { name: `Update ${productName}` }),
+  });
+}
+
 async function seedCartLine(page: Page, productSlug: string) {
   await page.goto('/cart');
   const response = await page.evaluate(async (slug) => {
@@ -570,7 +598,7 @@ async function seedCartLine(page: Page, productSlug: string) {
       ? ((await csrf.json()) as { csrfToken: string })
       : null;
     const add = await fetch(`${apiUrl}/cart/items`, {
-      body: JSON.stringify({ productSlug: slug, quantity: 1 }),
+      body: JSON.stringify({ amount: 100_000, productSlug: slug }),
       credentials: 'include',
       headers: {
         'content-type': 'application/json',

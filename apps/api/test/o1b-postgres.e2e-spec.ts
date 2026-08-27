@@ -35,20 +35,28 @@ describePostgres(
       ] as const) {
         await prisma.product.upsert({
           create: {
+            amountUnit: 'EACH',
             categoryId: category.id,
             currency: 'USD',
             description: 'O1B disposable reservation fixture',
             imagePath: `/assets/products/${slug}.webp`,
             isActive: true,
+            kitYieldVolumeMl: null,
+            maximumOrderAmount: null,
+            minimumOrderAmount: 1,
             name,
+            orderStepAmount: 1,
+            packageNetWeightMg: null,
+            priceBasisAmount: 1,
             priceMinor: 500,
             priceQualifier: 'per fixture',
+            saleKind: 'PACKAGE',
             slug,
             specifications: [],
-            stockQuantity: 10,
+            stockAmount: 10,
             teaser: 'O1B fixture',
           },
-          update: { currency: 'USD', isActive: true, stockQuantity: 10 },
+          update: { currency: 'USD', isActive: true, stockAmount: 10 },
           where: { slug },
         });
       }
@@ -59,7 +67,7 @@ describePostgres(
       await prisma.cartItem.deleteMany();
       await prisma.cart.deleteMany();
       await prisma.product.updateMany({
-        data: { currency: 'USD', isActive: true, stockQuantity: 10 },
+        data: { currency: 'USD', isActive: true, stockAmount: 10 },
         where: { slug: { in: [alphaSlug, betaSlug] } },
       });
     });
@@ -75,20 +83,22 @@ describePostgres(
       await postgres.end();
     });
 
-    it('stores exactly 15 minutes and clamps create/add/update without renewing a no-op clamp', async () => {
+    it('stores exactly 15 minutes and rejects inexact create/add/update without renewing the hold', async () => {
       await setStock(alphaSlug, 3);
+      await expect(
+        carts.createAndAdd({ productSlug: alphaSlug, amount: 5 }, baseNow),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
       const first = await carts.createAndAdd(
-        { productSlug: alphaSlug, quantity: 5 },
+        { productSlug: alphaSlug, amount: 3 },
         baseNow,
       );
       const firstCapability = await requireCapability(first.rawToken, baseNow);
       expect(first.cart).toMatchObject({
-        adjustmentMessage:
-          'Some quantities were reduced to currently available stock.',
+        adjustmentMessage: null,
         serverNow: baseNow.toISOString(),
       });
       expect(first.cart.items[0]).toMatchObject({
-        quantity: 3,
+        amount: 3,
         reservationExpiresAt: '2026-08-25T12:15:00.000Z',
         reservationStatus: 'active',
       });
@@ -104,7 +114,7 @@ describePostgres(
       await carts.remove(firstCapability, alphaSlug, atMinutes(1));
       await setStock(alphaSlug, 5);
       const added = await carts.createAndAdd(
-        { productSlug: alphaSlug, quantity: 2 },
+        { productSlug: alphaSlug, amount: 2 },
         atMinutes(2),
       );
       const addCapability = await requireCapability(
@@ -114,14 +124,13 @@ describePostgres(
       const beforeAdd = await itemFor(addCapability, alphaSlug);
       const addResult = await carts.add(
         addCapability,
-        { productSlug: alphaSlug, quantity: 5 },
+        { productSlug: alphaSlug, amount: 3 },
         atMinutes(4),
       );
       const afterAdd = await itemFor(addCapability, alphaSlug);
       expect(addResult).toMatchObject({
-        adjustmentMessage:
-          'Some quantities were reduced to currently available stock.',
-        items: [{ quantity: 5, reservationStatus: 'active' }],
+        adjustmentMessage: null,
+        items: [{ amount: 5, reservationStatus: 'active' }],
       });
       expect(afterAdd.currentReservationId).not.toBe(
         beforeAdd.currentReservationId,
@@ -130,17 +139,16 @@ describePostgres(
         await prisma.cartReservation.findUniqueOrThrow({
           where: { id: requiredId(afterAdd.currentReservationId) },
         }),
-      ).toMatchObject({ expiresAt: atMinutes(19), quantity: 5 });
+      ).toMatchObject({ expiresAt: atMinutes(19), amount: 5 });
 
       const beforeNoop = afterAdd.currentReservationId;
-      const noop = await carts.add(
-        addCapability,
-        { productSlug: alphaSlug, quantity: 1 },
-        atMinutes(5),
-      );
-      expect(noop.adjustmentMessage).toBe(
-        'Some quantities were reduced to currently available stock.',
-      );
+      await expect(
+        carts.add(
+          addCapability,
+          { productSlug: alphaSlug, amount: 1 },
+          atMinutes(5),
+        ),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
       expect(
         (await itemFor(addCapability, alphaSlug)).currentReservationId,
       ).toBe(beforeNoop);
@@ -148,24 +156,17 @@ describePostgres(
       await carts.remove(addCapability, alphaSlug, atMinutes(6));
       await setStock(alphaSlug, 4);
       const updated = await carts.createAndAdd(
-        { productSlug: alphaSlug, quantity: 2 },
+        { productSlug: alphaSlug, amount: 2 },
         atMinutes(7),
       );
       const updateCapability = await requireCapability(
         updated.rawToken,
         atMinutes(7),
       );
-      const updateResult = await carts.update(
-        updateCapability,
-        alphaSlug,
-        { quantity: 8 },
-        atMinutes(9),
-      );
-      expect(updateResult).toMatchObject({
-        adjustmentMessage:
-          'Some quantities were reduced to currently available stock.',
-        items: [{ quantity: 4, reservationStatus: 'active' }],
-      });
+      const beforeRejectedUpdate = await itemFor(updateCapability, alphaSlug);
+      await expect(
+        carts.update(updateCapability, alphaSlug, { amount: 8 }, atMinutes(9)),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
       expect(
         await prisma.cartReservation.findUniqueOrThrow({
           where: {
@@ -174,52 +175,54 @@ describePostgres(
             ),
           },
         }),
-      ).toMatchObject({ expiresAt: atMinutes(24), quantity: 4 });
+      ).toMatchObject({
+        expiresAt: atMinutes(22),
+        id: beforeRejectedUpdate.currentReservationId,
+        amount: 2,
+      });
 
       await carts.remove(updateCapability, alphaSlug, atMinutes(10));
       await setStock(alphaSlug, 100);
       const capped = await carts.createAndAdd(
-        { productSlug: alphaSlug, quantity: 90 },
+        { productSlug: alphaSlug, amount: 90 },
         atMinutes(11),
       );
       const cappedCapability = await requireCapability(
         capped.rawToken,
         atMinutes(11),
       );
-      const lineMax = await carts.add(
-        cappedCapability,
-        { productSlug: alphaSlug, quantity: 20 },
-        atMinutes(12),
-      );
-      expect(lineMax).toMatchObject({
-        adjustmentMessage:
-          'Some quantities were reduced to currently available stock.',
-        items: [{ quantity: 99, reservationStatus: 'active' }],
-      });
+      await expect(
+        carts.add(
+          cappedCapability,
+          { productSlug: alphaSlug, amount: 20 },
+          atMinutes(12),
+        ),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+      expect((await itemFor(cappedCapability, alphaSlug)).amount).toBe(90);
     });
 
     it('serializes parallel carts so successful active reservations never exceed stock', async () => {
       await setStock(alphaSlug, 5);
       const attempts = await Promise.allSettled(
         Array.from({ length: 3 }, () =>
-          carts.createAndAdd({ productSlug: alphaSlug, quantity: 3 }, baseNow),
+          carts.createAndAdd({ productSlug: alphaSlug, amount: 3 }, baseNow),
         ),
       );
       expect(
         attempts.filter(({ status }) => status === 'fulfilled'),
-      ).toHaveLength(2);
+      ).toHaveLength(1);
       expect(
         attempts.filter(({ status }) => status === 'rejected'),
-      ).toHaveLength(1);
+      ).toHaveLength(2);
       const active = await prisma.cartReservation.aggregate({
-        _sum: { quantity: true },
+        _sum: { amount: true },
         where: {
           expiresAt: { gt: baseNow },
           product: { slug: alphaSlug },
           status: 'ACTIVE',
         },
       });
-      expect(active._sum.quantity).toBe(5);
+      expect(active._sum.amount).toBe(3);
       expect(
         attempts
           .filter(
@@ -234,7 +237,7 @@ describePostgres(
 
     it('releases decrease delta without extension and preserves RELEASED history on remove and clear', async () => {
       const created = await carts.createAndAdd(
-        { productSlug: alphaSlug, quantity: 4 },
+        { productSlug: alphaSlug, amount: 4 },
         baseNow,
       );
       const capability = await requireCapability(created.rawToken, baseNow);
@@ -243,11 +246,11 @@ describePostgres(
       const decreased = await carts.update(
         capability,
         alphaSlug,
-        { quantity: 2 },
+        { amount: 2 },
         atMinutes(5),
       );
       expect(decreased.items[0]).toMatchObject({
-        quantity: 2,
+        amount: 2,
         reservationExpiresAt: '2026-08-25T12:15:00.000Z',
       });
       expect(
@@ -256,7 +259,7 @@ describePostgres(
         }),
       ).toMatchObject({
         expiresAt: atMinutes(15),
-        quantity: 2,
+        amount: 2,
         releasedAt: null,
         status: 'ACTIVE',
       });
@@ -271,19 +274,19 @@ describePostgres(
         }),
       ).toMatchObject({
         cartItemId: null,
-        quantity: 2,
+        amount: 2,
         releasedAt: atMinutes(6),
         status: 'RELEASED',
       });
 
       await carts.add(
         capability,
-        { productSlug: alphaSlug, quantity: 2 },
+        { productSlug: alphaSlug, amount: 2 },
         atMinutes(7),
       );
       await carts.add(
         capability,
-        { productSlug: betaSlug, quantity: 3 },
+        { productSlug: betaSlug, amount: 3 },
         atMinutes(8),
       );
       const activeIds = (
@@ -309,7 +312,7 @@ describePostgres(
     it('retains an expired desired line, makes exact-boundary stock reusable, then rechecks zero and fresh availability', async () => {
       await setStock(alphaSlug, 3);
       const first = await carts.createAndAdd(
-        { productSlug: alphaSlug, quantity: 3 },
+        { productSlug: alphaSlug, amount: 3 },
         baseNow,
       );
       const firstCapability = await requireCapability(first.rawToken, baseNow);
@@ -319,13 +322,13 @@ describePostgres(
       const expired = await carts.getCart(firstCapability, atMinutes(15));
       expect(expired.items[0]).toMatchObject({
         availability: 'unavailable',
-        quantity: 3,
+        amount: 3,
         reservationExpiresAt: atMinutes(15).toISOString(),
         reservationStatus: 'expired',
       });
 
       const second = await carts.createAndAdd(
-        { productSlug: alphaSlug, quantity: 3 },
+        { productSlug: alphaSlug, amount: 3 },
         atMinutes(15),
       );
       const secondCapability = await requireCapability(
@@ -345,7 +348,7 @@ describePostgres(
         items: [
           {
             availability: 'unavailable',
-            quantity: 3,
+            amount: 3,
             reservationExpiresAt: null,
             reservationStatus: 'unreserved',
           },
@@ -362,7 +365,7 @@ describePostgres(
         checkoutEligible: true,
         items: [
           {
-            quantity: 3,
+            amount: 3,
             reservationExpiresAt: atMinutes(33).toISOString(),
             reservationStatus: 'active',
           },
@@ -387,14 +390,14 @@ describePostgres(
         expect.arrayContaining([
           expect.objectContaining({
             productSlug: alphaSlug,
-            quantity: 3,
+            amount: 3,
             reservationExpiresAt: atMinutes(15).toISOString(),
             reservationStatus: 'active',
           }),
           expect.objectContaining({
             availability: 'unavailable',
             productSlug: betaSlug,
-            quantity: 5,
+            amount: 5,
             reservationExpiresAt: null,
             reservationStatus: 'unreserved',
           }),
@@ -409,7 +412,7 @@ describePostgres(
     it('consumes a named active reservation exactly once and detached EXPIRED/CONSUMED history survives removal', async () => {
       await setStock(alphaSlug, 5);
       const consumedCart = await carts.createAndAdd(
-        { productSlug: alphaSlug, quantity: 2 },
+        { productSlug: alphaSlug, amount: 2 },
         baseNow,
       );
       const consumedCapability = await requireCapability(
@@ -427,14 +430,14 @@ describePostgres(
           { isolationLevel: 'Serializable', maxWait: 2_000, timeout: 5_000 },
         );
       await expect(consume()).resolves.toEqual([
-        expect.objectContaining({ quantity: 2, reservationId: consumedId }),
+        expect.objectContaining({ amount: 2, reservationId: consumedId }),
       ]);
       await expect(consume()).resolves.toEqual([
-        expect.objectContaining({ quantity: 2, reservationId: consumedId }),
+        expect.objectContaining({ amount: 2, reservationId: consumedId }),
       ]);
       expect(
         await prisma.product.findUniqueOrThrow({ where: { slug: alphaSlug } }),
-      ).toMatchObject({ stockQuantity: 3 });
+      ).toMatchObject({ stockAmount: 3 });
       await carts.remove(consumedCapability, alphaSlug, atMinutes(6));
       expect(
         await prisma.cartReservation.findUniqueOrThrow({
@@ -443,7 +446,7 @@ describePostgres(
       ).toMatchObject({ cartItemId: null, status: 'CONSUMED' });
 
       const expiredCart = await carts.createAndAdd(
-        { productSlug: betaSlug, quantity: 1 },
+        { productSlug: betaSlug, amount: 1 },
         baseNow,
       );
       const expiredCapability = await requireCapability(
@@ -469,7 +472,7 @@ describePostgres(
       });
       await expect(
         postgres.query(
-          `INSERT INTO "CartReservation" ("cartId", "cartItemId", "productId", "quantity", "status", "reservedAt", "expiresAt", "updatedAt") VALUES ($1, $2, $3, 1, 'ACTIVE', $4::timestamp, $4::timestamp + interval '14 minutes', $4::timestamp)`,
+          `INSERT INTO "CartReservation" ("cartId", "cartItemId", "productId", "amount", "status", "reservedAt", "expiresAt", "updatedAt") VALUES ($1, $2, $3, 1, 'ACTIVE', $4::timestamp, $4::timestamp + interval '14 minutes', $4::timestamp)`,
           [capability.cartId, item.id, product.id, baseNow],
         ),
       ).rejects.toMatchObject({ code: '23514' });
@@ -481,7 +484,7 @@ describePostgres(
           cartItemId: item.id,
           expiresAt: clock.expiresAt,
           productId: product.id,
-          quantity: 1,
+          amount: 1,
           reservedAt: clock.reservedAt,
         },
       });
@@ -492,24 +495,21 @@ describePostgres(
             cartItemId: item.id,
             expiresAt: clock.expiresAt,
             productId: product.id,
-            quantity: 1,
+            amount: 1,
             reservedAt: clock.reservedAt,
           },
         }),
       ).rejects.toMatchObject({ code: 'P2002' });
       await expect(
         postgres.query(
-          `INSERT INTO "CartReservation" ("cartId", "productId", "quantity", "status", "reservedAt", "expiresAt", "updatedAt") VALUES ($1, $2, 1, 'ACTIVE', $3::timestamp, $3::timestamp + interval '15 minutes', $3::timestamp)`,
+          `INSERT INTO "CartReservation" ("cartId", "productId", "amount", "status", "reservedAt", "expiresAt", "updatedAt") VALUES ($1, $2, 1, 'ACTIVE', $3::timestamp, $3::timestamp + interval '15 minutes', $3::timestamp)`,
           [capability.cartId, product.id, baseNow],
         ),
       ).rejects.toMatchObject({ code: '23514' });
     });
 
-    async function setStock(
-      slug: string,
-      stockQuantity: number,
-    ): Promise<void> {
-      await prisma.product.update({ data: { stockQuantity }, where: { slug } });
+    async function setStock(slug: string, stockAmount: number): Promise<void> {
+      await prisma.product.update({ data: { stockAmount }, where: { slug } });
     }
 
     async function requireCapability(
@@ -537,12 +537,12 @@ describePostgres(
           tokenDigest: Uint8Array.from(hashCartToken(rawToken)),
         },
       });
-      for (const [slug, quantity] of lines) {
+      for (const [slug, amount] of lines) {
         const product = await prisma.product.findUniqueOrThrow({
           where: { slug },
         });
         await prisma.cartItem.create({
-          data: { cartId: cart.id, productId: product.id, quantity },
+          data: { cartId: cart.id, productId: product.id, amount },
         });
       }
       return { cartId: cart.id, expiresAt: cart.expiresAt, rawToken };

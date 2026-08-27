@@ -57,7 +57,7 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
     const created = await request(server)
       .post('/api/v1/cart/items')
       .set('Origin', 'http://localhost:3000')
-      .send({ productSlug: 'cascade-hops', quantity: 2 })
+      .send({ productSlug: 'safale-us05-yeast', amount: 2 })
       .expect(200);
     const setCookie = created.headers['set-cookie']?.[0];
     if (!setCookie) throw new Error('Expected cart cookie');
@@ -68,9 +68,7 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
     });
     expect(Buffer.from(persisted.tokenDigest)).toEqual(hashCartToken(rawToken));
     expect(JSON.stringify(persisted)).not.toContain(rawToken);
-    expect(JSON.stringify(created.body)).not.toMatch(
-      /stock|cartId|token|digest/i,
-    );
+    expect(JSON.stringify(created.body)).not.toMatch(/cartId|token|digest/i);
 
     const csrfResponse = await request(server)
       .get('/api/v1/cart/csrf')
@@ -88,32 +86,35 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
         request(server)
           .post('/api/v1/cart/items')
           .set(mutationHeaders)
-          .send({ productSlug: 'cascade-hops', quantity: 1 })
+          .send({ productSlug: 'safale-us05-yeast', amount: 1 })
           .expect(200),
       ),
     );
     expect(
       await prisma.cartItem.findFirstOrThrow({
-        where: { cartId: persisted.id, product: { slug: 'cascade-hops' } },
+        where: {
+          cartId: persisted.id,
+          product: { slug: 'safale-us05-yeast' },
+        },
       }),
-    ).toMatchObject({ quantity: 8 });
+    ).toMatchObject({ amount: 8 });
     expect(
       await prisma.cartItem.count({ where: { cartId: persisted.id } }),
     ).toBe(1);
 
     await Promise.all(
-      [4, 5, 6, 7].map((quantity) =>
+      [4, 5, 6, 7].map((amount) =>
         request(server)
-          .patch('/api/v1/cart/items/cascade-hops')
+          .patch('/api/v1/cart/items/safale-us05-yeast')
           .set(mutationHeaders)
-          .send({ quantity })
+          .send({ amount })
           .expect(200),
       ),
     );
     const updated = await prisma.cartItem.findFirstOrThrow({
       where: { cartId: persisted.id },
     });
-    expect([4, 5, 6, 7]).toContain(updated.quantity);
+    expect([4, 5, 6, 7]).toContain(updated.amount);
 
     await Promise.all([
       request(server)
@@ -123,7 +124,7 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
       request(server)
         .post('/api/v1/cart/items')
         .set(mutationHeaders)
-        .send({ productSlug: 'cascade-hops', quantity: 1 })
+        .send({ productSlug: 'safale-us05-yeast', amount: 1 })
         .expect(200),
     ]);
     expect(
@@ -131,7 +132,7 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
     ).toBeLessThanOrEqual(1);
   });
 
-  it('enforces named digest, expiry, quantity and composite-line SQL constraints', async () => {
+  it('enforces named digest, expiry, amount and composite-line SQL constraints', async () => {
     await expect(
       postgres.query(
         `INSERT INTO "Cart" ("tokenDigest", "expiresAt", "updatedAt") VALUES (decode('aa', 'hex'), CURRENT_TIMESTAMP + interval '1 day', CURRENT_TIMESTAMP)`,
@@ -150,20 +151,20 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
       },
     });
     const product = await prisma.product.findUniqueOrThrow({
-      where: { slug: 'cascade-hops' },
+      where: { slug: 'safale-us05-yeast' },
     });
     await expect(
       postgres.query(
-        `INSERT INTO "CartItem" ("cartId", "productId", "quantity", "updatedAt") VALUES ($1, $2, 0, CURRENT_TIMESTAMP)`,
+        `INSERT INTO "CartItem" ("cartId", "productId", "amount", "updatedAt") VALUES ($1, $2, 0, CURRENT_TIMESTAMP)`,
         [cart.id, product.id],
       ),
     ).rejects.toMatchObject({ code: '23514' });
     await prisma.cartItem.create({
-      data: { cartId: cart.id, productId: product.id, quantity: 1 },
+      data: { cartId: cart.id, productId: product.id, amount: 1 },
     });
     await expect(
       prisma.cartItem.create({
-        data: { cartId: cart.id, productId: product.id, quantity: 2 },
+        data: { cartId: cart.id, productId: product.id, amount: 2 },
       }),
     ).rejects.toMatchObject({ code: 'P2002' });
   });
@@ -171,22 +172,22 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
   it('fails active/USD/stock checks before first-cart persistence and rejects expiry', async () => {
     const server = app.getHttpServer() as App;
     const product = await prisma.product.findUniqueOrThrow({
-      where: { slug: 'cascade-hops' },
+      where: { slug: 'safale-us05-yeast' },
     });
     for (const data of [
       { isActive: false },
       { currency: 'EUR' },
-      { stockQuantity: 0 },
+      { stockAmount: 0 },
     ]) {
       await prisma.product.update({ data, where: { id: product.id } });
       await request(server)
         .post('/api/v1/cart/items')
         .set('Origin', 'http://localhost:3000')
-        .send({ productSlug: 'cascade-hops', quantity: 1 })
+        .send({ productSlug: 'safale-us05-yeast', amount: 1 })
         .expect(422);
       expect(await prisma.cart.count()).toBe(0);
       await prisma.product.update({
-        data: { currency: 'USD', isActive: true, stockQuantity: 100 },
+        data: { currency: 'USD', isActive: true, stockAmount: 100 },
         where: { id: product.id },
       });
     }
@@ -205,8 +206,8 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
   it('enforces 50 distinct lines transactionally in PostgreSQL', async () => {
     const category = await prisma.category.findFirstOrThrow();
     await postgres.query(
-      `INSERT INTO "Product" ("id", "name", "slug", "teaser", "description", "priceMinor", "priceQualifier", "currency", "stockQuantity", "isActive", "imagePath", "specifications", "categoryId", "updatedAt")
-       SELECT gen_random_uuid(), 'O0 line ' || value, 'o0-line-' || lpad(value::text, 2, '0'), 'fixture', 'fixture', 100, 'fixture', 'USD', 100, true, '/assets/products/o0-line-' || lpad(value::text, 2, '0') || '.webp', '[]'::jsonb, $1, CURRENT_TIMESTAMP
+      `INSERT INTO "Product" ("id", "name", "slug", "teaser", "description", "priceMinor", "priceQualifier", "currency", "saleKind", "amountUnit", "priceBasisAmount", "minimumOrderAmount", "orderStepAmount", "stockAmount", "isActive", "imagePath", "specifications", "categoryId", "updatedAt")
+       SELECT gen_random_uuid(), 'O0 line ' || value, 'o0-line-' || lpad(value::text, 2, '0'), 'fixture', 'fixture', 100, 'fixture', 'USD', 'PACKAGE', 'EACH', 1, 1, 1, 100, true, '/assets/products/o0-line-' || lpad(value::text, 2, '0') || '.webp', '[]'::jsonb, $1, CURRENT_TIMESTAMP
        FROM generate_series(1, 51) value`,
       [category.id],
     );
@@ -226,7 +227,7 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
       data: products.map(({ id }) => ({
         cartId: cart.id,
         productId: id,
-        quantity: 1,
+        amount: 1,
       })),
     });
     const cookie = `hb_cart=${rawToken}`;
@@ -240,7 +241,7 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
       .set('Cookie', cookie)
       .set('Origin', 'http://localhost:3000')
       .set('X-CSRF-Token', csrf)
-      .send({ productSlug: 'o0-line-51', quantity: 1 })
+      .send({ productSlug: 'o0-line-51', amount: 1 })
       .expect(422);
     expect(await prisma.cartItem.count({ where: { cartId: cart.id } })).toBe(
       50,

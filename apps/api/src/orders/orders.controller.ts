@@ -96,7 +96,7 @@ export class OrdersController {
   })
   @ApiUnprocessableEntityResponse({
     description:
-      'Cart, reservation, product, quantity, stock or payment method is unavailable',
+      'Cart, reservation, product, amount, stock or payment method is unavailable',
   })
   @ApiUnsupportedMediaTypeResponse({ description: 'JSON body required' })
   async create(

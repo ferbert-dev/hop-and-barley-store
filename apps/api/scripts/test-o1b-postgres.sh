@@ -51,6 +51,21 @@ apply_prior_migrations() {
   done
 }
 
+create_legacy_catalog() {
+  local database_name=$1
+  docker exec "$container_name" psql --set ON_ERROR_STOP=1 \
+    --username "$database_user" --dbname "$database_name" \
+    --command "
+      INSERT INTO \"Product\" (
+        \"id\", \"name\", \"slug\", \"teaser\", \"description\",
+        \"priceMinor\", \"priceQualifier\", \"currency\", \"stockQuantity\",
+        \"isActive\", \"imagePath\", \"specifications\", \"categoryId\", \"updatedAt\"
+      ) VALUES
+        ('20000000-0000-4000-8000-000000000004', 'Cascade Hops', 'cascade-hops', 'Legacy O1B', 'Legacy O1B', 749, 'per 100g', 'USD', 100, true, '/assets/products/cascade-hops.webp', '[]', '10000000-0000-4000-8000-000000000001', CURRENT_TIMESTAMP),
+        ('20000000-0000-4000-8000-000000000007', 'Centennial Hops', 'centennial-hops', 'Legacy O1B', 'Legacy O1B', 620, 'per 100g', 'USD', 100, true, '/assets/products/centennial-hops.webp', '[]', '10000000-0000-4000-8000-000000000001', CURRENT_TIMESTAMP);
+    " >/dev/null
+}
+
 create_legacy_cart_line() {
   local database_name=$1
   docker exec "$container_name" psql --set ON_ERROR_STOP=1 \
@@ -126,7 +141,7 @@ create_recovery_fixtures() {
 
 docker exec "$container_name" createdb -U "$database_user" atomic_o1b
 apply_prior_migrations atomic_o1b
-DATABASE_URL=$(database_url atomic_o1b) pnpm --dir "$repo_root" --filter @hop-and-barley/api db:seed
+create_legacy_catalog atomic_o1b
 create_legacy_cart_line atomic_o1b
 if {
   sed -n '1,$p' "$migration_path"
@@ -152,7 +167,7 @@ test "$atomic_shape" = 't|t|1'
 
 docker exec "$container_name" createdb -U "$database_user" upgrade_o1b
 apply_prior_migrations upgrade_o1b
-DATABASE_URL=$(database_url upgrade_o1b) pnpm --dir "$repo_root" --filter @hop-and-barley/api db:seed
+create_legacy_catalog upgrade_o1b
 create_legacy_cart_line upgrade_o1b
 docker exec --interactive "$container_name" psql \
   --set ON_ERROR_STOP=1 --username "$database_user" --dbname upgrade_o1b \
@@ -299,7 +314,7 @@ fresh_constraints=$(docker exec "$container_name" psql --tuples-only --no-align 
   --command "
     SELECT count(*) FROM pg_constraint
     WHERE conname IN (
-      'CartReservation_quantity_check',
+      'CartReservation_amount_check',
       'CartReservation_exact_lifetime_check',
       'CartReservation_state_check',
       'CartReservation_line_state_check',

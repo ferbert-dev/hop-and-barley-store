@@ -32,11 +32,16 @@ export class CreateOrderItemDto {
   @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
   productSlug!: string;
 
-  @ApiProperty({ format: 'int32', maximum: 99, minimum: 1, type: 'integer' })
+  @ApiProperty({
+    format: 'int32',
+    maximum: 2_000_000_000,
+    minimum: 1,
+    type: 'integer',
+  })
   @IsInt()
   @Min(1)
-  @Max(99)
-  quantity!: number;
+  @Max(2_000_000_000)
+  amount!: number;
 }
 
 export class CreateOrderDto {

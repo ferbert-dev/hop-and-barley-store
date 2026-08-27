@@ -19,7 +19,7 @@ jest.mock('../database/prisma.service', () => ({
 const checkout = {
   city: 'Portland',
   fullName: 'Ada Brewer',
-  items: [{ productSlug: 'cascade-hops', quantity: 2 }],
+  items: [{ productSlug: 'cascade-hops', amount: 2 }],
   paymentMethod: CheckoutPaymentMethod.CASH_ON_DELIVERY,
   phoneNumber: '+1 555 0100',
   shippingAddress: '10 Brewery Lane',

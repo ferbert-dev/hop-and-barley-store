@@ -18,10 +18,19 @@ const legacyItem = {
 
 const pagedItem = {
   ...legacyItem,
+  amountUnit: 'MILLIGRAM',
   availability: 'in-stock',
   category: { name: 'Hops', slug: 'hops' },
   imagePath: '/assets/products/cascade-hops.webp',
-  priceQualifier: 'per pound',
+  kitYieldVolumeMl: null,
+  maximumOrderAmount: null,
+  minimumOrderAmount: 100_000,
+  orderStepAmount: 5_000,
+  packageNetWeightMg: null,
+  priceBasisAmount: 100_000,
+  priceQualifier: 'per 100g',
+  saleKind: 'WEIGHT',
+  stockAmount: 100_000_000,
   teaser: 'Citrus and floral whole-cone hops.',
 };
 
@@ -166,6 +175,7 @@ test('normalizer rejects prohibited persistence fields in a legacy array', () =>
   const persistenceValues = {
     categoryId: '10000000-0000-4000-8000-000000000001',
     isActive: true,
+    stockAmount: 100,
     stockQuantity: 100,
   };
 

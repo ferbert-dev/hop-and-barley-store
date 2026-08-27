@@ -47,7 +47,7 @@ function SiteHeaderDisclosure({
   const { ensureLoaded, items, state: cartState } = useCart();
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const cartQuantity = items.reduce((total, item) => total + item.quantity, 0);
+  const cartLineCount = items.length;
 
   useEffect(() => {
     void ensureLoaded();
@@ -140,8 +140,8 @@ function SiteHeaderDisclosure({
                 prefetch={false}
                 aria-label={
                   cartState.kind === 'ready'
-                    ? `Shopping cart, ${String(cartQuantity)} ${
-                        cartQuantity === 1 ? 'item' : 'items'
+                    ? `Shopping cart, ${String(cartLineCount)} ${
+                        cartLineCount === 1 ? 'item' : 'items'
                       }`
                     : 'Shopping cart'
                 }
@@ -161,7 +161,7 @@ function SiteHeaderDisclosure({
                     aria-hidden="true"
                     className="storefront-nav__cart-count"
                   >
-                    {cartQuantity}
+                    {cartLineCount}
                   </span>
                 ) : null}
               </Link>

@@ -6,17 +6,17 @@ import {
 const expectedCategories = ['adjuncts', 'hops', 'kits', 'malts', 'yeast'];
 
 const expectedProducts = {
-  'caramel-malt': [300, '/assets/products/caramel-malt.webp'],
+  'caramel-malt': [66, '/assets/products/caramel-malt.webp'],
   'cascade-hops': [749, '/assets/products/cascade-hops.webp'],
   'centennial-hops': [620, '/assets/products/centennial-hops.webp'],
   'citra-hops': [599, '/assets/products/citra-hops.webp'],
   'imperial-yeast': [899, '/assets/products/imperial-yeast.webp'],
-  'maris-otter-malt': [250, '/assets/products/maris-otter-malt.webp'],
+  'maris-otter-malt': [55, '/assets/products/maris-otter-malt.webp'],
   'mosaic-hops': [950, '/assets/products/mosaic-hops.webp'],
-  'pilsner-malt': [220, '/assets/products/pilsner-malt.webp'],
+  'pilsner-malt': [49, '/assets/products/pilsner-malt.webp'],
   'saaz-hops': [475, '/assets/products/saaz-hops.webp'],
   'safale-us05-yeast': [325, '/assets/products/safale-us05-yeast.webp'],
-  'unmalted-wheat': [180, '/assets/products/unmalted-wheat.webp'],
+  'unmalted-wheat': [40, '/assets/products/unmalted-wheat.webp'],
   'west-coast-ipa-kit': [6000, '/assets/products/west-coast-ipa-kit.webp'],
 } as const;
 
@@ -37,7 +37,9 @@ describe('C1 catalog fixtures', () => {
     for (const product of catalogProducts) {
       expect(isUuid(product.id)).toBe(true);
       expect(product.currency).toBe('USD');
-      expect(product.stockQuantity).toBe(100);
+      expect(product.stockAmount).toBe(
+        product.saleKind === 'WEIGHT' ? 100_000_000 : 100,
+      );
       expect(product.isActive).toBe(true);
       expect(product.description.split('\n\n')).toHaveLength(3);
       expect(product.teaser.trim()).not.toBe('');
@@ -55,6 +57,16 @@ describe('C1 catalog fixtures', () => {
         0,
       ),
     ).toBe(95);
+
+    expect(
+      catalogProducts.find(({ slug }) => slug === 'safale-us05-yeast'),
+    ).toMatchObject({ packageNetWeightMg: 11_500, saleKind: 'PACKAGE' });
+    expect(
+      catalogProducts.find(({ slug }) => slug === 'imperial-yeast'),
+    ).toMatchObject({ packageNetWeightMg: null, saleKind: 'PACKAGE' });
+    expect(
+      catalogProducts.find(({ slug }) => slug === 'west-coast-ipa-kit'),
+    ).toMatchObject({ kitYieldVolumeMl: 18_927, saleKind: 'KIT' });
   });
 
   it('preserves ordered heterogeneous specifications for the brewing kit', () => {

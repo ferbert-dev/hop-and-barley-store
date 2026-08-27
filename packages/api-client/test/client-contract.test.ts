@@ -73,11 +73,11 @@ void logoutRequest;
 const cartRequest = configuredClient.GET('/api/v1/cart');
 const cartCsrfRequest = configuredClient.GET('/api/v1/cart/csrf');
 const firstCartAdd = configuredClient.POST('/api/v1/cart/items', {
-  body: { productSlug: 'cascade-hops', quantity: 2 },
+  body: { productSlug: 'cascade-hops', amount: 2 },
   params: { header: { Origin: 'http://localhost:3000' } },
 });
 const existingCartAdd = configuredClient.POST('/api/v1/cart/items', {
-  body: { productSlug: 'cascade-hops', quantity: 1 },
+  body: { productSlug: 'cascade-hops', amount: 1 },
   params: {
     header: {
       Origin: 'http://localhost:3000',
@@ -86,7 +86,7 @@ const existingCartAdd = configuredClient.POST('/api/v1/cart/items', {
   },
 });
 const cartPatch = configuredClient.PATCH('/api/v1/cart/items/{productSlug}', {
-  body: { quantity: 3 },
+  body: { amount: 3 },
   params: {
     header: {
       Origin: 'http://localhost:3000',
@@ -133,7 +133,7 @@ const createOrder = configuredClient.POST('/api/v1/orders', {
   body: {
     city: 'Portland',
     fullName: 'Ada Brewer',
-    items: [{ productSlug: 'cascade-hops', quantity: 2 }],
+    items: [{ productSlug: 'cascade-hops', amount: 2 }],
     paymentMethod: 'cash_on_delivery',
     phoneNumber: '+1 555 0100',
     shippingAddress: '10 Brewery Lane',
@@ -154,12 +154,15 @@ const safeOrder: components['schemas']['OrderDto'] = {
   itemSubtotalMinor: 1398,
   items: [
     {
+      amountUnit: 'EACH',
       lineTotalMinor: 1398,
+      priceBasisAmount: 1,
       priceQualifier: 'per pound',
       productName: 'Cascade Hops',
       productSlug: 'cascade-hops',
-      quantity: 2,
-      unitPriceMinor: 699,
+      amount: 2,
+      priceMinor: 699,
+      saleKind: 'PACKAGE',
     },
   ],
   paidAt: null,
@@ -185,22 +188,30 @@ const safeCart: components['schemas']['CartDto'] = {
   distinctItemCount: 1,
   items: [
     {
+      amountUnit: 'EACH',
       availability: 'available',
-      currentUnitPriceMinor: 699,
+      kitYieldVolumeMl: null,
+      maximumOrderAmount: null,
+      minimumOrderAmount: 1,
+      orderStepAmount: 1,
+      packageNetWeightMg: null,
+      priceMinor: 699,
+      priceBasisAmount: 1,
       imagePath: '/assets/products/cascade-hops.webp',
       lineTotalMinor: 1398,
       name: 'Cascade Hops',
       priceQualifier: 'per pound',
       productId: '20000000-0000-4000-8000-000000000002',
       productSlug: 'cascade-hops',
-      quantity: 2,
+      amount: 2,
       reservationExpiresAt: '2026-08-25T12:15:00.000Z',
       reservationStatus: 'active',
+      saleKind: 'PACKAGE',
+      stockAmount: 100,
     },
   ],
   serverNow: '2026-08-25T12:00:00.000Z',
   subtotalMinor: 1398,
-  totalQuantity: 2,
 };
 void safeCart;
 
@@ -217,16 +228,25 @@ const safeSession: components['schemas']['AuthSessionDto'] = {
 void safeSession;
 
 const detail: components['schemas']['ProductDetailDto'] = {
+  amountUnit: 'MILLIGRAM',
   availability: 'in-stock',
   category: { name: 'Hops', slug: 'hops' },
   currency: 'USD',
   description: 'Three-paragraph detail copy',
   id: '20000000-0000-4000-8000-000000000001',
   imagePath: '/assets/products/citra-hops.webp',
+  kitYieldVolumeMl: null,
+  maximumOrderAmount: null,
+  minimumOrderAmount: 100_000,
   name: 'Citra Hops',
+  orderStepAmount: 5_000,
+  packageNetWeightMg: null,
+  priceBasisAmount: 100_000,
   priceMinor: 599,
   priceQualifier: 'per 100g',
+  saleKind: 'WEIGHT',
   slug: 'citra-hops',
+  stockAmount: 100_000_000,
   specifications: [
     { label: 'Origin', value: 'USA' },
     { label: 'Uses', value: ['Late additions', 'Dry hopping'] },

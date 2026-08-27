@@ -62,36 +62,52 @@ jest.mock('./../src/database/prisma.service', () => ({
         .mockImplementation(({ where }: { where: { slug: string } }) =>
           where.slug === 'cascade-hops'
             ? Promise.resolve({
+                amountUnit: 'MILLIGRAM',
                 category: { name: 'Hops', slug: 'hops' },
                 currency: 'USD',
                 description: 'Bright whole-cone hops',
                 id: '20000000-0000-4000-8000-000000000002',
                 imagePath: '/assets/products/cascade-hops.webp',
+                kitYieldVolumeMl: null,
+                maximumOrderAmount: null,
+                minimumOrderAmount: 100_000,
                 name: 'Cascade Hops',
+                orderStepAmount: 5_000,
+                packageNetWeightMg: null,
+                priceBasisAmount: 100_000,
                 priceMinor: 699,
-                priceQualifier: 'per pound',
+                priceQualifier: 'per 100g',
+                saleKind: 'WEIGHT',
                 slug: 'cascade-hops',
                 specifications: [
                   { label: 'Origin', value: 'USA' },
                   { label: 'Uses', value: ['Late additions', 'Dry hopping'] },
                 ],
-                stockQuantity: 100,
+                stockAmount: 100_000_000,
                 teaser: 'Citrus and floral whole-cone hops.',
               })
             : Promise.resolve(null),
         ),
       findMany: jest.fn().mockResolvedValue([
         {
+          amountUnit: 'MILLIGRAM',
           category: { name: 'Hops', slug: 'hops' },
           currency: 'USD',
           description: 'Bright whole-cone hops',
           id: '20000000-0000-4000-8000-000000000002',
           imagePath: '/assets/products/cascade-hops.webp',
+          kitYieldVolumeMl: null,
+          maximumOrderAmount: null,
+          minimumOrderAmount: 100_000,
           name: 'Cascade Hops',
+          orderStepAmount: 5_000,
+          packageNetWeightMg: null,
+          priceBasisAmount: 100_000,
           priceMinor: 699,
-          priceQualifier: 'per pound',
+          priceQualifier: 'per 100g',
+          saleKind: 'WEIGHT',
           slug: 'cascade-hops',
-          stockQuantity: 100,
+          stockAmount: 100_000_000,
           teaser: 'Citrus and floral whole-cone hops.',
         },
       ]),
@@ -630,16 +646,25 @@ describe('Platform API (e2e)', () => {
       'slug',
     ]);
     expect(schemas.ProductDto.required?.sort()).toEqual([
+      'amountUnit',
       'availability',
       'category',
       'currency',
       'description',
       'id',
       'imagePath',
+      'kitYieldVolumeMl',
+      'maximumOrderAmount',
+      'minimumOrderAmount',
       'name',
+      'orderStepAmount',
+      'packageNetWeightMg',
+      'priceBasisAmount',
       'priceMinor',
       'priceQualifier',
+      'saleKind',
       'slug',
+      'stockAmount',
       'teaser',
     ]);
     expect(schemas.ProductDto.properties?.priceMinor).toMatchObject({
@@ -738,16 +763,25 @@ describe('Platform API (e2e)', () => {
     });
     expect(Object.keys(body).sort()).toEqual(['items', 'meta']);
     expect(Object.keys(body.items[0]).sort()).toEqual([
+      'amountUnit',
       'availability',
       'category',
       'currency',
       'description',
       'id',
       'imagePath',
+      'kitYieldVolumeMl',
+      'maximumOrderAmount',
+      'minimumOrderAmount',
       'name',
+      'orderStepAmount',
+      'packageNetWeightMg',
+      'priceBasisAmount',
       'priceMinor',
       'priceQualifier',
+      'saleKind',
       'slug',
+      'stockAmount',
       'teaser',
     ]);
     expect(Object.keys(body.meta).sort()).toEqual([
@@ -802,17 +836,26 @@ describe('Platform API (e2e)', () => {
     expect(
       document.components.schemas.ProductDetailDto.required?.sort(),
     ).toEqual([
+      'amountUnit',
       'availability',
       'category',
       'currency',
       'description',
       'id',
       'imagePath',
+      'kitYieldVolumeMl',
+      'maximumOrderAmount',
+      'minimumOrderAmount',
       'name',
+      'orderStepAmount',
+      'packageNetWeightMg',
+      'priceBasisAmount',
       'priceMinor',
       'priceQualifier',
+      'saleKind',
       'slug',
       'specifications',
+      'stockAmount',
       'teaser',
     ]);
     expect(
@@ -845,23 +888,31 @@ describe('Platform API (e2e)', () => {
       .get('/api/v1/products/cascade-hops')
       .expect(200);
     expect(response.body).toEqual({
+      amountUnit: 'MILLIGRAM',
       availability: 'in-stock',
       category: { name: 'Hops', slug: 'hops' },
       currency: 'USD',
       description: 'Bright whole-cone hops',
       id: '20000000-0000-4000-8000-000000000002',
       imagePath: '/assets/products/cascade-hops.webp',
+      kitYieldVolumeMl: null,
+      maximumOrderAmount: null,
+      minimumOrderAmount: 100_000,
       name: 'Cascade Hops',
+      orderStepAmount: 5_000,
+      packageNetWeightMg: null,
+      priceBasisAmount: 100_000,
       priceMinor: 699,
-      priceQualifier: 'per pound',
+      priceQualifier: 'per 100g',
+      saleKind: 'WEIGHT',
       slug: 'cascade-hops',
+      stockAmount: 100_000_000,
       specifications: [
         { label: 'Origin', value: 'USA' },
         { label: 'Uses', value: ['Late additions', 'Dry hopping'] },
       ],
       teaser: 'Citrus and floral whole-cone hops.',
     });
-    expect(response.body).not.toHaveProperty('stockQuantity');
     expect(response.body).not.toHaveProperty('isActive');
   });
 

@@ -11,10 +11,29 @@ export class OrderItemDto {
   priceQualifier!: string;
 
   @ApiProperty({ format: 'int32', minimum: 0, type: 'integer' })
-  unitPriceMinor!: number;
+  priceMinor!: number;
 
-  @ApiProperty({ format: 'int32', maximum: 99, minimum: 1, type: 'integer' })
-  quantity!: number;
+  @ApiProperty({ enum: ['WEIGHT', 'PACKAGE', 'KIT'], type: String })
+  saleKind!: 'WEIGHT' | 'PACKAGE' | 'KIT';
+
+  @ApiProperty({ enum: ['MILLIGRAM', 'EACH'], type: String })
+  amountUnit!: 'MILLIGRAM' | 'EACH';
+
+  @ApiProperty({
+    format: 'int32',
+    maximum: 2_000_000_000,
+    minimum: 1,
+    type: 'integer',
+  })
+  priceBasisAmount!: number;
+
+  @ApiProperty({
+    format: 'int32',
+    maximum: 2_000_000_000,
+    minimum: 1,
+    type: 'integer',
+  })
+  amount!: number;
 
   @ApiProperty({ format: 'int32', minimum: 0, type: 'integer' })
   lineTotalMinor!: number;

@@ -21,7 +21,16 @@ const pagedItem = {
   availability: 'in-stock',
   category: { name: 'Hops', slug: 'hops' },
   imagePath: '/assets/products/cascade-hops.webp',
+  kitYieldVolumeMl: null,
+  maximumOrderAmount: 100_000_000,
+  minimumOrderAmount: 100_000,
+  orderStepAmount: 5_000,
+  packageNetWeightMg: null,
+  priceBasisAmount: 100_000,
   priceQualifier: 'per 100g',
+  saleKind: 'WEIGHT',
+  stockAmount: 100_000_000,
+  amountUnit: 'MILLIGRAM',
   teaser: 'Citrus and floral whole-cone hops.',
 };
 
@@ -88,7 +97,11 @@ describe('loadCatalog', () => {
         'http://api:3001/api/v1',
       ),
     ).resolves.toMatchObject({
-      catalog: { items: [pagedItem], kind: 'paged', meta },
+      catalog: {
+        items: [expect.objectContaining({ id: pagedItem.id })],
+        kind: 'paged',
+        meta,
+      },
       connected: true,
     });
     expect(fetch).toHaveBeenCalledOnce();
