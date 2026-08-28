@@ -32,7 +32,6 @@ export function CatalogControls({
       role="search"
     >
       <div className={styles.filterHeading}>
-        <p className="eyebrow">Find your ingredients</p>
         {showClear ? (
           <Button href="/" variant="secondary">
             Clear filters
@@ -42,6 +41,7 @@ export function CatalogControls({
 
       <div className={styles.searchRow}>
         <Field
+          className={styles.searchInput}
           defaultValue={query.search ?? ''}
           id="catalog-search"
           label="Search products"
@@ -108,6 +108,7 @@ export function CatalogControls({
 
       <div className={styles.sortField}>
         <Select
+          className={styles.sortSelect}
           defaultValue={query.sort}
           id="catalog-sort"
           label="Sort by"

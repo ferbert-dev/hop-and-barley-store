@@ -21,6 +21,8 @@ test.describe('measured product quantities', () => {
 
     const amount = amountInput(page);
     await expect(amount).toBeVisible();
+    await expect(amount).toHaveAccessibleName('Quantity (kg)');
+    await expect(page.getByText('kg', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('combobox')).toHaveCount(0);
     await expect(amount).toHaveValue('0.1');
     await expect(

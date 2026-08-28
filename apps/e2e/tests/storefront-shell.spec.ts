@@ -214,3 +214,27 @@ test('renders the configured API availability state without changing the shell',
   await expect(page.locator('main')).toHaveCount(1);
   await waitForShellAssets(page);
 });
+
+test('fills the complete catalog hero section with the hop image', async ({
+  page,
+}) => {
+  for (const width of [360, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+    const hero = page.getByRole('region', { name: 'Product catalog' });
+    const image = hero.getByRole('img', {
+      name: 'Close-up hop cones and green leaves',
+    });
+    const [heroBox, imageBox] = await Promise.all([
+      hero.boundingBox(),
+      image.boundingBox(),
+    ]);
+
+    expect(heroBox, `${width}px hero must be measurable`).not.toBeNull();
+    expect(imageBox, `${width}px hero image must be measurable`).not.toBeNull();
+    expect(heroBox!.x).toBe(0);
+    expect(heroBox!.width).toBe(width);
+    expect(imageBox).toEqual(heroBox);
+  }
+});

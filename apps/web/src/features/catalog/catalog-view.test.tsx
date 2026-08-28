@@ -84,6 +84,11 @@ describe('catalog discovery screen', () => {
   it('renders the generated paged response through URL-backed controls and D3 cards', () => {
     render(<CatalogScreen query={query} result={pagedResult()} />);
 
+    expect(
+      screen.getByRole('heading', { name: 'Find your ingredients' }),
+    ).toBeVisible();
+    expect(screen.queryByText('From the database')).not.toBeInTheDocument();
+    expect(screen.queryByText('Current selection')).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('API connected');
     expect(
       screen.getByRole('img', {
@@ -101,6 +106,9 @@ describe('catalog discovery screen', () => {
       'href',
       '/product/cascade-hops',
     );
+    expect(
+      screen.getByRole('link', { name: 'View Cascade Hops details' }),
+    ).toHaveAttribute('href', '/product/cascade-hops');
     expect(screen.getByRole('img', { name: 'Cascade hops' })).toHaveAttribute(
       'src',
       '/assets/products/cascade-hops.webp',

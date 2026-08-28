@@ -172,6 +172,9 @@ describe('content surfaces', () => {
       'href',
       '/product/citra-hops',
     );
+    expect(
+      screen.getByRole('link', { name: 'View Citra Hops details' }),
+    ).toHaveAttribute('href', '/product/citra-hops');
     expect(screen.getByText('€5.99')).toBeInTheDocument();
   });
 });

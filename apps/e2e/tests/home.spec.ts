@@ -17,7 +17,7 @@ test('shows the configured Hop & Barley stack status', async ({ page }) => {
     await expect(page.getByRole('article')).toHaveCount(0);
   } else {
     await expect(
-      page.getByRole('link', { name: 'Cascade Hops' }),
+      page.getByRole('link', { name: 'Cascade Hops', exact: true }),
     ).toHaveAttribute('href', '/product/cascade-hops');
     await expect(page.getByRole('img', { name: 'Cascade hops' })).toBeVisible();
   }

@@ -56,6 +56,7 @@
 
 .button:focus-visible,
 .control:focus-visible,
+.productMedia:focus-visible,
 .productLink:focus-visible {
   outline: 3px solid var(--hb-color-brand);
   outline-offset: 2px;
@@ -126,6 +127,7 @@
   aspect-ratio: 3 / 2;
   background: var(--hb-color-surface-muted);
   border-radius: var(--hb-radius-md);
+  display: block;
   overflow: hidden;
 }
 

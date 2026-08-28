@@ -167,6 +167,28 @@ Page 1 (0:1)
 - Search matching rules, filter combination logic, URL/query persistence, default sort, result counts, and zero/loading/error states.
 - Responsive layouts and the card destination are not prototype-confirmed.
 
+**User-confirmed hero extension — 2026-08-28**
+
+- The hop hero image fills the complete width and height of its allocated
+  section below the header. The storefront does not add an inner inset or a
+  content-width cap around that image.
+- This full-bleed treatment is a user-approved correction, not evidence that
+  the source frame defines responsive hero spacing.
+
+**User-confirmed catalog presentation extension — 2026-08-28**
+
+- Remove `From the database` and `Current selection`. Use
+  `Find your ingredients` as the catalog section title.
+- Make search the visually primary filter and give the native sorting control
+  an intentional storefront treatment.
+- Both the product image and product name open product details. The rest of the
+  card is not an implicit link.
+- Product Type should become a compact dropdown with removable selected tags
+  and support multiple selections. The combination rule remains a decision
+  gate: because every product has exactly one category, literal AND between
+  two different product types always returns no products. Do not change the
+  query/API contract until OR versus literal AND is confirmed.
+
 ### Product details — `product`
 
 [Open node `9:2284`](https://www.figma.com/design/H7jIUNYzAGc7o8R0iABQjy/Project-M4-1--Next.js--share-?node-id=9-2284)
@@ -196,6 +218,9 @@ Page 1 (0:1)
   has a cart line, another add increments that line by the newly selected amount
   instead of replacing it. The product page does not show a separate `in cart`
   quantity; line editing remains on the shopping-cart screen.
+- On product detail weight controls, the visible field label is `Quantity (kg)`
+  above the input. Do not render a second `kg` label beside the field. This
+  placement is limited to product details; it does not redefine the cart layout.
 - These controls extend the approved Figma visual language. They are a product
   decision, not evidence that the additional labels or states were drawn in the
   source frame.

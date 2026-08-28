@@ -1,7 +1,5 @@
 .hero {
-  margin-inline: auto;
-  max-width: var(--hb-layout-content);
-  padding: var(--hb-space-4) var(--hb-page-gutter) var(--hb-space-6);
+  overflow: hidden;
 }
 
 .heroImage {
@@ -15,19 +13,13 @@
 .catalog {
   background: var(--hb-color-surface);
   color: var(--hb-color-ink);
-  padding: clamp(4rem, 8vw, 7rem)
+  padding: clamp(2.5rem, 5vw, 4.5rem)
     max(var(--hb-page-gutter), calc((100vw - var(--hb-layout-content)) / 2));
 }
 
-.catalog > :global(.eyebrow),
-.sectionHeading :global(.eyebrow),
-.filterHeading :global(.eyebrow) {
-  color: var(--hb-color-brand);
-}
-
 .sectionHeading h2 {
-  font-size: clamp(2.8rem, 6vw, 5.5rem);
-  margin-bottom: var(--hb-space-12);
+  font-size: clamp(2.8rem, 6vw, 5rem);
+  margin: 0 0 var(--hb-space-8);
 }
 
 .discoveryLayout {
@@ -50,19 +42,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--hb-space-4);
-  justify-content: space-between;
-}
-
-.filterHeading :global(.eyebrow) {
-  color: var(--hb-color-brand);
-  margin-bottom: var(--hb-space-2);
-}
-
-.filterHeading h2 {
-  font-family: var(--hb-font-serif);
-  font-size: var(--hb-font-size-xl);
-  letter-spacing: -0.025em;
-  margin: 0;
+  justify-content: end;
 }
 
 .searchRow {
@@ -73,7 +53,19 @@
 }
 
 .searchButton {
-  min-block-size: 2.75rem;
+  min-block-size: 3.5rem;
+  padding-inline: var(--hb-space-6);
+}
+
+.searchInput,
+.sortSelect {
+  border-color: var(--hb-color-brand);
+  box-shadow: var(--hb-shadow-sm);
+  min-block-size: 3.5rem;
+}
+
+.searchInput {
+  font-size: var(--hb-font-size-lg);
 }
 
 .keywordChips,
@@ -161,6 +153,10 @@
 
 .sortField {
   display: grid;
+}
+
+.sortSelect {
+  font-weight: 600;
 }
 
 .results {
