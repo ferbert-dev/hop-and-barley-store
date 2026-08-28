@@ -155,7 +155,7 @@ export function AccountProfileForm({
               ? 'Your account information was saved, but the profile photo is too large.'
               : avatarResult.kind === 'invalid'
                 ? 'Your account information was saved, but the profile photo is not a valid JPEG, PNG, or WebP image.'
-                : 'Your account information was saved, but the profile photo could not be updated. Please try again.',
+                : 'Your account information was saved, but the profile photo update could not be confirmed. Check your profile photo and try again if needed.',
         });
         return;
       }

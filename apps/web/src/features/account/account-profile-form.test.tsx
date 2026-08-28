@@ -163,7 +163,7 @@ describe('AccountProfileForm', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Your account information was saved, but the profile photo could not be updated. Please try again.',
+      'Your account information was saved, but the profile photo update could not be confirmed. Check your profile photo and try again if needed.',
     );
     expect(
       screen.getByText('profile.png will be uploaded when you save.'),
