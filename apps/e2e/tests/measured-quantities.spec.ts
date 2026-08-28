@@ -171,8 +171,10 @@ test.describe('measured product quantities', () => {
     });
     await page.getByRole('link', { name: /Shopping cart, 1 item/ }).click();
     await expect(
-      page.getByText(/2\s*(?:packs?|sachets?)/i).first(),
-    ).toBeVisible();
+      page
+        .getByLabel('SafAle US-05 Dry Ale Yeast quantity')
+        .getByLabel('Packs'),
+    ).toHaveValue('2');
     await expect(page.getByText(/23(?:\.0+)?\s*g/i).first()).toBeVisible();
 
     await page.goto('/product/imperial-yeast');
