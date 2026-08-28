@@ -11,6 +11,7 @@ import {
 
 import {
   evaluatePasswordRequirements,
+  normalizePasswordInput,
   PASSWORD_REQUIREMENTS,
 } from '@hop-and-barley/auth-contract';
 
@@ -80,7 +81,7 @@ export function AuthForm({
   const confirmationMismatch =
     kind === 'register' &&
     confirmPassword.length > 0 &&
-    password !== confirmPassword
+    normalizePasswordInput(password) !== normalizePasswordInput(confirmPassword)
       ? 'Passwords do not match.'
       : undefined;
 

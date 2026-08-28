@@ -11,6 +11,25 @@ describe('registration password policy', () => {
     );
   });
 
+  it('rejects when NFC normalization reduces the password below 12 characters', () => {
+    expect(() => normalizeRegistrationPassword('A\u0301bcdefg1!xy')).toThrow(
+      'Invalid registration input.',
+    );
+  });
+
+  it('rejects control characters', () => {
+    const unsafeControlInput = [
+      'Abcd',
+      'efgh',
+      '1!',
+      String.fromCodePoint(0),
+      'x',
+    ].join('');
+    expect(() => normalizeRegistrationPassword(unsafeControlInput)).toThrow(
+      'Invalid registration input.',
+    );
+  });
+
   it.each([
     ['fewer than 12 total characters', 'Abcdefg1!x'],
     ['no lowercase letter', 'ABCDEFGHI1!X'],
