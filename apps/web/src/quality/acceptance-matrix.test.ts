@@ -106,7 +106,7 @@ describe('quality acceptance matrix', () => {
       'product-detail': '/product/[slug]',
       cart: '/cart',
       checkout: '/checkout',
-      'account-profile': '/account/[id]',
+      'account-profile': '/account',
       'admin-products': '/admin/products',
     });
 

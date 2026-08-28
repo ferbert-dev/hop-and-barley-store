@@ -22,6 +22,7 @@
     "test:catalog:postgres": "bash scripts/test-catalog-postgres.sh",
     "test:a1:postgres": "bash scripts/test-a1-postgres.sh",
     "test:a1b:postgres": "bash scripts/test-a1b-postgres.sh",
+    "test:a4:postgres": "bash scripts/test-a4-postgres.sh",
     "test:m1:postgres": "bash scripts/test-m1-postgres.sh",
     "test:m2:postgres": "bash scripts/test-m2-postgres.sh",
     "test:o0:postgres": "bash scripts/test-o0-postgres.sh",

@@ -61,9 +61,38 @@ test.describe('connected local authentication journey', () => {
 
     await page.getByRole('link', { name: 'Account' }).click();
     await expect(
-      page.getByRole('heading', { name: 'Your account' }),
+      page.getByRole('heading', { name: 'Account Information' }),
     ).toBeVisible();
-    await expect(page.getByText('You are signed in securely.')).toBeVisible();
+    await expect(page.getByLabel('Full Name')).toBeVisible();
+    await expect(page.getByLabel('Phone number')).toBeVisible();
+    await expect(page.getByLabel('Email')).toHaveValue(email);
+    await expect(page.getByLabel('City')).toBeVisible();
+    await expect(page.getByText('Account role').locator('..')).toContainText(
+      'Customer',
+    );
+
+    const profileSave = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/v1/users/me') &&
+        response.request().method() === 'PATCH',
+    );
+    await page.getByLabel('Full Name').fill('Local Brewer');
+    await page.getByLabel('Phone number').fill('+34 600 123 456');
+    await page.getByLabel('City').fill('Madrid');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await profileSave;
+    await expect(
+      page.getByRole('status', {
+        name: 'Your account information was saved.',
+      }),
+    ).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel('Full Name')).toHaveValue('Local Brewer');
+    await expect(page.getByLabel('Phone number')).toHaveValue(
+      '+34 600 123 456',
+    );
+    await expect(page.getByLabel('Email')).toHaveValue(email);
+    await expect(page.getByLabel('City')).toHaveValue('Madrid');
     expect(
       await page.evaluate(() => ({
         localStorage: localStorage.length,

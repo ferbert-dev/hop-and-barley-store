@@ -15,7 +15,7 @@ verify it.
   reduced-motion duration tokens and `scroll-behavior: auto`.
 - **Decided:** catalog uses `/`; product detail uses `/product/[slug]`; the
   required order form begins at `/cart`; review/confirmation uses `/checkout`;
-  the protected customer route is `/account/[id]`; the admin product list uses
+  the protected customer route is the self-only `/account`; the admin product list uses
   `/admin/products`.
 - **Planned:** the route families and states in the matrix below.
 - **Unresolved:** final auth, recovery, account-order, admin create/edit and
@@ -56,21 +56,21 @@ navigation, visible focus, names/labels, contrast, error messaging, reduced
 motion, overflow/reflow and route announcement. A check can be marked
 `not-applicable` only with a written reason and reviewer agreement.
 
-| Family                                   | Route policy                | Required states                                                                                                                                  |
-| ---------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Shared storefront shell                  | Shared across routes        | default; mobile navigation open; keyboard navigation; API unavailable                                                                            |
-| Catalog and discovery                    | Confirmed `/`               | loading; ready; filtered; empty; error                                                                                                           |
-| Product detail/reviews/cart action       | Confirmed `/product/[slug]` | loading; in stock; out of stock; not found; API error; empty/populated reviews; review validation error; cart error                              |
-| Cart and required order form             | Confirmed `/cart`           | empty; populated; quantity validation error; API error; submitting order                                                                         |
-| Checkout review/confirmation             | Confirmed `/checkout`       | review; submitting; success; validation error; order error                                                                                       |
-| Registration/sign-in/sign-out            | Unresolved until A0/A1C     | sign in; register; validation error; invalid credentials; expired session; Google unconfigured                                                   |
-| Account recovery                         | Unresolved until A3         | request; request success; reset; invalid/expired token; validation error                                                                         |
-| Customer account/profile                 | Confirmed `/account/[id]`   | loading; ready; edit; validation error; missing-session redirect; authenticated forbidden; API error                                             |
-| Customer order history                   | Unresolved until A5         | loading; populated; empty; pagination; missing-session redirect; authenticated forbidden; API error                                              |
-| Admin product list/search                | Confirmed `/admin/products` | loading; populated; empty search; missing-session redirect; authenticated forbidden; API error                                                   |
-| Admin product creation                   | Unresolved until M3         | ready; validation error; saving; success; missing-session redirect; authenticated forbidden; API error                                           |
-| Admin product edit/visibility/retirement | Unresolved until M4/M5      | loading; ready; validation; saving; visibility updated; retirement blocked/retired; missing-session redirect; authenticated forbidden; API error |
-| Optional admin dashboard                 | Unresolved, P2 M6           | loading; ready; empty; missing-session redirect; authenticated forbidden; API error                                                              |
+| Family                                   | Route policy                   | Required states                                                                                                                                  |
+| ---------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Shared storefront shell                  | Shared across routes           | default; mobile navigation open; keyboard navigation; API unavailable                                                                            |
+| Catalog and discovery                    | Confirmed `/`                  | loading; ready; filtered; empty; error                                                                                                           |
+| Product detail/reviews/cart action       | Confirmed `/product/[slug]`    | loading; in stock; out of stock; not found; API error; empty/populated reviews; review validation error; cart error                              |
+| Cart and required order form             | Confirmed `/cart`              | empty; populated; quantity validation error; API error; submitting order                                                                         |
+| Checkout review/confirmation             | Confirmed `/checkout`          | review; submitting; success; validation error; order error                                                                                       |
+| Registration/sign-in/sign-out            | Unresolved until A0/A1C        | sign in; register; validation error; invalid credentials; expired session; Google unconfigured                                                   |
+| Account recovery                         | Unresolved until A3            | request; request success; reset; invalid/expired token; validation error                                                                         |
+| Customer account/profile                 | Confirmed self-only `/account` | loading; ready; edit; validation error; missing-session redirect; authenticated forbidden; API error                                             |
+| Customer order history                   | Unresolved until A5            | loading; populated; empty; pagination; missing-session redirect; authenticated forbidden; API error                                              |
+| Admin product list/search                | Confirmed `/admin/products`    | loading; populated; empty search; missing-session redirect; authenticated forbidden; API error                                                   |
+| Admin product creation                   | Unresolved until M3            | ready; validation error; saving; success; missing-session redirect; authenticated forbidden; API error                                           |
+| Admin product edit/visibility/retirement | Unresolved until M4/M5         | loading; ready; validation; saving; visibility updated; retirement blocked/retired; missing-session redirect; authenticated forbidden; API error |
+| Optional admin dashboard                 | Unresolved, P2 M6              | loading; ready; empty; missing-session redirect; authenticated forbidden; API error                                                              |
 
 Success, error, empty and loading states are verified separately. Every
 protected account/admin family also separates a missing-session redirect from
