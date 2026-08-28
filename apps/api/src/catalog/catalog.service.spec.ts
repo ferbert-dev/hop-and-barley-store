@@ -50,6 +50,7 @@ const facetQuery = {
   select: { name: true, slug: true },
   where: {
     products: { some: { currency: 'USD', isActive: true } },
+    slug: { in: ['hops', 'malts', 'yeast', 'adjuncts'] },
   },
 };
 

@@ -2,6 +2,7 @@ import {
   catalogCategories,
   catalogProducts,
 } from '../../prisma/catalog-fixtures';
+import { CATALOG_INGREDIENT_PRODUCT_TYPES } from './catalog-product-types';
 
 const expectedCategories = ['adjuncts', 'hops', 'kits', 'malts', 'yeast'];
 
@@ -27,6 +28,22 @@ describe('C1 catalog fixtures', () => {
     );
     expect(new Set(catalogCategories.map(({ id }) => id)).size).toBe(5);
     expect(catalogCategories.every(({ id }) => isUuid(id))).toBe(true);
+    expect(
+      CATALOG_INGREDIENT_PRODUCT_TYPES.map(({ name, slug }) => ({
+        name,
+        slug,
+      })),
+    ).toEqual([
+      { name: 'Hops', slug: 'hops' },
+      { name: 'Malt', slug: 'malts' },
+      { name: 'Yeast', slug: 'yeast' },
+      { name: 'Adjuncts', slug: 'adjuncts' },
+    ]);
+    expect(catalogCategories.find(({ slug }) => slug === 'kits')).toMatchObject(
+      {
+        name: 'Kits',
+      },
+    );
   });
 
   it('defines exactly the twelve USD products using the accepted D1 paths', () => {

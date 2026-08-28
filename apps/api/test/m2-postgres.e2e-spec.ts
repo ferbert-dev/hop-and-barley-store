@@ -116,7 +116,7 @@ describePostgres('M2 administrator product list with PostgreSQL 17.6', () => {
       totalItems: 4,
       totalPages: 1,
     });
-    expect(body.meta.facets.categories).toContainEqual({
+    expect(body.meta.facets.categories).not.toContainEqual({
       name: 'M2 lifecycle',
       slug: 'm2-lifecycle',
     });

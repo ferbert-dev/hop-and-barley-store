@@ -1,5 +1,6 @@
 import type { Prisma } from '../generated/prisma/client';
 import type { CatalogQueryDto, CatalogSort } from './dto/catalog-query.dto';
+import { CATALOG_INGREDIENT_PRODUCT_TYPE_SLUGS } from './catalog-product-types';
 
 export type CatalogListVisibility = 'admin' | 'public';
 
@@ -53,6 +54,7 @@ export function buildCatalogFacetQuery(
     orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }, { slug: 'asc' }],
     select: { name: true, slug: true },
     where: {
+      slug: { in: [...CATALOG_INGREDIENT_PRODUCT_TYPE_SLUGS] },
       products: {
         some: {
           currency: 'USD',
