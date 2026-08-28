@@ -96,7 +96,9 @@ export class LoginService {
     }
 
     try {
-      return await this.sessions.issue(user.id, presentedRawToken);
+      return await this.sessions.issue(user.id, presentedRawToken, {
+        rememberMe: dto.rememberMe,
+      });
     } catch (error) {
       if (error instanceof SessionIssueRejectedError) {
         throw new UnauthorizedException(GENERIC_UNAUTHORIZED);

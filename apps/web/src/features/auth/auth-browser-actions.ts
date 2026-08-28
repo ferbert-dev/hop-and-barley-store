@@ -45,7 +45,7 @@ export async function loginFromBrowser(
   _previous: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
-  const input = validateLoginInput(readCredentials(formData));
+  const input = validateLoginInput(readLoginInput(formData));
   if (!input.ok) return { errors: input.errors, status: 'invalid' };
   try {
     const origin = window.location.origin;
@@ -101,5 +101,12 @@ function readRegistrationInput(formData: FormData) {
   return {
     ...readCredentials(formData),
     confirmPassword: String(formData.get('confirmPassword') ?? ''),
+  };
+}
+
+function readLoginInput(formData: FormData) {
+  return {
+    ...readCredentials(formData),
+    rememberMe: formData.get('rememberMe') === 'true',
   };
 }

@@ -9,7 +9,8 @@ import {
   parseSessionToken,
 } from './session-token';
 
-const ABSOLUTE_LIFETIME_MS = 7 * 24 * 60 * 60 * 1_000;
+const DEFAULT_ABSOLUTE_LIFETIME_MS = 7 * 24 * 60 * 60 * 1_000;
+const REMEMBERED_ABSOLUTE_LIFETIME_MS = 30 * 24 * 60 * 60 * 1_000;
 const IDLE_LIFETIME_MS = 24 * 60 * 60 * 1_000;
 const TOUCH_INTERVAL_MS = 15 * 60 * 1_000;
 const MAX_ACTIVE_SESSIONS = 5;
@@ -27,6 +28,11 @@ export type ActiveSession = Readonly<{
   userId: string;
 }>;
 
+export type SessionIssueOptions = Readonly<{
+  now?: Date;
+  rememberMe?: boolean;
+}>;
+
 export class SessionIssueRejectedError extends Error {
   constructor() {
     super('Session issue rejected');
@@ -40,14 +46,19 @@ export class SessionService {
   async issue(
     userId: string,
     presentedRawToken: string | null,
-    now = new Date(),
+    options: SessionIssueOptions = {},
   ): Promise<ActiveSession> {
+    const now = options.now ?? new Date();
+    const absoluteLifetimeMs =
+      options.rememberMe === true
+        ? REMEMBERED_ABSOLUTE_LIFETIME_MS
+        : DEFAULT_ABSOLUTE_LIFETIME_MS;
     const rawToken = generateSessionToken();
     const tokenHash = toPrismaBytes(rawToken);
     const presentedTokenHash = presentedRawToken
       ? toPrismaBytes(presentedRawToken)
       : null;
-    const expiresAt = new Date(now.getTime() + ABSOLUTE_LIFETIME_MS);
+    const expiresAt = new Date(now.getTime() + absoluteLifetimeMs);
 
     const persisted = await this.serializable(async (transaction) => {
       if (!(await lockUser(transaction, userId))) {

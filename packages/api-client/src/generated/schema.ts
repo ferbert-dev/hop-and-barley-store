@@ -483,6 +483,11 @@ export interface components {
              */
             email: string;
             password: string;
+            /**
+             * @description Persists the cookie and extends the absolute session lifetime to 30 days only when true.
+             * @default false
+             */
+            rememberMe: boolean;
         };
         CurrentUserDto: {
             /** Format: uuid */

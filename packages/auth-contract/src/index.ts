@@ -75,6 +75,16 @@ export const registrationCredentialsSchema = z
   })
   .strict();
 
+export const loginRememberMeSchema = z.boolean().catch(false).default(false);
+
+export const loginCredentialsSchema = z
+  .object({
+    email: z.string(),
+    password: z.string(),
+    rememberMe: loginRememberMeSchema,
+  })
+  .strict();
+
 export const registrationFormSchema = registrationCredentialsSchema
   .extend({
     confirmPassword: z

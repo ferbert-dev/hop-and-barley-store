@@ -31,19 +31,47 @@ describe('direct browser auth transport', () => {
   });
 
   it('keeps failures generic', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
-        async () =>
-          new Response(JSON.stringify({ status: 'unavailable' }), {
-            headers: { 'cache-control': 'private, no-store' },
-            status: 429,
-          }),
-      ),
+    const fetch = vi.fn<(request: Request) => Promise<Response>>(
+      async () =>
+        new Response(JSON.stringify({ status: 'unavailable' }), {
+          headers: { 'cache-control': 'private, no-store' },
+          status: 429,
+        }),
     );
+    vi.stubGlobal('fetch', fetch);
+    const formData = credentials();
+    formData.set('rememberMe', 'true');
+
     await expect(
-      loginFromBrowser('/', INITIAL_AUTH_FORM_STATE, credentials()),
+      loginFromBrowser('/', INITIAL_AUTH_FORM_STATE, formData),
     ).resolves.toEqual({ status: 'unavailable' });
+    await expect(fetch.mock.calls[0]![0].clone().json()).resolves.toEqual({
+      email: 'brewer@example.com',
+      password: expect.any(String),
+      rememberMe: true,
+    });
+  });
+
+  it('fails an invalid or missing remember choice closed to unchecked', async () => {
+    const fetch = vi.fn<(request: Request) => Promise<Response>>(
+      async () =>
+        new Response(JSON.stringify({ status: 'unavailable' }), {
+          headers: { 'cache-control': 'private, no-store' },
+          status: 429,
+        }),
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    const invalid = credentials();
+    invalid.set('rememberMe', 'unexpected');
+    await loginFromBrowser('/', INITIAL_AUTH_FORM_STATE, invalid);
+    await loginFromBrowser('/', INITIAL_AUTH_FORM_STATE, credentials());
+
+    for (const [request] of fetch.mock.calls) {
+      await expect(request.clone().json()).resolves.toMatchObject({
+        rememberMe: false,
+      });
+    }
   });
 });
 

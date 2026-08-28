@@ -6,19 +6,30 @@ import {
 } from './auth-cookie';
 
 describe('auth cookie transport', () => {
-  it('preserves the local A1B host-only HttpOnly cookie contract', () => {
+  it('preserves a browser-session host-only HttpOnly cookie', () => {
     expect(
       parseUpstreamSessionCookie(
-        `hb_session=${'A'.repeat(43)}; Max-Age=604800; Expires=Sat, 29 Aug 2026 10:00:00 GMT; Path=/; HttpOnly; SameSite=Lax`,
+        `hb_session=${'A'.repeat(43)}; Path=/; HttpOnly; SameSite=Lax`,
       ),
     ).toEqual({
-      expires: new Date('2026-08-29T10:00:00.000Z'),
       httpOnly: true,
-      maxAge: 604800,
       name: 'hb_session',
       path: '/',
       sameSite: 'lax',
       secure: false,
+      value: 'A'.repeat(43),
+    });
+  });
+
+  it('preserves the exact 30-day persistent cookie contract', () => {
+    expect(
+      parseUpstreamSessionCookie(
+        `hb_session=${'A'.repeat(43)}; Max-Age=2592000; Expires=Mon, 21 Sep 2026 10:00:00 GMT; Path=/; HttpOnly; SameSite=Lax`,
+      ),
+    ).toMatchObject({
+      expires: new Date('2026-09-21T10:00:00.000Z'),
+      maxAge: 2_592_000,
+      name: 'hb_session',
       value: 'A'.repeat(43),
     });
   });
@@ -41,6 +52,8 @@ describe('auth cookie transport', () => {
     `hb_session=${'A'.repeat(43)}; Domain=example.com; Path=/; HttpOnly; SameSite=Lax`,
     `hb_session=${'A'.repeat(43)}; Path=/; SameSite=Lax`,
     `__Host-hb_session=${'A'.repeat(43)}; Path=/; HttpOnly; SameSite=Lax`,
+    `hb_session=${'A'.repeat(43)}; Max-Age=2592000; Path=/; HttpOnly; SameSite=Lax`,
+    `hb_session=${'A'.repeat(43)}; Expires=Mon, 21 Sep 2026 10:00:00 GMT; Path=/; HttpOnly; SameSite=Lax`,
     `other=${'A'.repeat(43)}; Path=/; HttpOnly; SameSite=Lax`,
   ])('fails closed for a weakened upstream cookie: %s', (header) => {
     expect(() => parseUpstreamSessionCookie(header)).toThrow(

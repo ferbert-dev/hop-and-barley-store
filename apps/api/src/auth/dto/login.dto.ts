@@ -1,5 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class LoginDto {
   @ApiProperty({
@@ -19,4 +20,14 @@ export class LoginDto {
   })
   @IsString()
   password!: string;
+
+  @ApiPropertyOptional({
+    default: false,
+    description:
+      'Persists the cookie and extends the absolute session lifetime to 30 days only when true.',
+    type: Boolean,
+  })
+  @Transform(({ value }) => value === true)
+  @IsBoolean()
+  rememberMe = false;
 }

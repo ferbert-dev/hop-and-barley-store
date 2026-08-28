@@ -145,21 +145,31 @@ describe('Platform API (e2e)', () => {
     authenticate: jest.fn((rawToken: string) =>
       Promise.resolve(activeSessions.get(rawToken) ?? null),
     ),
-    issue: jest.fn((userId: string, presented: string | null) => {
-      if (presented) activeSessions.delete(presented);
-      const rawToken = 'A'.repeat(43);
-      const session: ActiveSession = {
-        expiresAt: new Date('2026-08-29T10:00:00.000Z'),
-        issuedAt: new Date('2026-08-22T10:00:00.000Z'),
-        lastSeenAt: new Date('2026-08-22T10:00:00.000Z'),
-        rawToken,
-        role: 'CUSTOMER',
-        sessionId: '20000000-0000-4000-8000-000000000001',
-        userId,
-      };
-      activeSessions.set(rawToken, session);
-      return Promise.resolve(session);
-    }),
+    issue: jest.fn(
+      (
+        userId: string,
+        presented: string | null,
+        options: { rememberMe?: boolean } = {},
+      ) => {
+        if (presented) activeSessions.delete(presented);
+        const rawToken = 'A'.repeat(43);
+        const session: ActiveSession = {
+          expiresAt: new Date(
+            options.rememberMe
+              ? '2026-09-21T10:00:00.000Z'
+              : '2026-08-29T10:00:00.000Z',
+          ),
+          issuedAt: new Date('2026-08-22T10:00:00.000Z'),
+          lastSeenAt: new Date('2026-08-22T10:00:00.000Z'),
+          rawToken,
+          role: 'CUSTOMER',
+          sessionId: '20000000-0000-4000-8000-000000000001',
+          userId,
+        };
+        activeSessions.set(rawToken, session);
+        return Promise.resolve(session);
+      },
+    ),
     revokeAll: jest.fn().mockResolvedValue(0),
     revokeCurrent: jest.fn((rawToken: string) => {
       const revoked = activeSessions.delete(rawToken);
@@ -169,7 +179,7 @@ describe('Platform API (e2e)', () => {
   const loginService = {
     login: jest.fn(
       async (
-        dto: { email: string; password: string },
+        dto: { email: string; password: string; rememberMe: boolean },
         presented: string | null,
       ) => {
         if (
@@ -181,6 +191,7 @@ describe('Platform API (e2e)', () => {
         return sessionService.issue(
           '10000000-0000-4000-8000-000000000001',
           presented,
+          { rememberMe: dto.rememberMe },
         );
       },
     ),
@@ -325,8 +336,10 @@ describe('Platform API (e2e)', () => {
     expect(setCookie).toBeDefined();
     if (!setCookie) throw new Error('Expected a session cookie');
     expect(setCookie).toMatch(
-      /^hb_session=[A-Za-z0-9_-]{43}; Max-Age=604800; Expires=.*; Path=\/; HttpOnly; SameSite=Lax$/,
+      /^hb_session=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Lax$/,
     );
+    expect(setCookie).not.toContain('Max-Age=');
+    expect(setCookie).not.toContain('Expires=');
     expect(setCookie).not.toContain('Domain=');
     expect(setCookie).not.toContain('Secure');
     expect(JSON.stringify(login.body)).not.toMatch(/token|email|sessionId/i);
@@ -363,6 +376,57 @@ describe('Platform API (e2e)', () => {
       .get('/api/v1/auth/session')
       .set('Cookie', cookie)
       .expect(401);
+  });
+
+  it('derives an exact 30-day absolute session and persistent cookie only from remembered login', async () => {
+    const server = app.getHttpServer() as App;
+    const login = await request(server)
+      .post('/api/v1/auth/login')
+      .set('Origin', 'http://localhost:3000')
+      .send({
+        email: 'brewer@example.com',
+        password: 'correct-password-value',
+        rememberMe: true,
+      })
+      .expect(200);
+
+    expect(login.body).toMatchObject({
+      absoluteExpiresAt: '2026-09-21T10:00:00.000Z',
+      idleExpiresAt: '2026-08-23T10:00:00.000Z',
+    });
+    expect(login.headers['set-cookie']?.[0]).toMatch(
+      /^hb_session=[A-Za-z0-9_-]{43}; Max-Age=2592000; Expires=Mon, 21 Sep 2026 10:00:00 GMT; Path=\/; HttpOnly; SameSite=Lax$/,
+    );
+    expect(sessionService.issue).toHaveBeenCalledWith(
+      '10000000-0000-4000-8000-000000000001',
+      null,
+      { rememberMe: true },
+    );
+  });
+
+  it('fails an invalid remember choice closed to the unchecked session policy', async () => {
+    const server = app.getHttpServer() as App;
+    const login = await request(server)
+      .post('/api/v1/auth/login')
+      .set('Origin', 'http://localhost:3000')
+      .send({
+        email: 'brewer@example.com',
+        password: 'correct-password-value',
+        rememberMe: 'true',
+      })
+      .expect(200);
+
+    expect(login.body).toMatchObject({
+      absoluteExpiresAt: '2026-08-29T10:00:00.000Z',
+    });
+    expect(login.headers['set-cookie']?.[0]).toMatch(
+      /^hb_session=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Lax$/,
+    );
+    expect(sessionService.issue).toHaveBeenCalledWith(
+      '10000000-0000-4000-8000-000000000001',
+      null,
+      { rememberMe: false },
+    );
   });
 
   it('returns byte-identical private 401 failures for unknown and wrong credentials', async () => {
@@ -495,6 +559,7 @@ describe('Platform API (e2e)', () => {
       .expect(200);
     const document = JSON.parse(response.text) as {
       components: {
+        schemas: Record<string, OpenApiSchema>;
         securitySchemes: Record<
           string,
           { description: string; in: string; name: string; type: string }
@@ -540,6 +605,15 @@ describe('Platform API (e2e)', () => {
     expect(login.security).toBeUndefined();
     expect(login.parameters?.map(({ name }) => name)).toEqual(['Origin']);
     expect(login.responses['200'].headers).toHaveProperty('Set-Cookie');
+    expect(document.components.schemas.LoginDto).toMatchObject({
+      properties: {
+        rememberMe: {
+          default: false,
+          type: 'boolean',
+        },
+      },
+      required: ['email', 'password'],
+    });
     expect(current.security).toEqual([{ sessionCookie: [] }]);
     expect(csrf.security).toEqual([{ sessionCookie: [] }]);
     expect(logout.security).toEqual([{ sessionCookie: [] }]);

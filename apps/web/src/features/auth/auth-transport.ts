@@ -4,7 +4,7 @@ import { createApiClient, type components } from '@hop-and-barley/api-client';
 
 import { resolveApiOrigin } from '../../lib/catalog';
 import { parseUpstreamSessionCookie, type SessionCookie } from './auth-cookie';
-import type { AuthCredentials } from './auth-validation';
+import type { AuthCredentials, LoginCredentials } from './auth-validation';
 
 const DEFAULT_API_URL = 'http://localhost:3001/api/v1';
 const AUTH_REQUEST_TIMEOUT_MS = 1_500;
@@ -67,7 +67,7 @@ export async function registerWithPassword(
 }
 
 export async function loginWithPassword(
-  credentials: AuthCredentials,
+  credentials: LoginCredentials,
   origin: string,
   rawApiUrl = process.env.API_INTERNAL_URL ?? DEFAULT_API_URL,
 ): Promise<LoginResult> {

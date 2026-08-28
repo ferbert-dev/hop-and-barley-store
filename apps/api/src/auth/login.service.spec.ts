@@ -13,7 +13,11 @@ describe('LoginService', () => {
 
     const failure = await captureFailure(
       fixture.service.login(
-        { email: 'unknown@example.com', password: 'unknown-password-value' },
+        {
+          email: 'unknown@example.com',
+          password: 'unknown-password-value',
+          rememberMe: false,
+        },
         null,
       ),
     );
@@ -34,13 +38,21 @@ describe('LoginService', () => {
 
     const wrongFailure = await captureFailure(
       wrong.service.login(
-        { email: 'brewer@example.com', password: 'wrong-password-value' },
+        {
+          email: 'brewer@example.com',
+          password: 'wrong-password-value',
+          rememberMe: false,
+        },
         null,
       ),
     );
     const disabledFailure = await captureFailure(
       disabled.service.login(
-        { email: 'brewer@example.com', password: 'correct-password-value' },
+        {
+          email: 'brewer@example.com',
+          password: 'correct-password-value',
+          rememberMe: false,
+        },
         null,
       ),
     );
@@ -56,7 +68,11 @@ describe('LoginService', () => {
     const previous = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
     const result = await fixture.service.login(
-      { email: 'Brewer@Example.com', password: 'correct-password-value' },
+      {
+        email: 'Brewer@Example.com',
+        password: 'correct-password-value',
+        rememberMe: true,
+      },
       previous,
     );
 
@@ -64,7 +80,9 @@ describe('LoginService', () => {
       PASSWORD_HASH,
       'correct-password-value',
     );
-    expect(fixture.sessions.issue).toHaveBeenCalledWith(USER_ID, previous);
+    expect(fixture.sessions.issue).toHaveBeenCalledWith(USER_ID, previous, {
+      rememberMe: true,
+    });
     expect(result.rawToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(result.userId).toBe(USER_ID);
   });
@@ -76,6 +94,7 @@ describe('LoginService', () => {
       {
         email: 'brewer@example.com',
         password: 'Cafe\u0301-Long-Passphrase',
+        rememberMe: false,
       },
       null,
     );
@@ -90,7 +109,11 @@ describe('LoginService', () => {
     const fixture = createFixture(activeUser(), true);
 
     await fixture.service.login(
-      { email: 'Brewer@Example.com', password: 'correct-password-value' },
+      {
+        email: 'Brewer@Example.com',
+        password: 'correct-password-value',
+        rememberMe: false,
+      },
       null,
     );
 
@@ -115,7 +138,14 @@ function createFixture(
   };
   const sessions = {
     issue: jest
-      .fn<Promise<ActiveSession>, [userId: string, presented: string | null]>()
+      .fn<
+        Promise<ActiveSession>,
+        [
+          userId: string,
+          presented: string | null,
+          options: { rememberMe: boolean },
+        ]
+      >()
       .mockResolvedValue({
         expiresAt: new Date('2026-08-29T10:00:00.000Z'),
         issuedAt: new Date('2026-08-22T10:00:00.000Z'),

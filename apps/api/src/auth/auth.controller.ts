@@ -28,6 +28,7 @@ import type { AuthRequest } from './auth-request';
 import { AuthSessionDto } from './dto/auth-session.dto';
 import { CsrfResponseDto } from './dto/csrf-response.dto';
 import { LoginDto } from './dto/login.dto';
+import { LoginZodPipe } from './dto/login-zod.pipe';
 import { LogoutResponseDto } from './dto/logout-response.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RegistrationZodPipe } from './dto/registration-zod.pipe';
@@ -99,7 +100,7 @@ export class AuthController {
   @ApiTooManyRequestsResponse({ description: 'Login unavailable' })
   @ApiServiceUnavailableResponse({ description: 'Login unavailable' })
   async login(
-    @Body() dto: LoginDto,
+    @Body(LoginZodPipe) dto: LoginDto,
     @Req() request: AuthRequest,
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthSessionDto> {
@@ -108,7 +109,12 @@ export class AuthController {
     const session = await this.loginService.login(dto, presented);
     response.setHeader(
       'Set-Cookie',
-      createSessionCookie(mode, session.rawToken, session.expiresAt),
+      createSessionCookie(
+        mode,
+        session.rawToken,
+        session.expiresAt,
+        dto.rememberMe,
+      ),
     );
     return toSessionDto(session);
   }

@@ -1,9 +1,9 @@
 export type IncomingCookie = Readonly<{ name: string; value: string }>;
 
 export type SessionCookie = Readonly<{
-  expires: Date;
+  expires?: Date;
   httpOnly: true;
-  maxAge: number;
+  maxAge?: number;
   name: 'hb_session' | '__Host-hb_session';
   path: '/';
   sameSite: 'lax';
@@ -69,34 +69,39 @@ export function parseUpstreamSessionCookie(header: string): SessionCookie {
 
   const maxAgeValue = attributes.get('max-age');
   const expiresValue = attributes.get('expires');
+  if (
+    (maxAgeValue === undefined) !== (expiresValue === undefined) ||
+    (maxAgeValue !== undefined &&
+      (typeof maxAgeValue !== 'string' || !/^\d+$/u.test(maxAgeValue))) ||
+    (expiresValue !== undefined && typeof expiresValue !== 'string')
+  ) {
+    throwInvalidCookie();
+  }
   const maxAge =
-    typeof maxAgeValue === 'string' && /^\d+$/u.test(maxAgeValue)
-      ? Number(maxAgeValue)
-      : Number.NaN;
+    typeof maxAgeValue === 'string' ? Number(maxAgeValue) : undefined;
   const expires =
-    typeof expiresValue === 'string'
-      ? new Date(expiresValue)
-      : new Date(Number.NaN);
+    typeof expiresValue === 'string' ? new Date(expiresValue) : undefined;
   const secure = attributes.get('secure') === true;
 
   if (
-    (maxAge !== 0 && maxAge !== 604800) ||
-    Number.isNaN(expires.getTime()) ||
+    (maxAge !== undefined && maxAge !== 0 && maxAge !== 2_592_000) ||
+    (expires !== undefined && Number.isNaN(expires.getTime())) ||
     attributes.get('path') !== '/' ||
     attributes.get('httponly') !== true ||
     attributes.get('samesite') !== 'Lax' ||
     (name === '__Host-hb_session' && !secure) ||
     (name === 'hb_session' && secure) ||
-    (maxAge === 0 && value !== '') ||
-    (maxAge === 604800 && value === '')
+    (value === '' && maxAge !== 0) ||
+    (value !== '' && maxAge === 0) ||
+    (value === '' && expires === undefined)
   ) {
     throwInvalidCookie();
   }
 
   return {
-    expires,
+    ...(expires === undefined ? {} : { expires }),
     httpOnly: true,
-    maxAge,
+    ...(maxAge === undefined ? {} : { maxAge }),
     name,
     path: '/',
     sameSite: 'lax',
