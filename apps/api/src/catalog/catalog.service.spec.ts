@@ -45,11 +45,20 @@ const productDetailSelect = {
   specifications: true,
 };
 
+const evaluatedAt = new Date('2026-08-28T17:00:00.000Z');
+const publicLifecycleWhere = {
+  AND: [
+    { OR: [{ activeFrom: null }, { activeFrom: { lte: evaluatedAt } }] },
+    { OR: [{ activeUntil: null }, { activeUntil: { gt: evaluatedAt } }] },
+  ],
+  isActive: true,
+};
+
 const facetQuery = {
   orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }, { slug: 'asc' }],
   select: { name: true, slug: true },
   where: {
-    products: { some: { currency: 'USD', isActive: true } },
+    products: { some: { currency: 'USD', ...publicLifecycleWhere } },
     slug: { in: ['hops', 'malts', 'yeast', 'adjuncts'] },
   },
 };
@@ -68,6 +77,13 @@ describe('CatalogService', () => {
     product: { count, findMany: findProducts },
   };
   let service: CatalogService;
+
+  beforeAll(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(evaluatedAt);
+  });
+
+  afterAll(() => jest.useRealTimers());
 
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -154,7 +170,11 @@ describe('CatalogService', () => {
     });
     expect(rootProductFindFirst).toHaveBeenCalledWith({
       select: productDetailSelect,
-      where: { currency: 'USD', isActive: true, slug: 'cascade-hops' },
+      where: {
+        currency: 'USD',
+        slug: 'cascade-hops',
+        ...publicLifecycleWhere,
+      },
     });
   });
 
@@ -204,7 +224,7 @@ describe('CatalogService', () => {
       page: 1,
       sort: 'name-asc',
     });
-    const where = { currency: 'USD', isActive: true };
+    const where = { currency: 'USD', ...publicLifecycleWhere };
 
     expect(transaction).toHaveBeenCalledWith(expect.any(Function), {
       isolationLevel: 'RepeatableRead',
@@ -281,7 +301,11 @@ describe('CatalogService', () => {
       ],
     });
     const where = {
-      AND: [textFilter('Café'), textFilter('hops')],
+      AND: [
+        ...publicLifecycleWhere.AND,
+        textFilter('Café'),
+        textFilter('hops'),
+      ],
       category: { slug: 'hops' },
       currency: 'USD',
       isActive: true,
@@ -359,7 +383,7 @@ describe('CatalogService', () => {
     });
 
     expect(count).toHaveBeenCalledWith({
-      where: { currency: 'USD', isActive: true, priceMinor },
+      where: { currency: 'USD', ...publicLifecycleWhere, priceMinor },
     });
   });
 

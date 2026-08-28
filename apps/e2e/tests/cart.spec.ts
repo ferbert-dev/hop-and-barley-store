@@ -454,8 +454,12 @@ function cartLine({
 }>): CartFixtureItem {
   const priceMinor = 599;
   const priceBasisAmount = 100_000;
+  const imagePathBySlug: Readonly<Record<string, string>> = {
+    'caramel-malt-60l': '/assets/products/caramel-malt.webp',
+  };
   return {
-    imagePath: `/assets/products/${productSlug}.jpg`,
+    imagePath:
+      imagePathBySlug[productSlug] ?? `/assets/products/${productSlug}.webp`,
     lineTotalMinor:
       priceMinor === null
         ? null
@@ -685,7 +689,7 @@ async function assertNoBlockingAxeViolations(page: Page, label: string) {
 }
 
 async function focusWithKeyboard(page: Page, target: Locator) {
-  for (let index = 0; index < 24; index += 1) {
+  for (let index = 0; index < 64; index += 1) {
     await page.keyboard.press('Tab');
     if (
       await target.evaluate((element) => document.activeElement === element)

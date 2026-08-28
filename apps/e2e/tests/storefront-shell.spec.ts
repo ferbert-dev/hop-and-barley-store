@@ -35,7 +35,7 @@ test('supports the mobile disclosure with keyboard-only navigation', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 800 });
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
 
   await page.keyboard.press('Tab');
   const skipLink = page.getByRole('link', { name: 'Skip to main content' });
@@ -66,7 +66,7 @@ test('closes the inline disclosure when crossing the wide breakpoint', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1023, height: 900 });
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Open menu' }).click();
   await expect(
     page.getByRole('button', { name: 'Close menu' }),
@@ -226,15 +226,26 @@ test('fills the complete catalog hero section with the hop image', async ({
     const image = hero.getByRole('img', {
       name: 'Close-up hop cones and green leaves',
     });
-    const [heroBox, imageBox] = await Promise.all([
-      hero.boundingBox(),
-      image.boundingBox(),
-    ]);
-
-    expect(heroBox, `${width}px hero must be measurable`).not.toBeNull();
-    expect(imageBox, `${width}px hero image must be measurable`).not.toBeNull();
-    expect(heroBox!.x).toBe(0);
-    expect(heroBox!.width).toBe(width);
-    expect(imageBox).toEqual(heroBox);
+    await expect(hero).toBeVisible();
+    await expect(image).toBeVisible();
+    await expect
+      .poll(() =>
+        hero.evaluate((element) => {
+          const imageElement = element.querySelector('img');
+          if (!imageElement) return false;
+          const heroBox = element.getBoundingClientRect();
+          const imageBox = imageElement.getBoundingClientRect();
+          return (
+            heroBox.x === 0 &&
+            heroBox.width === window.innerWidth &&
+            heroBox.height > 0 &&
+            imageBox.x === heroBox.x &&
+            imageBox.y === heroBox.y &&
+            imageBox.width === heroBox.width &&
+            imageBox.height === heroBox.height
+          );
+        }),
+      )
+      .toBe(true);
   }
 });

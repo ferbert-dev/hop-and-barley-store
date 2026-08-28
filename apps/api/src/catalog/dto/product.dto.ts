@@ -87,8 +87,11 @@ export class ProductDto {
   priceQualifier!: string;
 
   @ApiProperty({
-    example: '/assets/products/cascade-hops.webp',
-    pattern: '^/assets/products/[a-z0-9]+(?:-[a-z0-9]+)*[.]webp$',
+    description:
+      'Bundled storefront asset or opaque API-owned uploaded product asset.',
+    example: '/product-assets/7ed6a7c7-5210-4b1f-ae50-0d8d596216cb.webp',
+    pattern:
+      '^(?:/assets/products/[a-z0-9]+(?:-[a-z0-9]+)*|/product-assets/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})[.]webp$',
     type: String,
   })
   imagePath!: string;

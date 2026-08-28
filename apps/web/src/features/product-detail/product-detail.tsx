@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { Price } from '../../components/ui/price';
 import { productAssetsBySlug } from '../../design-system/assets';
+import { isUploadedProductImagePath } from '../../lib/product-image';
 import { formatSaleUnit } from '../quantity/quantity-model';
 import type { ProductDetailProduct } from '../../lib/product-detail';
 import { ProductCartControl } from './product-cart-control';
@@ -11,7 +12,8 @@ import styles from './product-detail.module.css';
 export function ProductDetail({ product }: { product: ProductDetailProduct }) {
   const asset =
     productAssetsBySlug[product.slug as keyof typeof productAssetsBySlug];
-  if (!asset || asset.src !== product.imagePath) {
+  const isUploadedImage = isUploadedProductImagePath(product.imagePath);
+  if ((!asset || asset.src !== product.imagePath) && !isUploadedImage) {
     throw new TypeError(
       `Product detail asset contract failed for ${product.slug}`,
     );
@@ -36,13 +38,14 @@ export function ProductDetail({ product }: { product: ProductDetailProduct }) {
       <div className={styles.detailGrid}>
         <div className={styles.media}>
           <Image
-            alt={asset.alt}
+            alt={asset?.alt ?? product.name}
             className={styles.image}
-            height={asset.height}
+            height={asset?.height ?? 667}
             preload
             sizes="(max-width: 47.999rem) calc(100vw - 2rem), (max-width: 63.999rem) 50vw, 40rem"
-            src={asset.src}
-            width={asset.width}
+            src={product.imagePath}
+            unoptimized={isUploadedImage}
+            width={asset?.width ?? 1000}
           />
         </div>
 

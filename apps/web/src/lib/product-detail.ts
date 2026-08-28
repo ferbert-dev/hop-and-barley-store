@@ -3,11 +3,10 @@ import { cache } from 'react';
 
 import { readQuantityMetadata } from '../features/quantity/quantity-model';
 import { resolveApiOrigin } from './catalog';
+import { isProductImagePath } from './product-image';
 
 const DEFAULT_API_URL = 'http://127.0.0.1:3001/api/v1';
 const PRODUCT_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const PRODUCT_IMAGE_PATTERN =
-  /^\/assets\/products\/[a-z0-9]+(?:-[a-z0-9]+)*[.]webp$/;
 const PROHIBITED_PRODUCT_FIELDS = [
   'categoryId',
   'isActive',
@@ -92,8 +91,7 @@ function normalizeProductDetail(value: unknown): ProductDetailProduct {
     currency !== 'USD' ||
     !isNonEmptyString(teaser) ||
     !isNonEmptyString(priceQualifier) ||
-    typeof imagePath !== 'string' ||
-    !PRODUCT_IMAGE_PATTERN.test(imagePath) ||
+    !isProductImagePath(imagePath) ||
     (availability !== 'in-stock' && availability !== 'out-of-stock') ||
     !isCategory(category) ||
     !Array.isArray(specifications) ||

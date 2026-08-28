@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import path from 'node:path';
 
 const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
 const adminPassword = process.env.HB_LOCAL_ADMIN_PASSWORD;
@@ -19,6 +20,9 @@ test.describe('connected administrator product management', () => {
     await page.goto('/admin/products');
 
     await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Fproducts$/);
+
+    await page.goto('/admin/add');
+    await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Fadd$/);
   });
 
   test('denies a current customer without exposing administrator content', async ({
@@ -174,6 +178,69 @@ test.describe('connected administrator product management', () => {
         sessionStorage: sessionStorage.length,
       })),
     ).toEqual({ localStorage: 0, sessionStorage: 0 });
+  });
+
+  test('creates a scheduled measured product and stores its real image', async ({
+    page,
+  }) => {
+    await signInAsAdmin(page);
+    await page.goto('/admin/add');
+
+    const productName = `E2E Harvest Hops ${Date.now()}`;
+    await page.getByLabel('Title').fill(productName);
+    await page
+      .getByLabel('Description')
+      .fill('A connected browser proof for administrator product creation.');
+    await page.getByLabel('Price (USD)').fill('5.99');
+    await page.getByLabel('Stock (kg)').fill('1.2');
+    await page.getByLabel('Active from').fill('2099-01-01T00:00');
+    await page
+      .getByLabel('Choose image')
+      .setInputFiles(
+        path.join(
+          process.cwd(),
+          '../web/public/assets/products/citra-hops.webp',
+        ),
+      );
+
+    await expect(
+      page.getByRole('img', { name: 'Selected product image preview' }),
+    ).toBeVisible();
+    const creationResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/v1/admin/products') &&
+        response.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: 'Save' }).click();
+    const response = await creationResponse;
+    expect(response.status()).toBe(201);
+    const created = (await response.json()) as { imagePath: string };
+    expect(created.imagePath).toMatch(
+      /^\/product-assets\/[0-9a-f-]{36}[.]webp$/u,
+    );
+
+    await expect(
+      page.getByRole('heading', { name: 'Product created' }),
+    ).toBeVisible();
+    const assetResponse = await page.request.get(
+      new URL(created.imagePath, page.url()).toString(),
+    );
+    expect(assetResponse.status()).toBe(200);
+    expect(assetResponse.headers()['content-type']).toBe('image/webp');
+
+    await page
+      .getByRole('link', { name: 'Back to product management' })
+      .click();
+    await page.getByLabel('Search products').fill(productName);
+    await page.getByLabel('Search products').press('Enter');
+    const productRow = page
+      .getByRole('row')
+      .filter({ hasText: productName })
+      .first();
+    await expect(productRow).toBeVisible();
+    await expect(
+      productRow.getByText('Scheduled', { exact: true }),
+    ).toBeVisible();
   });
 
   test('keeps the connected product list keyboard reachable and responsive', async ({

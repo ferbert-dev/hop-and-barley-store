@@ -6,14 +6,10 @@ const mocks = vi.hoisted(() => ({
     throw new Error('NEXT_NOT_FOUND');
   }),
   readAdminCapability: vi.fn(),
-  redirect: vi.fn((href: string) => {
-    throw new Error(`NEXT_REDIRECT:${href}`);
-  }),
 }));
 
 vi.mock('next/navigation', () => ({
   notFound: mocks.notFound,
-  redirect: mocks.redirect,
 }));
 vi.mock('../../features/admin/admin-capability', () => ({
   readAdminCapability: mocks.readAdminCapability,
@@ -24,12 +20,12 @@ import AdminLayout from './layout';
 beforeEach(() => vi.clearAllMocks());
 
 describe('admin layout authorization boundary', () => {
-  it('redirects anonymous visitors to the safe internal return path', async () => {
+  it('lets the leaf route choose the exact safe anonymous return path', async () => {
     mocks.readAdminCapability.mockResolvedValue({ kind: 'anonymous' });
 
-    await expect(AdminLayout({ children: <p>Protected</p> })).rejects.toThrow(
-      'NEXT_REDIRECT:/login?next=%2Fadmin%2Fproducts',
-    );
+    render(await AdminLayout({ children: <p>Leaf authorization</p> }));
+
+    expect(screen.getByText('Leaf authorization')).toBeVisible();
   });
 
   it('uses the neutral not-found boundary for a customer or unavailable capability', async () => {

@@ -17,20 +17,28 @@ export const CATALOG_PRODUCT_SORT_ORDER: Record<
 export function buildCatalogProductWhere(
   query: CatalogQueryDto,
   visibility: CatalogListVisibility,
+  evaluatedAt = new Date(),
 ): Prisma.ProductWhereInput {
   const where: Prisma.ProductWhereInput = {
     currency: 'USD',
-    ...(visibility === 'public' ? { isActive: true } : {}),
+    ...(visibility === 'public'
+      ? {
+          ...buildPublicProductLifecycleWhere(evaluatedAt),
+        }
+      : {}),
   };
 
   if (query.search) {
-    where.AND = query.search.split(' ').map((token) => ({
-      OR: [
-        { name: { contains: token, mode: 'insensitive' } },
-        { teaser: { contains: token, mode: 'insensitive' } },
-        { description: { contains: token, mode: 'insensitive' } },
-      ],
-    }));
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : []),
+      ...query.search.split(' ').map((token) => ({
+        OR: [
+          { name: { contains: token, mode: 'insensitive' as const } },
+          { teaser: { contains: token, mode: 'insensitive' as const } },
+          { description: { contains: token, mode: 'insensitive' as const } },
+        ],
+      })),
+    ];
   }
   if (query.category) where.category = { slug: query.category };
   if (query.minPriceMinor !== undefined || query.maxPriceMinor !== undefined) {
@@ -49,6 +57,7 @@ export function buildCatalogProductWhere(
 
 export function buildCatalogFacetQuery(
   visibility: CatalogListVisibility,
+  evaluatedAt = new Date(),
 ): Prisma.CategoryFindManyArgs {
   return {
     orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }, { slug: 'asc' }],
@@ -58,9 +67,23 @@ export function buildCatalogFacetQuery(
       products: {
         some: {
           currency: 'USD',
-          ...(visibility === 'public' ? { isActive: true } : {}),
+          ...(visibility === 'public'
+            ? buildPublicProductLifecycleWhere(evaluatedAt)
+            : {}),
         },
       },
     },
+  };
+}
+
+export function buildPublicProductLifecycleWhere(
+  evaluatedAt: Date,
+): Prisma.ProductWhereInput {
+  return {
+    AND: [
+      { OR: [{ activeFrom: null }, { activeFrom: { lte: evaluatedAt } }] },
+      { OR: [{ activeUntil: null }, { activeUntil: { gt: evaluatedAt } }] },
+    ],
+    isActive: true,
   };
 }

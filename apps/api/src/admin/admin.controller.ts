@@ -1,9 +1,26 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBadRequestResponse,
+  ApiBody,
+  ApiConflictResponse,
+  ApiConsumes,
+  ApiCreatedResponse,
+  ApiHeader,
   ApiOkResponse,
   ApiOperation,
+  ApiPayloadTooLargeResponse,
   ApiQuery,
+  ApiServiceUnavailableResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { AdminOnly } from './admin-only.decorator';
@@ -14,12 +31,56 @@ import {
 } from '../catalog/dto/catalog-query.dto';
 import { AdminProductListService } from './admin-product-list.service';
 import { AdminProductListResponseDto } from './dto/admin-product-list.dto';
+import { AdminProductCreationService } from './admin-product-creation.service';
+import {
+  AdminCreateProductBodyDto,
+  AdminCreateProductMultipartDto,
+  AdminCreatedProductDto,
+  AdminProductCreateOptionsDto,
+} from './dto/admin-product-create.dto';
+import {
+  PRODUCT_IMAGE_MAX_BYTES,
+  PRODUCT_IMAGE_MIME_TYPES,
+  type UploadedProductImage,
+} from '../product-assets/product-asset-storage.service';
+
+const productImageUploadOptions = {
+  fileFilter: (
+    _request: unknown,
+    file: { mimetype: string },
+    callback: (error: Error | null, acceptFile: boolean) => void,
+  ) => {
+    if (
+      !PRODUCT_IMAGE_MIME_TYPES.includes(
+        file.mimetype as (typeof PRODUCT_IMAGE_MIME_TYPES)[number],
+      )
+    ) {
+      callback(
+        new BadRequestException({ status: 'invalid-product-image' }),
+        false,
+      );
+      return;
+    }
+    callback(null, true);
+  },
+  limits: {
+    fieldNameSize: 100,
+    fieldSize: 20_000,
+    fields: 10,
+    fileSize: PRODUCT_IMAGE_MAX_BYTES,
+    files: 1,
+    parts: 11,
+  },
+};
 
 @ApiTags('admin')
 @AdminOnly()
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly products: AdminProductListService) {}
+  constructor(
+    private readonly products: AdminProductListService,
+    private readonly productCreation: AdminProductCreationService,
+  ) {}
 
   @Get('capabilities')
   @ApiOperation({
@@ -99,5 +160,44 @@ export class AdminController {
     @Query() query: CatalogQueryDto,
   ): Promise<AdminProductListResponseDto> {
     return this.products.listProducts(query);
+  }
+
+  @Get('products/create-options')
+  @ApiOperation({ summary: 'Get the bounded product creation options' })
+  @ApiOkResponse({ type: AdminProductCreateOptionsDto })
+  createOptions(): AdminProductCreateOptionsDto {
+    return this.productCreation.getCreateOptions();
+  }
+
+  @Post('products')
+  @UseInterceptors(FileInterceptor('image', productImageUploadOptions))
+  @ApiOperation({ summary: 'Create an administrator-managed product' })
+  @ApiHeader({ name: 'Origin', required: true, schema: { type: 'string' } })
+  @ApiHeader({
+    name: 'X-CSRF-Token',
+    required: true,
+    schema: {
+      pattern: '^[A-Za-z0-9_-]{1,16}\\.[A-Za-z0-9_-]{43}$',
+      type: 'string',
+    },
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: AdminCreateProductMultipartDto })
+  @ApiCreatedResponse({ type: AdminCreatedProductDto })
+  @ApiBadRequestResponse({ description: 'Invalid product fields or image' })
+  @ApiConflictResponse({ description: 'Generated product slug already exists' })
+  @ApiPayloadTooLargeResponse({ description: 'Product image exceeds 5 MiB' })
+  @ApiServiceUnavailableResponse({
+    description:
+      'Session verification, product storage or asset storage unavailable',
+  })
+  createProduct(
+    @Body() body: AdminCreateProductBodyDto,
+    @UploadedFile() image: UploadedProductImage | undefined,
+  ): Promise<AdminCreatedProductDto> {
+    if (!image) {
+      throw new BadRequestException({ status: 'product-image-required' });
+    }
+    return this.productCreation.createProduct(body, image);
   }
 }

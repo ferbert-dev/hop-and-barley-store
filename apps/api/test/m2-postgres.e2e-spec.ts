@@ -146,17 +146,13 @@ describePostgres('M2 administrator product list with PostgreSQL 17.6', () => {
     }
   });
 
-  it('keeps the M2 public catalog rule limited to isActive', async () => {
+  it('keeps the public catalog limited to currently active products', async () => {
     const response = await request(app.getHttpServer() as App)
       .get('/api/v1/products?category=m2-lifecycle&limit=4')
       .expect(200);
     const body = JSON.parse(response.text) as CatalogResponseDto;
 
-    expect(body.items.map(({ slug }) => slug)).toEqual([
-      'm2-active',
-      'm2-expired',
-      'm2-scheduled',
-    ]);
+    expect(body.items.map(({ slug }) => slug)).toEqual(['m2-active']);
     expect(body.items).not.toContainEqual(
       expect.objectContaining({ slug: 'm2-disabled' }),
     );

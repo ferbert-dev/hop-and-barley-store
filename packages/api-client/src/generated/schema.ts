@@ -240,6 +240,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/product-assets/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read an immutable uploaded product image */
+        get: operations["ProductAssetsController_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/capabilities": {
         parameters: {
             query?: never;
@@ -266,6 +283,24 @@ export interface paths {
         };
         /** List products for administrator management */
         get: operations["AdminController_listProducts"];
+        put?: never;
+        /** Create an administrator-managed product */
+        post: operations["AdminController_createProduct"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/products/create-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the bounded product creation options */
+        get: operations["AdminController_createOptions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -379,7 +414,10 @@ export interface components {
             currency: "USD";
             teaser: string;
             priceQualifier: string;
-            /** @example /assets/products/cascade-hops.webp */
+            /**
+             * @description Bundled storefront asset or opaque API-owned uploaded product asset.
+             * @example /product-assets/7ed6a7c7-5210-4b1f-ae50-0d8d596216cb.webp
+             */
             imagePath: string;
             /** @enum {string} */
             availability: "in-stock" | "out-of-stock";
@@ -456,7 +494,10 @@ export interface components {
             currency: "USD";
             teaser: string;
             priceQualifier: string;
-            /** @example /assets/products/cascade-hops.webp */
+            /**
+             * @description Bundled storefront asset or opaque API-owned uploaded product asset.
+             * @example /product-assets/7ed6a7c7-5210-4b1f-ae50-0d8d596216cb.webp
+             */
             imagePath: string;
             /** @enum {string} */
             availability: "in-stock" | "out-of-stock";
@@ -660,6 +701,99 @@ export interface components {
         AdminProductListResponseDto: {
             items: components["schemas"]["AdminProductListItemDto"][];
             meta: components["schemas"]["AdminProductListMetaDto"];
+        };
+        AdminProductCreateCategoryDto: {
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            name: string;
+        };
+        AdminProductCreateOptionsDto: {
+            categories: components["schemas"]["AdminProductCreateCategoryDto"][];
+            saleKinds: ("WEIGHT" | "PACKAGE")[];
+        };
+        AdminCreateProductMultipartDto: {
+            name: string;
+            description: string;
+            /**
+             * @description Positive USD decimal string with one or two fractional digits; minor units must fit int32.
+             * @example 5.99
+             */
+            price: string;
+            /**
+             * Format: uuid
+             * @description One of the four IDs returned by create-options.
+             */
+            categoryId: string;
+            /** @enum {string} */
+            saleKind: "WEIGHT" | "PACKAGE";
+            /**
+             * @description Canonical non-negative inventory integer, at most 2000000000.
+             * @example 100000000
+             */
+            stockAmount: string;
+            /** @enum {string} */
+            isActive: "true" | "false";
+            /**
+             * Format: date-time
+             * @description ISO instant with Z or numeric offset; defaults to the server current instant.
+             */
+            activeFrom?: string;
+            /**
+             * Format: date-time
+             * @description ISO instant with Z or numeric offset; must be strictly after activeFrom.
+             */
+            activeUntil?: string;
+            /** @description PACKAGE-only canonical positive net weight in milligrams, bounded to int32. */
+            packageNetWeightMg?: string;
+            /**
+             * Format: binary
+             * @description One JPEG, PNG or WebP image, at most 5 MiB.
+             */
+            image: string;
+        };
+        AdminCreatedProductDto: {
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            name: string;
+            teaser: string;
+            description: string;
+            /** Format: int32 */
+            priceMinor: number;
+            /** @enum {string} */
+            currency: "USD";
+            /** @enum {string} */
+            priceQualifier: "per 100g" | "per package";
+            category: components["schemas"]["AdminProductCreateCategoryDto"];
+            /** @enum {string} */
+            saleKind: "WEIGHT" | "PACKAGE";
+            /** @enum {string} */
+            amountUnit: "MILLIGRAM" | "EACH";
+            /** Format: int32 */
+            priceBasisAmount: number;
+            /** Format: int32 */
+            minimumOrderAmount: number;
+            /** Format: int32 */
+            orderStepAmount: number;
+            /** Format: int32 */
+            maximumOrderAmount: number | null;
+            /** Format: int32 */
+            stockAmount: number;
+            /** Format: int32 */
+            packageNetWeightMg: number | null;
+            isActive: boolean;
+            /** Format: date-time */
+            activeFrom: string;
+            /** Format: date-time */
+            activeUntil: string | null;
+            /** @example /product-assets/7ed6a7c7-5210-4b1f-ae50-0d8d596216cb.webp */
+            imagePath: string;
+            specifications: components["schemas"]["ProductSpecificationDto"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
         };
         AllocationUnavailableDto: {
             /** @enum {string} */
@@ -1507,6 +1641,42 @@ export interface operations {
             };
         };
     };
+    ProductAssetsController_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description WebP product image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/webp": string;
+                };
+            };
+            /** @description Product image not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Asset storage unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AdminController_capabilities: {
         parameters: {
             query?: never;
@@ -1578,6 +1748,114 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Session is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Administrator access is required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session verification is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_createProduct: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["AdminCreateProductMultipartDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCreatedProductDto"];
+                };
+            };
+            /** @description Invalid product fields or image */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Administrator access is required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Generated product slug already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Product image exceeds 5 MiB */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session verification, product storage or asset storage unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_createOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductCreateOptionsDto"];
+                };
             };
             /** @description Session is not valid */
             401: {

@@ -91,13 +91,6 @@ test.describe('connected local authentication journey', () => {
     await expect(page.getByRole('status')).toHaveText(
       'Your account information was saved.',
     );
-    await page.reload();
-    await expect(page.getByLabel('Full Name')).toHaveValue('Local Brewer');
-    await expect(page.getByLabel('Phone number')).toHaveValue(
-      '+34 600 123 456',
-    );
-    await expect(page.getByLabel('Email')).toHaveValue(email);
-    await expect(page.getByLabel('City')).toHaveValue('Madrid');
 
     const avatarUpload = page.waitForResponse(
       (response) =>
@@ -143,6 +136,14 @@ test.describe('connected local authentication journey', () => {
       'Your profile photo was removed.',
     );
     await expect(page.getByAltText('Current profile photo')).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.getByLabel('Full Name')).toHaveValue('Local Brewer');
+    await expect(page.getByLabel('Phone number')).toHaveValue(
+      '+34 600 123 456',
+    );
+    await expect(page.getByLabel('Email')).toHaveValue(email);
+    await expect(page.getByLabel('City')).toHaveValue('Madrid');
     expect(
       await page.evaluate(() => ({
         localStorage: localStorage.length,

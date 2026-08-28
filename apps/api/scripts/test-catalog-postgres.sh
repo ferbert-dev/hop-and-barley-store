@@ -73,7 +73,8 @@ for migration in \
   20260827100000_add_measured_product_quantities \
   20260827150000_disable_cart_reservations \
   20260828153000_add_product_activity_window \
-  20260828163000_align_ingredient_product_types; do
+  20260828163000_align_ingredient_product_types \
+  20260828170000_enable_uploaded_product_assets; do
   docker exec --interactive "$container_name" psql \
     --set ON_ERROR_STOP=1 --username "$database_user" --dbname upgrade_catalog \
     < "$repo_root/apps/api/prisma/migrations/$migration/migration.sql"
@@ -143,6 +144,34 @@ c1a_reapply_state=$(docker exec "$container_name" psql --tuples-only --no-align 
   --username "$database_user" --dbname rollback_c1a \
   --command 'SELECT (SELECT "name" FROM "Category" WHERE "slug" = '"'"'malts'"'"') || '"'"':'"'"' || (SELECT count(*) FROM "Category") || '"'"':'"'"' || (SELECT count(*) FROM "Product") || '"'"':'"'"' || (SELECT count(*) FROM "Product" WHERE "slug" = '"'"'west-coast-ipa-kit'"'"' AND "saleKind" = '"'"'KIT'"'"');')
 test "$c1a_reapply_state" = 'Malt:5:12:1'
+
+docker exec "$container_name" createdb -U "$database_user" \
+  --template fresh_catalog rollback_m3_assets
+m3_assets_rollback_path="$repo_root/apps/api/prisma/migrations/20260828170000_enable_uploaded_product_assets/rollback.sql"
+docker exec --interactive "$container_name" psql --no-psqlrc \
+  --set ON_ERROR_STOP=1 --username "$database_user" --dbname rollback_m3_assets \
+  < "$m3_assets_rollback_path"
+m3_assets_rollback_definition=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname rollback_m3_assets \
+  --command 'SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = '"'"'public."Product"'"'"'::regclass AND conname = '"'"'Product_imagePath_local_check'"'"';')
+[[ "$m3_assets_rollback_definition" == *'/assets/products/'* ]]
+[[ "$m3_assets_rollback_definition" != *'/product-assets/'* ]]
+
+docker exec "$container_name" createdb -U "$database_user" \
+  --template fresh_catalog rollback_m3_assets_refusal
+docker exec "$container_name" psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --username "$database_user" --dbname rollback_m3_assets_refusal \
+  --command 'INSERT INTO "Product" ("id", "name", "slug", "teaser", "description", "priceMinor", "priceQualifier", "currency", "saleKind", "amountUnit", "priceBasisAmount", "minimumOrderAmount", "orderStepAmount", "maximumOrderAmount", "stockAmount", "packageNetWeightMg", "kitYieldVolumeMl", "isActive", "activeFrom", "activeUntil", "imagePath", "specifications", "categoryId", "updatedAt") VALUES ('"'"'30000000-0000-4000-8000-000000000001'"'"', '"'"'Uploaded Test'"'"', '"'"'uploaded-test'"'"', '"'"'Uploaded test'"'"', '"'"'Uploaded test product'"'"', 100, '"'"'per 100g'"'"', '"'"'USD'"'"', '"'"'WEIGHT'"'"', '"'"'MILLIGRAM'"'"', 100000, 100000, 100000, 100000000, 100000, NULL, NULL, true, CURRENT_TIMESTAMP, NULL, '"'"'/product-assets/30000000-0000-4000-8000-000000000001.webp'"'"', '"'"'[{"label":"Product Type","value":"Hops"}]'"'"'::jsonb, '"'"'10000000-0000-4000-8000-000000000001'"'"', CURRENT_TIMESTAMP);' >/dev/null
+if docker exec --interactive "$container_name" psql --no-psqlrc \
+  --set ON_ERROR_STOP=1 --username "$database_user" --dbname rollback_m3_assets_refusal \
+  < "$m3_assets_rollback_path" >/dev/null 2>&1; then
+  echo 'Expected M3 asset rollback to refuse a referenced upload' >&2
+  exit 1
+fi
+m3_assets_constraint_count=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname rollback_m3_assets_refusal \
+  --command 'SELECT count(*) FROM pg_constraint WHERE conrelid = '"'"'public."Product"'"'"'::regclass AND conname = '"'"'Product_imagePath_local_check'"'"';')
+test "$m3_assets_constraint_count" = '1'
 
 DATABASE_URL="$fresh_url" NODE_OPTIONS='--experimental-vm-modules' \
   RUN_CATALOG_POSTGRES_INTEGRATION=1 \

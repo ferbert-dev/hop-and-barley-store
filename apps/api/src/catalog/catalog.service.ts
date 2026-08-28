@@ -10,6 +10,7 @@ import type {
 import {
   buildCatalogFacetQuery,
   buildCatalogProductWhere,
+  buildPublicProductLifecycleWhere,
   CATALOG_PRODUCT_SORT_ORDER,
 } from './catalog-list-query';
 
@@ -45,9 +46,14 @@ export class CatalogService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getProduct(slug: string): Promise<ProductDetailDto> {
+    const evaluatedAt = new Date();
     const product = await this.prisma.product.findFirst({
       select: productDetailSelect,
-      where: { currency: 'USD', isActive: true, slug },
+      where: {
+        currency: 'USD',
+        slug,
+        ...buildPublicProductLifecycleWhere(evaluatedAt),
+      },
     });
 
     if (!product) throw new NotFoundException('Product not found');
@@ -66,8 +72,9 @@ export class CatalogService {
   }
 
   async listProducts(query: CatalogQueryDto): Promise<CatalogResponseDto> {
-    const where = buildCatalogProductWhere(query, 'public');
-    const facetQuery = buildCatalogFacetQuery('public');
+    const evaluatedAt = new Date();
+    const where = buildCatalogProductWhere(query, 'public', evaluatedAt);
+    const facetQuery = buildCatalogFacetQuery('public', evaluatedAt);
     const { categories, products, totalItems } = await this.prisma.$transaction(
       async (transaction) => {
         const [count, items, facets] = await Promise.all([

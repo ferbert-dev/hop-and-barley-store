@@ -2,6 +2,7 @@
 
 import { createApiClient, type components } from '@hop-and-barley/api-client';
 import { resolveBrowserApiUrl } from '../../lib/browser-api-url';
+import { isProductImagePath } from '../../lib/product-image';
 import { readQuantityMetadata } from '../quantity/quantity-model';
 
 const DEFAULT_API_URL = 'http://localhost:3001';
@@ -202,8 +203,7 @@ function isCartItem(value: unknown) {
     value.productSlug.length > 0 &&
     typeof value.name === 'string' &&
     value.name.length > 0 &&
-    typeof value.imagePath === 'string' &&
-    value.imagePath.startsWith('/assets/products/') &&
+    isProductImagePath(value.imagePath) &&
     typeof value.priceQualifier === 'string' &&
     isPositiveSafeInteger(value.amount) &&
     readQuantityMetadata(value) !== null &&

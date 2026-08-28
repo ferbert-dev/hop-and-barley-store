@@ -119,4 +119,27 @@ describe('auth environment validation', () => {
       }),
     ).toMatchObject({ AUTH_SESSIONS_ENABLED: true });
   });
+
+  it('defaults and validates the provider-neutral product asset storage root', () => {
+    expect(validateEnvironment(BASE)).toMatchObject({
+      PRODUCT_ASSET_STORAGE_PATH: '.local/product-assets',
+    });
+    expect(
+      validateEnvironment({
+        ...BASE,
+        PRODUCT_ASSET_STORAGE_PATH: '  /srv/hop-and-barley/product-assets  ',
+      }),
+    ).toMatchObject({
+      PRODUCT_ASSET_STORAGE_PATH: '/srv/hop-and-barley/product-assets',
+    });
+    expect(() =>
+      validateEnvironment({ ...BASE, PRODUCT_ASSET_STORAGE_PATH: '/' }),
+    ).toThrow(/PRODUCT_ASSET_STORAGE_PATH/);
+    expect(() =>
+      validateEnvironment({
+        ...BASE,
+        PRODUCT_ASSET_STORAGE_PATH: 'assets\0escape',
+      }),
+    ).toThrow(/PRODUCT_ASSET_STORAGE_PATH/);
+  });
 });
