@@ -20,10 +20,28 @@ while IFS=' ' read -r ggshield_local_ref ggshield_local_sha ggshield_remote_ref 
     exit 1
   fi
 
+  case "$ggshield_local_sha$ggshield_remote_sha" in
+    *[!0-9a-fA-F]*)
+      echo "Cannot scan push: Git supplied an invalid object ID." >&2
+      exit 1
+      ;;
+  esac
+
+  if { [ "${#ggshield_local_sha}" -ne 40 ] && [ "${#ggshield_local_sha}" -ne 64 ]; } ||
+    { [ "${#ggshield_remote_sha}" -ne 40 ] && [ "${#ggshield_remote_sha}" -ne 64 ]; }; then
+    echo "Cannot scan push: Git supplied an invalid object ID." >&2
+    exit 1
+  fi
+
   if [ "$ggshield_local_sha" = "0000000000000000000000000000000000000000" ]; then
     continue
   fi
 
+  if ! git cat-file -e "${ggshield_local_sha}^{commit}" 2>/dev/null; then
+    echo "Cannot scan push: the local ref does not resolve to a commit." >&2
+    exit 1
+  fi
+
   printf '%s %s %s %s\n' "$ggshield_local_ref" "$ggshield_local_sha" "$ggshield_remote_ref" "$ggshield_remote_sha" |
-    ggshield secret scan pre-push --fail-on-server-error "$@" || exit $?
+    ggshield --config-path .gitguardian.yaml secret scan pre-push --fail-on-server-error "$@" || exit $?
 done

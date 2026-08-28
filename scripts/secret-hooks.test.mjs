@@ -48,6 +48,10 @@ if [ "$*" = 'rev-list --count --all' ]; then
   printf '123\\n'
   exit 0
 fi
+case "$*" in
+  'cat-file -e 1111111111111111111111111111111111111111^{commit}'|\
+  'cat-file -e 2222222222222222222222222222222222222222^{commit}') exit 0 ;;
+esac
 exit 64
 `,
   );
@@ -64,6 +68,9 @@ done
 case ",\${SKIP:-}," in
   *,ggshield,*) exit 0 ;;
 esac
+if [ "\${GGSHIELD_WEAK_GLOBAL_CONFIG:-}" = '1' ] && [ "$1" != '--config-path' ]; then
+  exit 0
+fi
 if [ "\${GITGUARDIAN_EXIT_ZERO:-}" = '1' ]; then
   exit 0
 fi
@@ -119,6 +126,10 @@ test('repository-owned secret hooks are executable and do not weaken scanner fai
       /unset GITGUARDIAN_EXIT_ZERO GITGUARDIAN_FAIL_ON_SERVER_ERROR SKIP/u,
     );
     assert.match(source, /--fail-on-server-error/u);
+    assert.match(
+      source,
+      /ggshield --config-path \.gitguardian\.yaml secret scan/u,
+    );
   }
 });
 
@@ -143,7 +154,7 @@ test('pre-commit formats first and scans the final staged snapshot', () => {
     assert.equal(
       readFileSync(harness.log, 'utf8'),
       'pnpm exec lint-staged\n' +
-        'ggshield secret scan pre-commit --scan-all-merge-files --fail-on-server-error\n' +
+        'ggshield --config-path .gitguardian.yaml secret scan pre-commit --scan-all-merge-files --fail-on-server-error\n' +
         'max-commits \n',
     );
   });
@@ -173,6 +184,7 @@ test('pre-commit preserves lint-staged and scanner failure statuses', () => {
         GGSHIELD_STUB_EXIT: '42',
         GITGUARDIAN_EXIT_ZERO: '1',
         GITGUARDIAN_FAIL_ON_SERVER_ERROR: 'false',
+        GGSHIELD_WEAK_GLOBAL_CONFIG: '1',
         SKIP: 'ggshield',
       },
     });
@@ -180,7 +192,7 @@ test('pre-commit preserves lint-staged and scanner failure statuses', () => {
     assert.equal(
       readFileSync(harness.log, 'utf8'),
       'pnpm exec lint-staged\n' +
-        'ggshield secret scan pre-commit --scan-all-merge-files --fail-on-server-error\n' +
+        'ggshield --config-path .gitguardian.yaml secret scan pre-commit --scan-all-merge-files --fail-on-server-error\n' +
         'max-commits \n',
     );
   });
@@ -202,10 +214,12 @@ test('pre-push scans every ref update with the remote and an uncapped local rang
     assert.equal(
       readFileSync(harness.log, 'utf8'),
       'git rev-list --count --all\n' +
-        'ggshield secret scan pre-push --fail-on-server-error upstream git@example.invalid:shop.git\n' +
+        'git cat-file -e 1111111111111111111111111111111111111111^{commit}\n' +
+        'ggshield --config-path .gitguardian.yaml secret scan pre-push --fail-on-server-error upstream git@example.invalid:shop.git\n' +
         'max-commits 123\n' +
         `stdin ${firstRef}\n` +
-        'ggshield secret scan pre-push --fail-on-server-error upstream git@example.invalid:shop.git\n' +
+        'git cat-file -e 2222222222222222222222222222222222222222^{commit}\n' +
+        'ggshield --config-path .gitguardian.yaml secret scan pre-push --fail-on-server-error upstream git@example.invalid:shop.git\n' +
         'max-commits 123\n' +
         `stdin ${secondRef}\n`,
     );
@@ -227,6 +241,23 @@ test('pre-push fails closed on malformed Git ref input', () => {
   });
 });
 
+test('pre-push fails closed when a complete local object ID is not a commit', () => {
+  withHarness({}, (harness) => {
+    const result = runHook('pre-push', harness, {
+      args: ['upstream', 'git@example.invalid:shop.git'],
+      input:
+        'refs/heads/ops5 4444444444444444444444444444444444444444 refs/heads/ops5 0000000000000000000000000000000000000000\n',
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /does not resolve to a commit/u);
+    assert.equal(
+      readFileSync(harness.log, 'utf8'),
+      'git rev-list --count --all\n' +
+        'git cat-file -e 4444444444444444444444444444444444444444^{commit}\n',
+    );
+  });
+});
+
 test('pre-push preserves scanner failures despite weakening inherited settings', () => {
   withHarness({}, (harness) => {
     const refUpdate =
@@ -237,6 +268,7 @@ test('pre-push preserves scanner failures despite weakening inherited settings',
         GGSHIELD_STUB_EXIT: '23',
         GITGUARDIAN_EXIT_ZERO: '1',
         GITGUARDIAN_FAIL_ON_SERVER_ERROR: 'false',
+        GGSHIELD_WEAK_GLOBAL_CONFIG: '1',
         SKIP: 'ggshield',
       },
       input: refUpdate,
@@ -245,7 +277,8 @@ test('pre-push preserves scanner failures despite weakening inherited settings',
     assert.equal(
       readFileSync(harness.log, 'utf8'),
       'git rev-list --count --all\n' +
-        'ggshield secret scan pre-push --fail-on-server-error upstream git@example.invalid:shop.git\n' +
+        'git cat-file -e 1111111111111111111111111111111111111111^{commit}\n' +
+        'ggshield --config-path .gitguardian.yaml secret scan pre-push --fail-on-server-error upstream git@example.invalid:shop.git\n' +
         'max-commits 123\n' +
         `stdin ${refUpdate}`,
     );

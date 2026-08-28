@@ -7,4 +7,4 @@ fi
 
 unset GITGUARDIAN_EXIT_ZERO GITGUARDIAN_FAIL_ON_SERVER_ERROR SKIP
 pnpm exec lint-staged
-exec ggshield secret scan pre-commit --scan-all-merge-files --fail-on-server-error
+exec ggshield --config-path .gitguardian.yaml secret scan pre-commit --scan-all-merge-files --fail-on-server-error
