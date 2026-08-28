@@ -6,20 +6,20 @@ import {
 } from './session-cookie';
 
 const TOKEN = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
-const EXPIRES_AT = new Date('2026-08-29T10:00:00.000Z');
+const EXPIRES_AT = new Date('2026-09-21T10:00:00.000Z');
 
 describe('session cookies', () => {
-  it('uses an explicit host-only local HTTP cookie contract', () => {
+  it('uses a browser-session cookie without persistence attributes by default', () => {
     expect(getSessionCookieName('local-http')).toBe('hb_session');
-    expect(createSessionCookie('local-http', TOKEN, EXPIRES_AT)).toBe(
-      'hb_session=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA; Max-Age=604800; Expires=Sat, 29 Aug 2026 10:00:00 GMT; Path=/; HttpOnly; SameSite=Lax',
+    expect(createSessionCookie('local-http', TOKEN, EXPIRES_AT, false)).toBe(
+      'hb_session=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA; Path=/; HttpOnly; SameSite=Lax',
     );
   });
 
-  it('uses the secure __Host- cookie only in explicit HTTPS mode', () => {
+  it('uses a 30-day persistent secure __Host- cookie only when remembered', () => {
     expect(getSessionCookieName('secure-https')).toBe('__Host-hb_session');
-    expect(createSessionCookie('secure-https', TOKEN, EXPIRES_AT)).toBe(
-      '__Host-hb_session=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA; Max-Age=604800; Expires=Sat, 29 Aug 2026 10:00:00 GMT; Path=/; HttpOnly; Secure; SameSite=Lax',
+    expect(createSessionCookie('secure-https', TOKEN, EXPIRES_AT, true)).toBe(
+      '__Host-hb_session=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA; Max-Age=2592000; Expires=Mon, 21 Sep 2026 10:00:00 GMT; Path=/; HttpOnly; Secure; SameSite=Lax',
     );
   });
 

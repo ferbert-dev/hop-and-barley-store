@@ -140,6 +140,29 @@ describe('auth presentation validation', () => {
   });
 
   it.each([
+    [true, true],
+    [false, false],
+    [undefined, false],
+    ['true', false],
+    [1, false],
+  ])('normalizes the login remember choice %p to %p', (input, rememberMe) => {
+    expect(
+      validateLoginInput({
+        email: ' brewer@example.com ',
+        password: 'password-value',
+        rememberMe: input,
+      }),
+    ).toEqual({
+      ok: true,
+      value: {
+        email: 'brewer@example.com',
+        password: 'password-value',
+        rememberMe,
+      },
+    });
+  });
+
+  it.each([
     ['', 'Enter your email address.'],
     ['not-an-email', 'Enter a valid email address.'],
   ])('rejects recovery email %j locally', (email, error) => {

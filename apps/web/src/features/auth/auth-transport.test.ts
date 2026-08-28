@@ -59,9 +59,9 @@ describe('generated-client auth transport', () => {
   });
 
   it('returns a safe session DTO and validated upstream cookie after login', async () => {
-    const fetch = vi.fn(async () =>
+    const fetch = vi.fn<(request: Request) => Promise<Response>>(async () =>
       jsonResponse(session, 200, {
-        'set-cookie': `hb_session=${'A'.repeat(43)}; Max-Age=604800; Expires=Sat, 29 Aug 2026 10:00:00 GMT; Path=/; HttpOnly; SameSite=Lax`,
+        'set-cookie': `hb_session=${'A'.repeat(43)}; Path=/; HttpOnly; SameSite=Lax`,
       }),
     );
     vi.stubGlobal('fetch', fetch);
@@ -70,6 +70,7 @@ describe('generated-client auth transport', () => {
       {
         email: 'brewer@example.com',
         password: 'correct horse battery staple',
+        rememberMe: false,
       },
       'http://localhost:3000',
       'http://api:3001/api/v1',
@@ -78,6 +79,10 @@ describe('generated-client auth transport', () => {
     expect(result).toMatchObject({ kind: 'authenticated', session });
     expect(result).not.toHaveProperty('csrfToken');
     expect(result).not.toHaveProperty('token');
+    const request = fetch.mock.calls[0]?.[0] as Request;
+    await expect(request.clone().json()).resolves.toMatchObject({
+      rememberMe: false,
+    });
   });
 
   it('forwards only the selected session cookie for a private session read', async () => {

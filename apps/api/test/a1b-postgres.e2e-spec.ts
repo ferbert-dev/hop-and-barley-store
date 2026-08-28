@@ -94,6 +94,24 @@ describePostgres('A1B sessions with disposable PostgreSQL', () => {
     ).toBe(7 * 24 * 60 * 60 * 1_000);
   });
 
+  it('persists the exact 30-day absolute expiry only for remembered sessions', async () => {
+    const userId = await createUser('remembered@example.com');
+    const issuedAt = new Date('2026-08-28T10:00:00.000Z');
+
+    const issued = await sessions.issue(userId, null, {
+      now: issuedAt,
+      rememberMe: true,
+    });
+    const row = await prisma.authSession.findFirstOrThrow({
+      where: { userId },
+    });
+
+    const expectedExpiry = new Date('2026-09-27T10:00:00.000Z');
+    expect(issued.expiresAt).toEqual(expectedExpiry);
+    expect(row.issuedAt).toEqual(issuedAt);
+    expect(row.expiresAt).toEqual(expectedExpiry);
+  });
+
   it('keeps at most five active sessions under concurrent issuance', async () => {
     const userId = await createUser('max-five@example.com');
 
@@ -140,11 +158,9 @@ describePostgres('A1B sessions with disposable PostgreSQL', () => {
 
   it('coalesces concurrent touches and never resurrects revoked or expired rows', async () => {
     const userId = await createUser('touch@example.com');
-    const issued = await sessions.issue(
-      userId,
-      null,
-      new Date(Date.now() - 60 * 60 * 1_000),
-    );
+    const issued = await sessions.issue(userId, null, {
+      now: new Date(Date.now() - 60 * 60 * 1_000),
+    });
     await prisma.authSession.updateMany({
       data: { lastSeenAt: new Date(Date.now() - 20 * 60 * 1_000) },
       where: { userId },

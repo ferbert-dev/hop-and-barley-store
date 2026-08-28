@@ -75,7 +75,7 @@ describe('SessionService', () => {
     const { prisma, transaction } = createPrisma();
     const service = new SessionService(prisma as never);
 
-    const result = await service.issue(USER_ID, PREVIOUS_TOKEN, NOW);
+    const result = await service.issue(USER_ID, PREVIOUS_TOKEN, { now: NOW });
 
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
       isolationLevel: 'Serializable',
@@ -111,6 +111,22 @@ describe('SessionService', () => {
     });
   });
 
+  it('extends only a remembered session to the exact 30-day absolute expiry', async () => {
+    const { prisma, transaction } = createPrisma();
+    const service = new SessionService(prisma as never);
+
+    const result = await service.issue(USER_ID, null, {
+      now: NOW,
+      rememberMe: true,
+    });
+
+    const createArgs = transaction.authSession.create.mock.calls[0]?.[0];
+    expect(createArgs?.data.expiresAt).toEqual(
+      new Date('2026-09-21T10:00:00.000Z'),
+    );
+    expect(result.expiresAt).toEqual(new Date('2026-09-21T10:00:00.000Z'));
+  });
+
   it('rotates a presented same-user session and revokes the oldest above five', async () => {
     const { prisma, transaction } = createPrisma();
     transaction.authSession.findMany.mockResolvedValue(
@@ -118,7 +134,7 @@ describe('SessionService', () => {
     );
     const service = new SessionService(prisma as never);
 
-    await service.issue(USER_ID, PREVIOUS_TOKEN, NOW);
+    await service.issue(USER_ID, PREVIOUS_TOKEN, { now: NOW });
 
     const rotateArgs = transaction.authSession.updateMany.mock.calls[0]?.[0];
     const overflowArgs = transaction.authSession.updateMany.mock.calls[1]?.[0];
@@ -142,21 +158,23 @@ describe('SessionService', () => {
     const service = new SessionService(prisma as never);
 
     try {
-      await expect(service.issue(USER_ID, null, NOW)).resolves.toBeDefined();
+      await expect(
+        service.issue(USER_ID, null, { now: NOW }),
+      ).resolves.toBeDefined();
       expect(prisma.$transaction).toHaveBeenCalledTimes(3);
       expect(timeout).toHaveBeenNthCalledWith(1, expect.any(Function), 3);
       expect(timeout).toHaveBeenNthCalledWith(2, expect.any(Function), 5);
 
       prisma.$transaction.mockClear().mockRejectedValue({ code: 'P2002' });
-      await expect(service.issue(USER_ID, null, NOW)).rejects.toMatchObject({
-        code: 'P2002',
-      });
+      await expect(
+        service.issue(USER_ID, null, { now: NOW }),
+      ).rejects.toMatchObject({ code: 'P2002' });
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
 
       prisma.$transaction.mockClear().mockRejectedValue({ code: 'P2034' });
-      await expect(service.issue(USER_ID, null, NOW)).rejects.toMatchObject({
-        code: 'P2034',
-      });
+      await expect(
+        service.issue(USER_ID, null, { now: NOW }),
+      ).rejects.toMatchObject({ code: 'P2034' });
       expect(prisma.$transaction).toHaveBeenCalledTimes(8);
     } finally {
       random.mockRestore();

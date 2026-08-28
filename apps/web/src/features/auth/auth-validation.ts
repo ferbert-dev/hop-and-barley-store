@@ -1,9 +1,18 @@
-import { registrationFormSchema } from '@hop-and-barley/auth-contract';
+import {
+  loginCredentialsSchema,
+  registrationFormSchema,
+} from '@hop-and-barley/auth-contract';
 
 export type AuthCredentials = Readonly<{
   email: string;
   password: string;
 }>;
+
+export type LoginCredentials = AuthCredentials &
+  Readonly<{ rememberMe: boolean }>;
+
+export type LoginFormInput = AuthCredentials &
+  Readonly<{ rememberMe?: unknown }>;
 
 export type RegistrationFormInput = AuthCredentials &
   Readonly<{ confirmPassword: string }>;
@@ -11,9 +20,9 @@ export type RegistrationFormInput = AuthCredentials &
 export type AuthFieldName = keyof RegistrationFormInput;
 type AuthFieldErrors = Partial<Record<AuthFieldName, string>>;
 
-export type AuthValidationResult =
+export type AuthValidationResult<T> =
   | Readonly<{ errors: AuthFieldErrors; ok: false }>
-  | Readonly<{ ok: true; value: AuthCredentials }>;
+  | Readonly<{ ok: true; value: T }>;
 
 export type RecoveryEmailValidationResult =
   | Readonly<{ error: string; ok: false }>
@@ -25,7 +34,7 @@ const AUTH_ENTRY_PATHS = new Set(['/login', '/register']);
 
 export function validateRegistrationInput(
   input: RegistrationFormInput,
-): AuthValidationResult {
+): AuthValidationResult<AuthCredentials> {
   const email = input.email.trim();
   const result = registrationFormSchema.safeParse({ ...input, email });
   if (result.success) {
@@ -51,8 +60,8 @@ export function validateRegistrationInput(
 }
 
 export function validateLoginInput(
-  input: AuthCredentials,
-): AuthValidationResult {
+  input: LoginFormInput,
+): AuthValidationResult<LoginCredentials> {
   const email = input.email.trim();
   const password = input.password;
   const errors: AuthFieldErrors = {};
@@ -67,9 +76,15 @@ export function validateLoginInput(
     errors.password = 'Enter your password.';
   }
 
-  return Object.keys(errors).length > 0
-    ? { errors, ok: false }
-    : { ok: true, value: { email, password } };
+  if (Object.keys(errors).length > 0) return { errors, ok: false };
+
+  const result = loginCredentialsSchema.safeParse({
+    email,
+    password,
+    rememberMe: input.rememberMe,
+  });
+  if (!result.success) return { errors: {}, ok: false };
+  return { ok: true, value: result.data };
 }
 
 export function validateRecoveryEmail(

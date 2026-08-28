@@ -77,10 +77,20 @@ const loginRequest = configuredClient.POST('/api/v1/auth/login', {
   body: {
     email: 'brewer@example.com',
     password: 'correct-password-value',
+    rememberMe: true,
   },
   params: { header: { Origin: 'http://localhost:3000' } },
 });
 void loginRequest;
+
+const defaultLoginRequest = configuredClient.POST('/api/v1/auth/login', {
+  body: {
+    email: 'brewer@example.com',
+    password: 'correct-password-value',
+  },
+  params: { header: { Origin: 'http://localhost:3000' } },
+});
+void defaultLoginRequest;
 
 const currentSessionRequest = configuredClient.GET('/api/v1/auth/session');
 const csrfRequest = configuredClient.GET('/api/v1/auth/csrf');

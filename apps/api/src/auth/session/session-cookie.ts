@@ -2,7 +2,7 @@ import { parseSessionToken } from './session-token';
 
 export type AuthCookieMode = 'local-http' | 'secure-https';
 
-const ABSOLUTE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+const REMEMBERED_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
 export function getSessionCookieName(mode: AuthCookieMode): string {
   return mode === 'secure-https' ? '__Host-hb_session' : 'hb_session';
@@ -12,11 +12,14 @@ export function createSessionCookie(
   mode: AuthCookieMode,
   token: string,
   expiresAt: Date,
+  rememberMe: boolean,
 ): string {
   return serializeCookie(
     mode,
     token,
-    `Max-Age=${ABSOLUTE_MAX_AGE_SECONDS}; Expires=${expiresAt.toUTCString()}`,
+    rememberMe === true
+      ? `Max-Age=${REMEMBERED_MAX_AGE_SECONDS}; Expires=${expiresAt.toUTCString()}`
+      : null,
   );
 }
 
@@ -51,8 +54,9 @@ export function readSessionCookie(
 function serializeCookie(
   mode: AuthCookieMode,
   value: string,
-  expiry: string,
+  expiry: string | null,
 ): string {
   const secure = mode === 'secure-https' ? '; Secure' : '';
-  return `${getSessionCookieName(mode)}=${value}; ${expiry}; Path=/; HttpOnly${secure}; SameSite=Lax`;
+  const expiryAttributes = expiry ? `; ${expiry}` : '';
+  return `${getSessionCookieName(mode)}=${value}${expiryAttributes}; Path=/; HttpOnly${secure}; SameSite=Lax`;
 }
