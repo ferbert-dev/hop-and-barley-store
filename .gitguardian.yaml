@@ -1,0 +1,4 @@
+version: 2
+exit_zero: false
+secret:
+  fail_on_server_error: true

@@ -42,6 +42,8 @@ jobs:
         run: pnpm clean
       - name: Verify CI workflow contract
         run: pnpm ci:contract
+      - name: Verify secret-protection hooks
+        run: pnpm secret-hooks:check
       - name: Verify generated API contract stability
         run: pnpm generated:verify
       - name: Typecheck from a clean output tree

@@ -23,6 +23,7 @@
     "format:check": "prettier --check .",
     "generated:verify": "pnpm --filter @hop-and-barley/auth-contract build && node scripts/verify-generated-stability.mjs",
     "ci:contract": "node --test scripts/ci-workflow-contract.test.mjs scripts/configure-ci-browser-env.test.mjs",
+    "secret-hooks:check": "node --test scripts/secret-hooks.test.mjs",
     "workflow:check": "node --test scripts/engineering-workflow-contract.test.mjs scripts/ci-workflow-contract.test.mjs",
     "test": "turbo run test:unit",
     "test:unit": "turbo run test:unit",
@@ -41,7 +42,7 @@
     "db:migrate:deploy": "pnpm --filter @hop-and-barley/api db:migrate:deploy",
     "db:seed": "pnpm --filter @hop-and-barley/api db:seed",
     "api:generate": "pnpm --filter @hop-and-barley/api generate:openapi && pnpm --filter @hop-and-barley/api-client generate",
-    "check": "pnpm workflow:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm build",
+    "check": "pnpm workflow:check && pnpm secret-hooks:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm build",
     "check:full": "pnpm check && pnpm test:e2e",
     "prepare": "husky"
   },
