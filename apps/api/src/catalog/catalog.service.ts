@@ -1,12 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../database/prisma.service';
-import type { CatalogQueryDto, CatalogSort } from './dto/catalog-query.dto';
+import type { CatalogQueryDto } from './dto/catalog-query.dto';
 import type { CatalogResponseDto } from './dto/catalog-response.dto';
 import type {
   ProductDetailDto,
   ProductSpecificationDto,
 } from './dto/product-detail.dto';
+import {
+  buildCatalogFacetQuery,
+  buildCatalogProductWhere,
+  CATALOG_PRODUCT_SORT_ORDER,
+} from './catalog-list-query';
 
 const productSelect = {
   amountUnit: true,
@@ -35,22 +40,6 @@ const productDetailSelect = {
   specifications: true,
 } satisfies Prisma.ProductSelect;
 
-const facetQuery = {
-  orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }, { slug: 'asc' }],
-  select: { name: true, slug: true },
-  where: {
-    products: { some: { currency: 'USD', isActive: true } },
-  },
-} satisfies Prisma.CategoryFindManyArgs;
-
-const sortOrder: Record<CatalogSort, Prisma.ProductOrderByWithRelationInput[]> =
-  {
-    'name-asc': [{ name: 'asc' }, { slug: 'asc' }],
-    'name-desc': [{ name: 'desc' }, { slug: 'asc' }],
-    'price-asc': [{ priceMinor: 'asc' }, { name: 'asc' }, { slug: 'asc' }],
-    'price-desc': [{ priceMinor: 'desc' }, { name: 'asc' }, { slug: 'asc' }],
-  };
-
 @Injectable()
 export class CatalogService {
   constructor(private readonly prisma: PrismaService) {}
@@ -77,13 +66,14 @@ export class CatalogService {
   }
 
   async listProducts(query: CatalogQueryDto): Promise<CatalogResponseDto> {
-    const where = buildProductWhere(query);
+    const where = buildCatalogProductWhere(query, 'public');
+    const facetQuery = buildCatalogFacetQuery('public');
     const { categories, products, totalItems } = await this.prisma.$transaction(
       async (transaction) => {
         const [count, items, facets] = await Promise.all([
           transaction.product.count({ where }),
           transaction.product.findMany({
-            orderBy: sortOrder[query.sort],
+            orderBy: CATALOG_PRODUCT_SORT_ORDER[query.sort],
             select: productSelect,
             skip: (query.page - 1) * query.limit,
             take: query.limit,
@@ -178,34 +168,4 @@ function isProductSpecification(
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
-}
-
-function buildProductWhere(query: CatalogQueryDto): Prisma.ProductWhereInput {
-  const where: Prisma.ProductWhereInput = {
-    currency: 'USD',
-    isActive: true,
-  };
-
-  if (query.search) {
-    where.AND = query.search.split(' ').map((token) => ({
-      OR: [
-        { name: { contains: token, mode: 'insensitive' } },
-        { teaser: { contains: token, mode: 'insensitive' } },
-        { description: { contains: token, mode: 'insensitive' } },
-      ],
-    }));
-  }
-  if (query.category) where.category = { slug: query.category };
-  if (query.minPriceMinor !== undefined || query.maxPriceMinor !== undefined) {
-    where.priceMinor = {
-      ...(query.minPriceMinor === undefined
-        ? {}
-        : { gte: query.minPriceMinor }),
-      ...(query.maxPriceMinor === undefined
-        ? {}
-        : { lte: query.maxPriceMinor }),
-    };
-  }
-
-  return where;
 }

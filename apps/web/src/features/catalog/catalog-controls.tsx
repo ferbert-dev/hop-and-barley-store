@@ -5,11 +5,21 @@ import { Field, Select } from '../../components/ui/field';
 import { buildCatalogHref, type CatalogQuery } from './catalog-query';
 import styles from './catalog.module.css';
 
+type CatalogHrefBuilder = (
+  current: CatalogQuery,
+  overrides?: Partial<CatalogQuery>,
+  resetPage?: boolean,
+) => string;
+
 export function CatalogControls({
+  action = '/',
+  buildHref = buildCatalogHref,
   categories,
   query,
   showClear,
 }: {
+  action?: string;
+  buildHref?: CatalogHrefBuilder;
   categories: PagedCatalogResponse['meta']['facets']['categories'];
   query: CatalogQuery;
   showClear: boolean;
@@ -25,7 +35,7 @@ export function CatalogControls({
 
   return (
     <form
-      action="/"
+      action={action}
       aria-label="Filter products"
       className={styles.filters}
       method="get"
@@ -33,7 +43,7 @@ export function CatalogControls({
     >
       <div className={styles.filterHeading}>
         {showClear ? (
-          <Button href="/" variant="secondary">
+          <Button href={action} variant="secondary">
             Clear filters
           </Button>
         ) : null}
@@ -61,7 +71,7 @@ export function CatalogControls({
             <li key={`${String(index)}:${token}`}>
               <a
                 aria-label={`Remove keyword ${token}`}
-                href={buildCatalogHref(
+                href={buildHref(
                   query,
                   {
                     search: removeSearchToken(searchTokens, index),
@@ -99,7 +109,7 @@ export function CatalogControls({
         {query.category ? (
           <a
             className={styles.clearProductType}
-            href={buildCatalogHref(query, { category: undefined }, true)}
+            href={buildHref(query, { category: undefined }, true)}
           >
             Clear product type
           </a>

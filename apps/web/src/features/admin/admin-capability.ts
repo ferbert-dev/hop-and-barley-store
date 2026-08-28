@@ -61,7 +61,7 @@ export async function getAdminCapability(
   }
 }
 
-function resolveTrustedAdminApiOrigin(rawApiUrl: string): string {
+export function resolveTrustedAdminApiOrigin(rawApiUrl: string): string {
   const origin = resolveApiOrigin(rawApiUrl);
   const { hostname } = new URL(origin);
   if (!TRUSTED_LOCAL_API_HOSTS.has(hostname)) {

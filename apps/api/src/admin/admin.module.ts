@@ -2,9 +2,13 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AdminAuthorizationGuard } from './admin-authorization.guard';
 import { AdminController } from './admin.controller';
+import { AdminProductListService } from './admin-product-list.service';
 
 @Module({
   controllers: [AdminController],
-  providers: [{ provide: APP_GUARD, useClass: AdminAuthorizationGuard }],
+  providers: [
+    AdminProductListService,
+    { provide: APP_GUARD, useClass: AdminAuthorizationGuard },
+  ],
 })
 export class AdminModule {}

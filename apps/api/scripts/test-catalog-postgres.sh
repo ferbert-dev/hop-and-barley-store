@@ -70,7 +70,9 @@ for migration in \
   20260822150000_add_guest_carts \
   20260825090000_add_cart_reservations \
   20260826120000_add_orders \
-  20260827100000_add_measured_product_quantities; do
+  20260827100000_add_measured_product_quantities \
+  20260827150000_disable_cart_reservations \
+  20260828153000_add_product_activity_window; do
   docker exec --interactive "$container_name" psql \
     --set ON_ERROR_STOP=1 --username "$database_user" --dbname upgrade_catalog \
     < "$repo_root/apps/api/prisma/migrations/$migration/migration.sql"

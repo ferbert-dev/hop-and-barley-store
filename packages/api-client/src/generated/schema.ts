@@ -257,6 +257,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List products for administrator management */
+        get: operations["AdminController_listProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orders": {
         parameters: {
             query?: never;
@@ -540,6 +557,72 @@ export interface components {
              * @example true
              */
             productManagement: boolean;
+        };
+        AdminProductListItemDto: {
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            name: string;
+            description: string;
+            /**
+             * Format: int32
+             * @example 499
+             */
+            priceMinor: number;
+            /** @enum {string} */
+            currency: "USD";
+            priceQualifier: string;
+            category: components["schemas"]["ProductCategoryDto"];
+            /** @enum {string} */
+            saleKind: "WEIGHT" | "PACKAGE" | "KIT";
+            /** @enum {string} */
+            amountUnit: "MILLIGRAM" | "EACH";
+            /** Format: int32 */
+            stockAmount: number;
+            isActive: boolean;
+            /** Format: date-time */
+            activeFrom: string | null;
+            /** Format: date-time */
+            activeUntil: string | null;
+            /** @enum {string} */
+            lifecycleStatus: "ACTIVE" | "DISABLED" | "SCHEDULED" | "EXPIRED";
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        AdminProductListFiltersDto: {
+            search: string | null;
+            category: string | null;
+            /** Format: int32 */
+            minPriceMinor: number | null;
+            /** Format: int32 */
+            maxPriceMinor: number | null;
+        };
+        AdminProductListFacetsDto: {
+            categories: components["schemas"]["ProductCategoryDto"][];
+        };
+        AdminProductListMetaDto: {
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            totalItems: number;
+            /** Format: int32 */
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPreviousPage: boolean;
+            /** @enum {string} */
+            sort: "name-asc" | "name-desc" | "price-asc" | "price-desc";
+            /** @enum {string} */
+            currency: "USD";
+            filters: components["schemas"]["AdminProductListFiltersDto"];
+            facets: components["schemas"]["AdminProductListFacetsDto"];
+        };
+        AdminProductListResponseDto: {
+            items: components["schemas"]["AdminProductListItemDto"][];
+            meta: components["schemas"]["AdminProductListMetaDto"];
         };
         AllocationUnavailableDto: {
             /** @enum {string} */
@@ -1354,6 +1437,61 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AdminCapabilitiesDto"];
                 };
+            };
+            /** @description Session is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Administrator access is required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session verification is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_listProducts: {
+        parameters: {
+            query?: {
+                limit?: number;
+                page?: number;
+                sort?: "name-asc" | "name-desc" | "price-asc" | "price-desc";
+                maxPriceMinor?: number;
+                minPriceMinor?: number;
+                category?: string;
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProductListResponseDto"];
+                };
+            };
+            /** @description Invalid catalog query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Session is not valid */
             401: {
