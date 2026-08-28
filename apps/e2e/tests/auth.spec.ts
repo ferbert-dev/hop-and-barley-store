@@ -61,7 +61,10 @@ test.describe('connected local authentication journey', () => {
 
     await page.getByRole('link', { name: 'Account' }).click();
     await expect(
-      page.getByRole('heading', { name: 'Account Information' }),
+      page.getByRole('heading', {
+        name: 'Account Information',
+        exact: true,
+      }),
     ).toBeVisible();
     await expect(page.getByLabel('Full Name')).toBeVisible();
     await expect(page.getByLabel('Phone number')).toBeVisible();
