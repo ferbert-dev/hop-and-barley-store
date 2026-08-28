@@ -24,6 +24,56 @@ describe('auth presentation validation', () => {
     });
   });
 
+  it('applies the password policy after NFC normalization', () => {
+    const password = 'A\u0301bcdefg1!xy';
+    const result = validateRegistrationInput({
+      confirmPassword: password,
+      email: 'brewer@example.com',
+      password,
+    });
+
+    expect(result).toMatchObject({
+      errors: { password: 'At least 12 characters total' },
+      ok: false,
+    });
+  });
+
+  it('returns the canonical password for registration transport', () => {
+    expect(
+      validateRegistrationInput({
+        confirmPassword: 'Cafe\u0301Strong1!',
+        email: 'brewer@example.com',
+        password: 'CaféStrong1!',
+      }),
+    ).toEqual({
+      ok: true,
+      value: {
+        email: 'brewer@example.com',
+        password: 'CaféStrong1!',
+      },
+    });
+  });
+
+  it('rejects control characters without adding a visible password rule', () => {
+    const unsafeControlInput = [
+      'Abcd',
+      'efgh',
+      '1!',
+      String.fromCodePoint(0),
+      'x',
+    ].join('');
+    const result = validateRegistrationInput({
+      confirmPassword: unsafeControlInput,
+      email: 'brewer@example.com',
+      password: unsafeControlInput,
+    });
+
+    expect(result).toMatchObject({
+      errors: { password: 'Enter a valid password.' },
+      ok: false,
+    });
+  });
+
   it.each([
     ['fewer than 12 total characters', 'Abcdefg1!x'],
     ['no lowercase letter', 'ABCDEFGHI1!X'],

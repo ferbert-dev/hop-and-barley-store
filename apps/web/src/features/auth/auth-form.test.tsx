@@ -105,6 +105,25 @@ describe('AuthForm', () => {
     );
   });
 
+  it('does not report a mismatch for canonically equivalent passwords', async () => {
+    const user = userEvent.setup();
+    render(<AuthForm action={vi.fn()} kind="register" />);
+
+    await user.type(screen.getByLabelText('Password'), 'CaféStrong1!');
+    await user.type(
+      screen.getByLabelText('Confirm Password'),
+      'Cafe\u0301Strong1!',
+    );
+
+    expect(
+      screen.queryByText('Passwords do not match.'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Confirm Password')).not.toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+  });
+
   it('announces field-safe login validation returned by the action', async () => {
     const user = userEvent.setup();
     const action = vi.fn<AuthFormAction>().mockResolvedValue({

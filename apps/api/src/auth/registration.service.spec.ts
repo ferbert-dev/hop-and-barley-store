@@ -3,6 +3,13 @@ import { RegistrationService } from './registration.service';
 jest.mock('../database/prisma.service', () => ({ PrismaService: class {} }));
 
 describe('RegistrationService', () => {
+  const unsafeControlInput = [
+    'Abcd',
+    'efgh',
+    '1!',
+    String.fromCodePoint(0),
+    'x',
+  ].join('');
   const passwordHash = {
     algorithm: 'argon2id',
     hashLength: 32,
@@ -52,6 +59,39 @@ describe('RegistrationService', () => {
       select: { id: true },
     });
   });
+
+  it('hashes the NFC-normalized password', async () => {
+    const prisma = {
+      user: { create: jest.fn().mockResolvedValue({ id: 'private' }) },
+    };
+    const hasher = { hash: jest.fn().mockResolvedValue(passwordHash) };
+    const service = new RegistrationService(prisma as never, hasher as never);
+
+    await service.register(
+      { email: 'brew@example.com', password: 'Cafe\u0301Strong1!' },
+      'request-normalized-password',
+    );
+
+    expect(hasher.hash).toHaveBeenCalledWith('CaféStrong1!');
+  });
+
+  it.each(['A\u0301bcdefg1!xy', unsafeControlInput])(
+    'rejects password boundary %p before hashing or storage',
+    async (password) => {
+      const prisma = { user: { create: jest.fn() } };
+      const hasher = { hash: jest.fn() };
+      const service = new RegistrationService(prisma as never, hasher as never);
+
+      await expect(
+        service.register(
+          { email: 'brew@example.com', password },
+          'request-invalid-password',
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(hasher.hash).not.toHaveBeenCalled();
+      expect(prisma.user.create).not.toHaveBeenCalled();
+    },
+  );
 
   it('hashes duplicates and returns the byte-identical accepted shape', async () => {
     const prisma = {

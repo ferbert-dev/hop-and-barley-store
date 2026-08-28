@@ -21,16 +21,22 @@ const LOWERCASE_PATTERN = /\p{Ll}/u;
 const UPPERCASE_PATTERN = /\p{Lu}/u;
 const DIGIT_PATTERN = /\p{Nd}/u;
 const SPECIAL_PATTERN = /[\p{P}\p{S}]/u;
+const CONTROL_CHARACTER_PATTERN = /\p{Cc}/u;
+
+export function normalizePasswordInput(password: string): string {
+  return password.normalize('NFC');
+}
 
 export function evaluatePasswordRequirements(
   password: string,
 ): PasswordRequirementState {
+  const normalizedPassword = normalizePasswordInput(password);
   return {
-    digit: DIGIT_PATTERN.test(password),
-    length: [...password].length >= PASSWORD_MIN_LENGTH,
-    lowercase: LOWERCASE_PATTERN.test(password),
-    special: SPECIAL_PATTERN.test(password),
-    uppercase: UPPERCASE_PATTERN.test(password),
+    digit: DIGIT_PATTERN.test(normalizedPassword),
+    length: [...normalizedPassword].length >= PASSWORD_MIN_LENGTH,
+    lowercase: LOWERCASE_PATTERN.test(normalizedPassword),
+    special: SPECIAL_PATTERN.test(normalizedPassword),
+    uppercase: UPPERCASE_PATTERN.test(normalizedPassword),
   };
 }
 
@@ -42,7 +48,15 @@ export const registrationEmailSchema = z
 
 export const registrationPasswordSchema = z
   .string()
+  .transform(normalizePasswordInput)
   .superRefine((password, context) => {
+    if (CONTROL_CHARACTER_PATTERN.test(password)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Enter a valid password.',
+      });
+    }
+
     const state = evaluatePasswordRequirements(password);
     for (const requirement of PASSWORD_REQUIREMENTS) {
       if (!state[requirement.key]) {
@@ -63,7 +77,10 @@ export const registrationCredentialsSchema = z
 
 export const registrationFormSchema = registrationCredentialsSchema
   .extend({
-    confirmPassword: z.string().min(1, 'Confirm your password.'),
+    confirmPassword: z
+      .string()
+      .min(1, 'Confirm your password.')
+      .transform(normalizePasswordInput),
   })
   .refine((value) => value.password === value.confirmPassword, {
     message: 'Passwords do not match.',
