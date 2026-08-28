@@ -45,14 +45,19 @@ test.describe('connected local authentication journey', () => {
     ).toBeVisible();
 
     await page.getByRole('link', { name: 'Continue to sign in' }).click();
+    const initialSignInForm = page.getByRole('group', {
+      name: 'Sign in to your account',
+    });
     const rememberMe = page.getByRole('checkbox', { name: 'Remember me' });
     await expect(rememberMe).not.toBeChecked();
     await expect(
       page.getByRole('link', { name: 'Forgot password?' }),
     ).toHaveAttribute('href', '/forgot-password');
-    await page.getByLabel('Email').fill(email);
-    await page.getByLabel('Password', { exact: true }).fill(password);
-    await page.getByRole('button', { name: 'Sign In' }).click();
+    await initialSignInForm.getByLabel('Email').fill(email);
+    await initialSignInForm
+      .getByLabel('Password', { exact: true })
+      .fill(password);
+    await initialSignInForm.getByRole('button', { name: 'Sign In' }).click();
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole('link', { name: 'Account' })).toBeVisible();
     const sessionCookie = await readSessionCookieMetadata(page);
@@ -73,6 +78,10 @@ test.describe('connected local authentication journey', () => {
     await expect(page.getByLabel('Full Name')).toBeVisible();
     await expect(page.getByLabel('Phone number')).toBeVisible();
     await expect(page.getByLabel('Email')).toHaveValue(email);
+    await expect(page.getByLabel('Email')).toHaveAttribute('readonly', '');
+    await expect(
+      page.getByText('Email cannot be changed from account information.'),
+    ).toBeVisible();
     await expect(page.getByLabel('City')).toBeVisible();
     await expect(page.getByText('Account role').locator('..')).toContainText(
       'Customer',
@@ -83,15 +92,6 @@ test.describe('connected local authentication journey', () => {
         response.url().includes('/api/v1/users/me') &&
         response.request().method() === 'PATCH',
     );
-    await page.getByLabel('Full Name').fill('Local Brewer');
-    await page.getByLabel('Phone number').fill('+34 600 123 456');
-    await page.getByLabel('City').fill('Madrid');
-    await page.getByRole('button', { name: 'Save' }).click();
-    await profileSave;
-    await expect(page.getByRole('status')).toHaveText(
-      'Your account information was saved.',
-    );
-
     const avatarUpload = page.waitForResponse(
       (response) =>
         response.url().includes('/api/v1/users/me/avatar') &&
@@ -102,15 +102,24 @@ test.describe('connected local authentication journey', () => {
         response.url().includes('/api/v1/users/me/avatar') &&
         response.request().method() === 'GET',
     );
+    await page.getByLabel('Full Name').fill('Local Brewer');
+    await page.getByLabel('Phone number').fill('+34 600 123 456');
+    await page.getByLabel('City').fill('Madrid');
     await page.getByLabel('Choose image').setInputFiles({
       buffer: ONE_PIXEL_PNG,
       mimeType: 'image/png',
       name: 'profile.png',
     });
-    await page.getByRole('button', { name: 'Upload photo' }).click();
-    await avatarUpload;
+    await expect(
+      page.getByText(/will be uploaded when you save/),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Upload photo' }),
+    ).toHaveCount(0);
+    await page.getByRole('button', { name: 'Save' }).click();
+    await Promise.all([profileSave, avatarUpload]);
     await expect(page.getByRole('status')).toHaveText(
-      'Your profile photo was updated.',
+      'Your account information and profile photo were saved.',
     );
     const currentPhoto = page.getByAltText('Current profile photo');
     await expect(currentPhoto).toBeVisible();
@@ -124,6 +133,25 @@ test.describe('connected local authentication journey', () => {
     expect((await avatarRead).headers()['cross-origin-resource-policy']).toBe(
       'cross-origin',
     );
+
+    await page.goto('/cart');
+    await expect(page).toHaveURL(/\/cart$/);
+    const persistedAvatarRead = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/v1/users/me/avatar') &&
+        response.request().method() === 'GET',
+    );
+    await page.goto('/account');
+    const persistedPhoto = page.getByAltText('Current profile photo');
+    await expect(persistedPhoto).toBeVisible();
+    await expect
+      .poll(() =>
+        persistedPhoto.evaluate((image: HTMLImageElement) =>
+          image.complete ? image.naturalWidth : 0,
+        ),
+      )
+      .toBeGreaterThan(0);
+    expect((await persistedAvatarRead).ok()).toBe(true);
 
     const avatarDelete = page.waitForResponse(
       (response) =>
@@ -156,11 +184,18 @@ test.describe('connected local authentication journey', () => {
     await expect(page.getByText('You have been signed out.')).toBeVisible();
     expect(await readSessionCookieMetadata(page)).toBeNull();
 
-    await page.getByLabel('Email').fill(email);
-    await page.getByLabel('Password', { exact: true }).fill(password);
-    await page.getByRole('checkbox', { name: 'Remember me' }).check();
+    const rememberedSignInForm = page.getByRole('group', {
+      name: 'Sign in to your account',
+    });
+    await rememberedSignInForm.getByLabel('Email').fill(email);
+    await rememberedSignInForm
+      .getByLabel('Password', { exact: true })
+      .fill(password);
+    await rememberedSignInForm
+      .getByRole('checkbox', { name: 'Remember me' })
+      .check();
     const rememberedLoginStartedAt = Math.floor(Date.now() / 1_000);
-    await page.getByRole('button', { name: 'Sign In' }).click();
+    await rememberedSignInForm.getByRole('button', { name: 'Sign In' }).click();
     await expect(page).toHaveURL(/\/$/);
 
     const rememberedCookie = await readSessionCookieMetadata(page);

@@ -1,11 +1,8 @@
 import {
-  BadRequestException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { canonicalizeRegistrationEmail } from '../auth/email-normalization';
-import { isNormalizedEmailConflict } from '../auth/normalized-email-conflict';
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
 import { validateAvatarFile, type UploadedAvatarFile } from './avatar-file';
@@ -17,10 +14,6 @@ import type {
   UpdateCurrentUserDto,
 } from './dto/user-profile.dto';
 
-const PROFILE_INVALID = Object.freeze({
-  message: 'Review your account information and try again.',
-  status: 'invalid-profile' as const,
-});
 const UNAUTHORIZED = Object.freeze({ status: 'unauthorized' as const });
 
 const currentUserSelect = {
@@ -76,38 +69,24 @@ export class UsersService {
     userId: string,
     patch: UpdateCurrentUserDto,
   ): Promise<CurrentUserProfileDto> {
-    const emailUpdate = canonicalEmailUpdate(patch);
-
-    try {
-      const stored = await this.prisma.$transaction(async (transaction) => {
-        const active = await transaction.user.findUnique({
-          select: { id: true, status: true },
-          where: { id: userId },
-        });
-        if (!active || active.status !== 'ACTIVE') {
-          throw new UnauthorizedException(UNAUTHORIZED);
-        }
-
-        await transaction.user.update({
-          data: emailUpdate,
-          select: { id: true },
-          where: { id: userId },
-        });
-        await updateProfile(transaction, userId, patch.profile);
-        await updatePrimaryAddress(transaction, userId, patch.primaryAddress);
-
-        return transaction.user.findUniqueOrThrow({
-          select: currentUserSelect,
-          where: { id: userId },
-        });
+    const stored = await this.prisma.$transaction(async (transaction) => {
+      const active = await transaction.user.findUnique({
+        select: { id: true, status: true },
+        where: { id: userId },
       });
-      return toCurrentUserDto(stored);
-    } catch (error) {
-      if (isNormalizedEmailConflict(error)) {
-        throw new BadRequestException(PROFILE_INVALID);
+      if (!active || active.status !== 'ACTIVE') {
+        throw new UnauthorizedException(UNAUTHORIZED);
       }
-      throw error;
-    }
+
+      await updateProfile(transaction, userId, patch.profile);
+      await updatePrimaryAddress(transaction, userId, patch.primaryAddress);
+
+      return transaction.user.findUniqueOrThrow({
+        select: currentUserSelect,
+        where: { id: userId },
+      });
+    });
+    return toCurrentUserDto(stored);
   }
 
   async saveAvatar(
@@ -173,18 +152,6 @@ export class UsersService {
       },
       where: { userId },
     });
-  }
-}
-
-function canonicalEmailUpdate(patch: UpdateCurrentUserDto): {
-  email?: string;
-  normalizedEmail?: string;
-} {
-  if (!Object.hasOwn(patch, 'email')) return {};
-  try {
-    return canonicalizeRegistrationEmail(patch.email ?? '');
-  } catch {
-    throw new BadRequestException(PROFILE_INVALID);
   }
 }
 

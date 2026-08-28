@@ -10,6 +10,7 @@ describe('UpdateCurrentUserDto allow-list', () => {
   };
 
   it.each([
+    'email',
     'role',
     'status',
     'password',
@@ -19,7 +20,10 @@ describe('UpdateCurrentUserDto allow-list', () => {
   ])('rejects mass-assignment field %s', async (field) => {
     await expect(
       createAppValidationPipe().transform(
-        { email: 'user@example.com', [field]: 'ADMIN' },
+        {
+          profile: { fullName: 'Brewer' },
+          [field]: field === 'email' ? 'other@example.com' : 'ADMIN',
+        },
         metadata,
       ),
     ).rejects.toMatchObject({ status: 400 });

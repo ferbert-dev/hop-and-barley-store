@@ -41,7 +41,6 @@ describe('browser customer profile transport', () => {
 
     await expect(
       saveProfileFromBrowser({
-        email: 'brewer@example.com',
         primaryAddress: null,
         profile: { fullName: 'Brewer', phone: '+34 600 123 456' },
       }),
@@ -55,7 +54,6 @@ describe('browser customer profile transport', () => {
     expect(patchRequest?.headers.get('origin')).toBe(window.location.origin);
     expect(patchRequest?.headers.get('x-csrf-token')).toBe(csrfToken);
     await expect(patchRequest?.clone().json()).resolves.toEqual({
-      email: 'brewer@example.com',
       primaryAddress: null,
       profile: { fullName: 'Brewer', phone: '+34 600 123 456' },
     });

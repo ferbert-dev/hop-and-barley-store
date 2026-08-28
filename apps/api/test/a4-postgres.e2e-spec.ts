@@ -83,24 +83,7 @@ describePostgres('A4 profiles with disposable PostgreSQL', () => {
     });
   });
 
-  it('maps a normalized-email race without partially changing either user', async () => {
-    const firstId = await createUser('first@example.com');
-    await createUser('taken@example.com');
-
-    await expect(
-      users.updateCurrent(firstId, {
-        email: 'TAKEN@example.com',
-        profile: { fullName: 'Must roll back' },
-      }),
-    ).rejects.toMatchObject({ status: 400 });
-
-    await expect(users.getCurrent(firstId)).resolves.toMatchObject({
-      email: 'first@example.com',
-      profile: null,
-    });
-  });
-
-  it('rolls back email and profile when address persistence fails mid-transaction', async () => {
+  it('rolls back profile when address persistence fails mid-transaction', async () => {
     const userId = await createUser('atomic@example.com');
     await postgres.query(`
       CREATE FUNCTION a4_reject_address_insert() RETURNS trigger AS $$
@@ -116,7 +99,6 @@ describePostgres('A4 profiles with disposable PostgreSQL', () => {
     try {
       await expect(
         users.updateCurrent(userId, {
-          email: 'changed@example.com',
           primaryAddress: { city: 'Madrid' },
           profile: { fullName: 'Must roll back' },
         }),
