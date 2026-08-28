@@ -25,7 +25,9 @@ CREATE TABLE "CustomerProfile" (
     OR
     (
       "avatarData" IS NOT NULL
+      AND "avatarContentType" IS NOT NULL
       AND "avatarContentType" IN ('image/jpeg', 'image/png', 'image/webp')
+      AND "avatarSizeBytes" IS NOT NULL
       AND "avatarSizeBytes" = octet_length("avatarData")
       AND "avatarSizeBytes" BETWEEN 1 AND 2097152
       AND "avatarUpdatedAt" IS NOT NULL

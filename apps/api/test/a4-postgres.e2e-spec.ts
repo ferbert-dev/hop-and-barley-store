@@ -174,6 +174,24 @@ describePostgres('A4 profiles with disposable PostgreSQL', () => {
       ),
     ).rejects.toMatchObject({ code: '23514' });
 
+    await expect(
+      postgres.query(
+        `UPDATE "CustomerProfile"
+         SET "avatarContentType" = NULL
+         WHERE "userId" = $1::uuid`,
+        [userId],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+
+    await expect(
+      postgres.query(
+        `UPDATE "CustomerProfile"
+         SET "avatarSizeBytes" = NULL
+         WHERE "userId" = $1::uuid`,
+        [userId],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+
     await users.deleteAvatar(userId);
     await expect(users.readAvatar(userId)).rejects.toMatchObject({
       status: 404,
