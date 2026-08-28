@@ -1,8 +1,10 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
+const THIRTY_DAYS_SECONDS = 30 * 24 * 60 * 60;
+const COOKIE_EXPIRY_TOLERANCE_SECONDS = 120;
 
 test.describe('connected local authentication journey', () => {
   test.describe.configure({ mode: 'serial' });
@@ -49,6 +51,13 @@ test.describe('connected local authentication journey', () => {
     await page.getByRole('button', { name: 'Sign In' }).click();
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole('link', { name: 'Account' })).toBeVisible();
+    const sessionCookie = await readSessionCookieMetadata(page);
+    expect(sessionCookie).toMatchObject({
+      expires: -1,
+      httpOnly: true,
+      path: '/',
+      sameSite: 'Lax',
+    });
 
     await page.getByRole('link', { name: 'Account' }).click();
     await expect(
@@ -65,6 +74,36 @@ test.describe('connected local authentication journey', () => {
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/login\?status=signed-out$/);
     await expect(page.getByText('You have been signed out.')).toBeVisible();
+    expect(await readSessionCookieMetadata(page)).toBeNull();
+
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password', { exact: true }).fill(password);
+    await page.getByRole('checkbox', { name: 'Remember me' }).check();
+    const rememberedLoginStartedAt = Math.floor(Date.now() / 1_000);
+    await page.getByRole('button', { name: 'Sign In' }).click();
+    await expect(page).toHaveURL(/\/$/);
+
+    const rememberedCookie = await readSessionCookieMetadata(page);
+    expect(rememberedCookie).toMatchObject({
+      httpOnly: true,
+      path: '/',
+      sameSite: 'Lax',
+    });
+    expect(rememberedCookie?.expires).toBeGreaterThanOrEqual(
+      rememberedLoginStartedAt +
+        THIRTY_DAYS_SECONDS -
+        COOKIE_EXPIRY_TOLERANCE_SECONDS,
+    );
+    expect(rememberedCookie?.expires).toBeLessThanOrEqual(
+      Math.ceil(Date.now() / 1_000) +
+        THIRTY_DAYS_SECONDS +
+        COOKIE_EXPIRY_TOLERANCE_SECONDS,
+    );
+
+    await page.getByRole('link', { name: 'Account' }).click();
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page).toHaveURL(/\/login\?status=signed-out$/);
+    expect(await readSessionCookieMetadata(page)).toBeNull();
     await page.goto('/account');
     await expect(page).toHaveURL(/\/login\?next=%2Faccount$/);
   });
@@ -122,6 +161,20 @@ test.describe('connected local authentication journey', () => {
     expect(nonGetRequests).toEqual([]);
   });
 });
+
+async function readSessionCookieMetadata(page: Page) {
+  const matches = (await page.context().cookies()).filter(
+    ({ name }) => name === 'hb_session' || name === '__Host-hb_session',
+  );
+  if (matches.length === 0) return null;
+  const cookie = matches[0];
+  if (matches.length !== 1 || !cookie) {
+    throw new Error('Expected exactly one configured session cookie');
+  }
+
+  const { expires, httpOnly, name, path, sameSite, secure } = cookie;
+  return { expires, httpOnly, name, path, sameSite, secure };
+}
 
 test.describe('authentication unavailable state', () => {
   test.skip(!unavailable, 'runs only against the delayed unavailable API');

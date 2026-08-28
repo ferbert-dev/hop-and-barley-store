@@ -487,7 +487,7 @@ export interface components {
              * @description Persists the cookie and extends the absolute session lifetime to 30 days only when true.
              * @default false
              */
-            rememberMe: boolean;
+            rememberMe?: boolean;
         };
         CurrentUserDto: {
             /** Format: uuid */
