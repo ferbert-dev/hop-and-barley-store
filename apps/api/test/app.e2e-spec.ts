@@ -1,4 +1,10 @@
-import { INestApplication, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  INestApplication,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types';
@@ -138,6 +144,15 @@ jest.mock('./../src/auth/password/password-hash-executor', () => ({
   },
 }));
 
+@ApiExcludeController()
+@Controller('admin')
+class UnmarkedAdminBoundaryProbeController {
+  @Get('unguarded')
+  unguarded(): { status: 'unsafe' } {
+    return { status: 'unsafe' };
+  }
+}
+
 describe('Platform API (e2e)', () => {
   let app: INestApplication;
   const activeSessions = new Map<string, ActiveSession>();
@@ -200,6 +215,7 @@ describe('Platform API (e2e)', () => {
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
+      controllers: [UnmarkedAdminBoundaryProbeController],
       imports: [AppModule],
     })
       .overrideProvider(SessionService)
@@ -515,6 +531,27 @@ describe('Platform API (e2e)', () => {
       expect(response.headers['cache-control']).toBe('private, no-store');
       expect(response.headers.vary).toBe('Cookie, Origin');
     }
+  });
+
+  it('denies mixed-case access to an unmarked admin namespace route', async () => {
+    const customerToken = `${'H'.repeat(42)}A`;
+    activeSessions.set(customerToken, {
+      expiresAt: new Date('2026-08-29T10:00:00.000Z'),
+      issuedAt: new Date('2026-08-22T10:00:00.000Z'),
+      lastSeenAt: new Date('2026-08-22T10:00:00.000Z'),
+      rawToken: customerToken,
+      role: 'CUSTOMER',
+      sessionId: '20000000-0000-4000-8000-000000000006',
+      status: 'ACTIVE',
+      userId: '10000000-0000-4000-8000-000000000006',
+    });
+
+    const response = await request(app.getHttpServer() as App)
+      .get('/api/v1/ADMIN/unguarded')
+      .set('Cookie', `hb_session=${customerToken}`)
+      .expect(403);
+
+    expect(response.body).toEqual({ status: 'forbidden' });
   });
 
   it('rejects unsafe cookie requests with missing CSRF or non-exact Origin', async () => {

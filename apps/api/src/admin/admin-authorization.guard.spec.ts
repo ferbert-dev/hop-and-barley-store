@@ -45,6 +45,20 @@ describe('AdminAuthorizationGuard', () => {
     expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
   });
 
+  it('denies a customer on a mixed-case unmarked admin namespace route', () => {
+    const { context, reflector } = createFixture(
+      {
+        role: 'CUSTOMER',
+        status: 'ACTIVE',
+      },
+      '/api/v1/ADMIN/unguarded',
+    );
+    reflector.getAllAndOverride.mockReturnValue(undefined);
+    const guard = new AdminAuthorizationGuard(reflector as never);
+
+    expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+  });
+
   it('does not apply admin authorization outside the admin namespace', () => {
     const { context, reflector } = createFixture(
       {

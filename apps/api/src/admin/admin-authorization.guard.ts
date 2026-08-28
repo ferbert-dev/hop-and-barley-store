@@ -42,5 +42,9 @@ export class AdminAuthorizationGuard implements CanActivate {
 }
 
 function isAdminApiPath(path: string): boolean {
-  return path === ADMIN_API_PREFIX || path.startsWith(`${ADMIN_API_PREFIX}/`);
+  const normalizedPath = path.toLowerCase();
+  return (
+    normalizedPath === ADMIN_API_PREFIX ||
+    normalizedPath.startsWith(`${ADMIN_API_PREFIX}/`)
+  );
 }
