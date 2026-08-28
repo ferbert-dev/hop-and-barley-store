@@ -39,7 +39,9 @@ test('renders the ready catalog and applies URL-owned filters', async ({
   await expect(page).toHaveURL(/\?search=Citra&category=hops$/);
   await expect(page).toHaveTitle('Citra — Hop & Barley products');
   await expect(page.getByRole('article')).toHaveCount(1);
-  await expect(page.getByRole('link', { name: 'Citra Hops' })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Citra Hops', exact: true }),
+  ).toBeVisible();
   await expect(page.getByText('1 product found').first()).toBeVisible();
   await expect(
     page.getByRole('link', { name: 'Clear filters' }),
@@ -174,7 +176,9 @@ test('supports keyboard-only catalog filtering with Tab, Shift+Tab, and Enter', 
 
   await expect(page).toHaveURL(/\?search=Citra&category=hops$/);
   await expect(page).toHaveTitle('Citra — Hop & Barley products');
-  await expect(page.getByRole('link', { name: 'Citra Hops' })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Citra Hops', exact: true }),
+  ).toBeVisible();
 
   const filteredFocus = page.getByRole('link', {
     name: 'Skip to main content',
@@ -190,10 +194,14 @@ test('keeps stable pagination and restores URL state with browser history', asyn
   test.skip(unavailable, 'requires the connected API');
   await page.goto(stateUrls.filtered, { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByRole('link', { name: 'Mosaic Hops' })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Mosaic Hops', exact: true }),
+  ).toBeVisible();
   await page.getByRole('link', { name: 'Next' }).click();
   await expect(page).toHaveURL(/page=2/);
-  await expect(page.getByRole('link', { name: 'Cascade Hops' })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Cascade Hops', exact: true }),
+  ).toBeVisible();
   await expect(
     page
       .getByRole('navigation', { name: 'Catalog pages' })
@@ -202,9 +210,13 @@ test('keeps stable pagination and restores URL state with browser history', asyn
 
   await page.goBack({ waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(stateUrls.filtered);
-  await expect(page.getByRole('link', { name: 'Mosaic Hops' })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Mosaic Hops', exact: true }),
+  ).toBeVisible();
   await page.goForward({ waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('link', { name: 'Cascade Hops' })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Cascade Hops', exact: true }),
+  ).toBeVisible();
 });
 
 test('renders the native filter form and filtered products in server HTML', async ({
@@ -493,7 +505,9 @@ test('honours reduced motion in ready, filtered, empty, loading, and error state
 
   await page.goto(stateUrls.filtered, { waitUntil: 'domcontentloaded' });
   await expectApiStatus(page, 'API connected');
-  await expect(page.getByRole('link', { name: 'Mosaic Hops' })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Mosaic Hops', exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole('link', { name: 'Next' })).toBeVisible();
   await expect(page).toHaveTitle('Hops — Hop & Barley products');
   await assertReducedMotionState(page, 'filtered');

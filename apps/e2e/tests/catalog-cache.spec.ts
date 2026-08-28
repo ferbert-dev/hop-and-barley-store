@@ -90,7 +90,10 @@ async function expectConnectedResponse(
   const page = await openCatalog(browser, search);
   await expect(page.getByRole('status').first()).toHaveText('API connected');
   await expect(
-    page.getByRole('link', { name: `${search} response ${attempt}` }),
+    page.getByRole('link', {
+      name: `${search} response ${attempt}`,
+      exact: true,
+    }),
   ).toBeVisible();
   await page.close();
 }
