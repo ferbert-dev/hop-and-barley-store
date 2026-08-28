@@ -131,6 +131,8 @@ model Product {
   packageNetWeightMg Int?
   kitYieldVolumeMl   Int?
   isActive           Boolean           @default(true)
+  activeFrom         DateTime?         @db.Timestamptz(3)
+  activeUntil        DateTime?         @db.Timestamptz(3)
   imagePath          String            @db.VarChar(255)
   specifications     Json              @db.JsonB
   categoryId         String            @db.Uuid

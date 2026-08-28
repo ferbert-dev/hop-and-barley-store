@@ -12,6 +12,7 @@ import { AppModule } from './../src/app.module';
 import { configureAppRouting } from './../src/app-routing';
 import { configureAppValidation } from './../src/app-validation';
 import type { CatalogResponseDto } from './../src/catalog/dto/catalog-response.dto';
+import type { AdminProductListResponseDto } from './../src/admin/dto/admin-product-list.dto';
 import { PrismaService } from './../src/database/prisma.service';
 import { configureOpenApi } from './../src/openapi';
 import { LoginService } from './../src/auth/login.service';
@@ -94,29 +95,52 @@ jest.mock('./../src/database/prisma.service', () => ({
               })
             : Promise.resolve(null),
         ),
-      findMany: jest.fn().mockResolvedValue([
-        {
-          amountUnit: 'MILLIGRAM',
-          category: { name: 'Hops', slug: 'hops' },
-          currency: 'USD',
-          description: 'Bright whole-cone hops',
-          id: '20000000-0000-4000-8000-000000000002',
-          imagePath: '/assets/products/cascade-hops.webp',
-          kitYieldVolumeMl: null,
-          maximumOrderAmount: null,
-          minimumOrderAmount: 100_000,
-          name: 'Cascade Hops',
-          orderStepAmount: 100_000,
-          packageNetWeightMg: null,
-          priceBasisAmount: 100_000,
-          priceMinor: 699,
-          priceQualifier: 'per 100g',
-          saleKind: 'WEIGHT',
-          slug: 'cascade-hops',
-          stockAmount: 100_000_000,
-          teaser: 'Citrus and floral whole-cone hops.',
-        },
-      ]),
+      findMany: jest
+        .fn()
+        .mockImplementation(({ select }: { select: { isActive?: boolean } }) =>
+          Promise.resolve([
+            select.isActive
+              ? {
+                  activeFrom: null,
+                  activeUntil: null,
+                  amountUnit: 'MILLIGRAM',
+                  category: { name: 'Hops', slug: 'hops' },
+                  createdAt: new Date('2026-08-01T10:00:00.000Z'),
+                  currency: 'USD',
+                  description: 'Bright whole-cone hops',
+                  id: '20000000-0000-4000-8000-000000000002',
+                  isActive: true,
+                  name: 'Cascade Hops',
+                  priceMinor: 699,
+                  priceQualifier: 'per 100g',
+                  saleKind: 'WEIGHT',
+                  slug: 'cascade-hops',
+                  stockAmount: 100_000_000,
+                  updatedAt: new Date('2026-08-20T10:00:00.000Z'),
+                }
+              : {
+                  amountUnit: 'MILLIGRAM',
+                  category: { name: 'Hops', slug: 'hops' },
+                  currency: 'USD',
+                  description: 'Bright whole-cone hops',
+                  id: '20000000-0000-4000-8000-000000000002',
+                  imagePath: '/assets/products/cascade-hops.webp',
+                  kitYieldVolumeMl: null,
+                  maximumOrderAmount: null,
+                  minimumOrderAmount: 100_000,
+                  name: 'Cascade Hops',
+                  orderStepAmount: 100_000,
+                  packageNetWeightMg: null,
+                  priceBasisAmount: 100_000,
+                  priceMinor: 699,
+                  priceQualifier: 'per 100g',
+                  saleKind: 'WEIGHT',
+                  slug: 'cascade-hops',
+                  stockAmount: 100_000_000,
+                  teaser: 'Citrus and floral whole-cone hops.',
+                },
+          ]),
+        ),
     };
     user = {
       create: jest.fn().mockResolvedValue({ id: 'private-user-id' }),
@@ -533,6 +557,119 @@ describe('Platform API (e2e)', () => {
     }
   });
 
+  it('protects the admin product list and returns only the minimized lifecycle contract', async () => {
+    const server = app.getHttpServer() as App;
+    const anonymous = await request(server)
+      .get('/api/v1/admin/products')
+      .expect(401);
+    expect(anonymous.body).toEqual({ status: 'unauthorized' });
+
+    const customerToken = `${'J'.repeat(42)}A`;
+    activeSessions.set(customerToken, {
+      expiresAt: new Date('2026-08-29T10:00:00.000Z'),
+      issuedAt: new Date('2026-08-22T10:00:00.000Z'),
+      lastSeenAt: new Date('2026-08-22T10:00:00.000Z'),
+      rawToken: customerToken,
+      role: 'CUSTOMER',
+      sessionId: '20000000-0000-4000-8000-000000000007',
+      status: 'ACTIVE',
+      userId: '10000000-0000-4000-8000-000000000007',
+    });
+    const customer = await request(server)
+      .get('/api/v1/admin/products')
+      .set('Cookie', `hb_session=${customerToken}`)
+      .expect(403);
+    expect(customer.body).toEqual({ status: 'forbidden' });
+
+    const adminToken = `${'K'.repeat(42)}A`;
+    activeSessions.set(adminToken, {
+      expiresAt: new Date('2026-08-29T10:00:00.000Z'),
+      issuedAt: new Date('2026-08-22T10:00:00.000Z'),
+      lastSeenAt: new Date('2026-08-22T10:00:00.000Z'),
+      rawToken: adminToken,
+      role: 'ADMIN',
+      sessionId: '20000000-0000-4000-8000-000000000008',
+      status: 'ACTIVE',
+      userId: '10000000-0000-4000-8000-000000000008',
+    });
+    const admin = await request(server)
+      .get('/api/v1/admin/products')
+      .set('Cookie', `hb_session=${adminToken}`)
+      .query({ category: 'hops', search: '  Cafe\u0301   hops  ' })
+      .expect(200);
+    const adminBody = JSON.parse(admin.text) as AdminProductListResponseDto;
+
+    expect(adminBody).toMatchObject({
+      items: [
+        {
+          activeFrom: null,
+          activeUntil: null,
+          lifecycleStatus: 'ACTIVE',
+          name: 'Cascade Hops',
+          slug: 'cascade-hops',
+        },
+      ],
+      meta: {
+        filters: { category: 'hops', search: 'Café hops' },
+        totalItems: 1,
+      },
+    });
+    expect(Object.keys(adminBody.items[0] ?? {}).sort()).toEqual([
+      'activeFrom',
+      'activeUntil',
+      'amountUnit',
+      'category',
+      'createdAt',
+      'currency',
+      'description',
+      'id',
+      'isActive',
+      'lifecycleStatus',
+      'name',
+      'priceMinor',
+      'priceQualifier',
+      'saleKind',
+      'slug',
+      'stockAmount',
+      'updatedAt',
+    ]);
+    expect(JSON.stringify(adminBody)).not.toMatch(
+      /imagePath|specifications|password|credential|storage|filesystem/i,
+    );
+    for (const response of [anonymous, customer, admin]) {
+      expect(response.headers['cache-control']).toBe('private, no-store');
+      expect(response.headers.vary).toBe('Cookie, Origin');
+    }
+  });
+
+  it('applies the exact catalog validation grammar to the admin product list', async () => {
+    const adminToken = `${'L'.repeat(42)}A`;
+    activeSessions.set(adminToken, {
+      expiresAt: new Date('2026-08-29T10:00:00.000Z'),
+      issuedAt: new Date('2026-08-22T10:00:00.000Z'),
+      lastSeenAt: new Date('2026-08-22T10:00:00.000Z'),
+      rawToken: adminToken,
+      role: 'ADMIN',
+      sessionId: '20000000-0000-4000-8000-000000000009',
+      status: 'ACTIVE',
+      userId: '10000000-0000-4000-8000-000000000009',
+    });
+    const cookie = `hb_session=${adminToken}`;
+
+    for (const path of [
+      '/api/v1/admin/products?unknown=value',
+      '/api/v1/admin/products?page[]=1',
+      '/api/v1/admin/products?minPriceMinor=10&maxPriceMinor=9',
+      '/api/v1/admin/products?search=ab%25cd',
+      '/api/v1/admin/products?sort=created-desc',
+    ]) {
+      await request(app.getHttpServer() as App)
+        .get(path)
+        .set('Cookie', cookie)
+        .expect(400);
+    }
+  });
+
   it('denies mixed-case access to an unmarked admin namespace route', async () => {
     const customerToken = `${'H'.repeat(42)}A`;
     activeSessions.set(customerToken, {
@@ -689,6 +826,7 @@ describe('Platform API (e2e)', () => {
     const csrf = document.paths['/api/v1/auth/csrf'].get;
     const logout = document.paths['/api/v1/auth/logout'].post;
     const adminCapabilities = document.paths['/api/v1/admin/capabilities'].get;
+    const adminProducts = document.paths['/api/v1/admin/products'].get;
     expect(login.security).toBeUndefined();
     expect(login.parameters?.map(({ name }) => name)).toEqual(['Origin']);
     expect(login.responses['200'].headers).toHaveProperty('Set-Cookie');
@@ -710,6 +848,14 @@ describe('Platform API (e2e)', () => {
     ]);
     expect(logout.responses['200'].headers).toHaveProperty('Set-Cookie');
     expect(adminCapabilities.security).toEqual([{ sessionCookie: [] }]);
+    expect(adminProducts.security).toEqual([{ sessionCookie: [] }]);
+    expect(Object.keys(adminProducts.responses).sort()).toEqual([
+      '200',
+      '400',
+      '401',
+      '403',
+      '503',
+    ]);
     expect(Object.keys(adminCapabilities.responses).sort()).toEqual([
       '200',
       '401',
@@ -727,6 +873,73 @@ describe('Platform API (e2e)', () => {
       required: ['productManagement'],
       type: 'object',
     });
+  });
+
+  it('documents the dedicated minimized admin product list response', async () => {
+    const response = await request(app.getHttpServer() as App)
+      .get('/api/docs-json')
+      .expect(200);
+    const document = JSON.parse(response.text) as {
+      components: { schemas: Record<string, OpenApiSchema> };
+      paths: Record<
+        string,
+        {
+          get: {
+            parameters: Array<{ name: string }>;
+            responses: Record<
+              string,
+              { content?: { 'application/json': { schema: { $ref: string } } } }
+            >;
+          };
+        }
+      >;
+    };
+    const operation = document.paths['/api/v1/admin/products'].get;
+    const item = document.components.schemas.AdminProductListItemDto;
+
+    expect(operation.parameters.map(({ name }) => name).sort()).toEqual([
+      'category',
+      'limit',
+      'maxPriceMinor',
+      'minPriceMinor',
+      'page',
+      'search',
+      'sort',
+    ]);
+    expect(
+      operation.responses['200'].content?.['application/json'].schema,
+    ).toEqual({ $ref: '#/components/schemas/AdminProductListResponseDto' });
+    expect(item.required?.sort()).toEqual([
+      'activeFrom',
+      'activeUntil',
+      'amountUnit',
+      'category',
+      'createdAt',
+      'currency',
+      'description',
+      'id',
+      'isActive',
+      'lifecycleStatus',
+      'name',
+      'priceMinor',
+      'priceQualifier',
+      'saleKind',
+      'slug',
+      'stockAmount',
+      'updatedAt',
+    ]);
+    expect(item.properties?.lifecycleStatus?.enum).toEqual([
+      'ACTIVE',
+      'DISABLED',
+      'SCHEDULED',
+      'EXPIRED',
+    ]);
+    expect(item.properties?.activeFrom).toMatchObject({
+      format: 'date-time',
+      type: 'string',
+    });
+    expect(item.properties).not.toHaveProperty('imagePath');
+    expect(item.properties).not.toHaveProperty('specifications');
   });
 
   it('documents the exact catalog query, envelope and nested DTO bounds', async () => {

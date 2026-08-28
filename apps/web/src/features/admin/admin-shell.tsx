@@ -1,6 +1,8 @@
+import type { ReactNode } from 'react';
+
 import styles from './admin-shell.module.css';
 
-export function AdminShell() {
+export function AdminShell({ children }: { children: ReactNode }) {
   return (
     <div className={styles.screen}>
       <section className={styles.shell} aria-labelledby="admin-heading">
@@ -15,13 +17,7 @@ export function AdminShell() {
           </span>
         </nav>
 
-        <section
-          className={styles.notice}
-          aria-labelledby="availability-heading"
-        >
-          <h2 id="availability-heading">Product Management</h2>
-          <p>Product management is not available yet.</p>
-        </section>
+        {children}
       </section>
     </div>
   );

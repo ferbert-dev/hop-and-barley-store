@@ -2,23 +2,31 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  cookies: vi.fn(async () => ({ getAll: () => [] })),
+  loadAdminProducts: vi.fn(),
   redirect: vi.fn((href: string) => {
     throw new Error(`NEXT_REDIRECT:${href}`);
   }),
 }));
 
+vi.mock('next/headers', () => ({ cookies: mocks.cookies }));
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }));
+vi.mock('server-only', () => ({}));
+vi.mock('../../features/admin/admin-products-server', () => ({
+  loadAdminProducts: mocks.loadAdminProducts,
+}));
 
 import AdminIndexPage from './page';
 import AdminProductsPage from './products/page';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.loadAdminProducts.mockResolvedValue({ kind: 'unavailable' });
 });
 
 describe('admin routes', () => {
-  it('renders the non-interactive Figma-confirmed shell inside the authorized layout', () => {
-    render(<AdminProductsPage />);
+  it('keeps the Figma-confirmed shell while showing the read-only product error state', async () => {
+    render(await AdminProductsPage({ searchParams: Promise.resolve({}) }));
 
     expect(
       screen.getByRole('heading', { name: 'Admin - Product Stock' }),
@@ -30,13 +38,12 @@ describe('admin routes', () => {
       'aria-disabled',
       'true',
     );
-    expect(
-      screen.getByText('Product management is not available yet.'),
-    ).toBeVisible();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'We could not load product management safely.',
+    );
   });
 
-  it('redirects an authorized /admin request to the protected products shell', async () => {
+  it('redirects an authorized /admin request to the protected products list', async () => {
     await expect(AdminIndexPage()).rejects.toThrow(
       'NEXT_REDIRECT:/admin/products',
     );

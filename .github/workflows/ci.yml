@@ -83,6 +83,8 @@ jobs:
         run: pnpm test:a1b:postgres
       - name: Verify administrator provisioning and current-principal authorization
         run: pnpm test:m1:postgres
+      - name: Verify admin product lifecycle migration, listing, and rollback
+        run: pnpm test:m2:postgres
       - name: Verify guest cart migration, constraints, and concurrency
         run: pnpm test:o0:postgres
       - name: Verify cart reservation migration, lifecycle, and concurrency
