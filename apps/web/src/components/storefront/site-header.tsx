@@ -19,7 +19,7 @@ function isProductsPath(pathname: string) {
 
 export type HeaderSessionState =
   | Readonly<{ kind: 'anonymous' | 'loading' | 'unavailable' }>
-  | Readonly<{ kind: 'authenticated' }>;
+  | Readonly<{ isAdmin: boolean; kind: 'authenticated' }>;
 
 type SiteHeaderClientProps = Readonly<{
   logoutAction: AuthFormAction;
@@ -168,6 +168,19 @@ function SiteHeaderDisclosure({
             </li>
             {sessionState.kind === 'authenticated' ? (
               <>
+                {sessionState.isAdmin ? (
+                  <li>
+                    <Link
+                      href="/admin/products"
+                      aria-current={
+                        pathname.startsWith('/admin/') ? 'page' : undefined
+                      }
+                      onClick={closeMenu}
+                    >
+                      Product Management
+                    </Link>
+                  </li>
+                ) : null}
                 <li>
                   <Link
                     href="/account"

@@ -81,6 +81,8 @@ jobs:
         run: pnpm test:a1:postgres
       - name: Verify session migration, constraints, and concurrency
         run: pnpm test:a1b:postgres
+      - name: Verify administrator provisioning and current-principal authorization
+        run: pnpm test:m1:postgres
       - name: Verify guest cart migration, constraints, and concurrency
         run: pnpm test:o0:postgres
       - name: Verify cart reservation migration, lifecycle, and concurrency
@@ -120,6 +122,8 @@ jobs:
         run: node scripts/configure-ci-browser-env.mjs
       - name: Start the isolated full stack
         run: docker compose up -d --build --wait
+      - name: Provision the isolated browser-test administrator
+        run: docker compose exec -T -e HB_LOCAL_ADMIN_PASSWORD api pnpm --filter @hop-and-barley/api admin:provision:local
       - name: Test the connected storefront
         run: pnpm --filter @hop-and-barley/e2e test:e2e
       - name: Remove only the isolated API service

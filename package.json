@@ -31,6 +31,7 @@
     "test:catalog:postgres": "pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api test:catalog:postgres",
     "test:a1:postgres": "pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api test:a1:postgres",
     "test:a1b:postgres": "pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api test:a1b:postgres",
+    "test:m1:postgres": "pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api test:m1:postgres",
     "test:o0:postgres": "pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api test:o0:postgres",
     "test:o1b:postgres": "pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api test:o1b:postgres",
     "test:o2:postgres": "pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api test:o2:postgres",
@@ -42,6 +43,7 @@
     "db:migrate:deploy": "pnpm --filter @hop-and-barley/api db:migrate:deploy",
     "db:seed": "pnpm --filter @hop-and-barley/api db:seed",
     "api:generate": "pnpm --filter @hop-and-barley/api generate:openapi && pnpm --filter @hop-and-barley/api-client generate",
+    "admin:provision:local": "pnpm --filter @hop-and-barley/api admin:provision:local",
     "check": "pnpm workflow:check && pnpm secret-hooks:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm build",
     "check:full": "pnpm check && pnpm test:e2e",
     "prepare": "husky"

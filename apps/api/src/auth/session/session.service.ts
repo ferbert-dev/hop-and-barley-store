@@ -25,6 +25,7 @@ export type ActiveSession = Readonly<{
   rawToken: string;
   role: UserRole;
   sessionId: string;
+  status: 'ACTIVE';
   userId: string;
 }>;
 
@@ -132,7 +133,7 @@ export class SessionService {
         },
       });
 
-      return { ...created, role: user.role };
+      return { ...created, role: user.role, status: user.status };
     });
 
     return {
@@ -142,6 +143,7 @@ export class SessionService {
       rawToken,
       role: persisted.role,
       sessionId: persisted.id,
+      status: persisted.status,
       userId,
     };
   }
@@ -222,6 +224,7 @@ export class SessionService {
       rawToken,
       role: session.user.role,
       sessionId: session.id,
+      status: session.user.status,
       userId: session.user.id,
     };
   }

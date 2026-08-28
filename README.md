@@ -140,6 +140,26 @@ Useful lifecycle commands:
 
 Do not use `docker compose down -v`, delete a volume, or reset Prisma unless the exact destructive action has been explicitly approved.
 
+### Provision the local administrator
+
+M1 fixes the local administrator identity at `admin@gmail.com`. Supply its
+strong password only as protected runtime input; do not store it in `.env`,
+source, shell history, logs, tickets, or screenshots.
+
+```bash
+printf 'Local administrator password: '
+IFS= read -r -s HB_LOCAL_ADMIN_PASSWORD
+printf '\n'
+export HB_LOCAL_ADMIN_PASSWORD
+docker compose exec -T -e HB_LOCAL_ADMIN_PASSWORD api pnpm --filter @hop-and-barley/api admin:provision:local
+unset HB_LOCAL_ADMIN_PASSWORD
+```
+
+Repeating the command with the same password is a verified no-op. If
+`admin@gmail.com` already belongs to a customer, the command fails without
+changing that account; an intentional local promotion additionally requires
+`--promote-existing-customer` and revokes its existing sessions.
+
 ## Development Commands
 
 | Command                                | Purpose                                                                   |

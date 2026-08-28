@@ -15,8 +15,14 @@ export function configureCiBrowserEnvironment({
   const authKeyring = `ci-v1:${randomBytesForCi(32).toString('hex')}`;
   const cartKeyring = `ci-v1:${randomBytesForCi(32).toString('hex')}`;
   const databasePassword = randomBytesForCi(24).toString('hex');
+  const localAdminPassword = `${randomBytesForCi(24).toString('hex')}${String.fromCharCode(97, 65, 49, 33)}`;
 
-  for (const value of [authKeyring, cartKeyring, databasePassword]) {
+  for (const value of [
+    authKeyring,
+    cartKeyring,
+    databasePassword,
+    localAdminPassword,
+  ]) {
     writeMask(value);
   }
 
@@ -29,6 +35,7 @@ export function configureCiBrowserEnvironment({
     CORS_ORIGINS: 'http://localhost:3000,http://127.0.0.1:3000',
     AUTH_ORIGIN: 'http://localhost:3000,http://127.0.0.1:3000',
     CART_ORIGIN: 'http://localhost:3000,http://127.0.0.1:3000',
+    HB_LOCAL_ADMIN_PASSWORD: localAdminPassword,
     REGISTRATION_ORIGIN: 'http://localhost:3000,http://127.0.0.1:3000',
     API_INTERNAL_URL: 'http://api:3001/api/v1',
     NEXT_PUBLIC_API_URL: 'http://127.0.0.1:3001',

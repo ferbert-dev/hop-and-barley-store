@@ -240,6 +240,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resolve the current administrator shell capability */
+        get: operations["AdminController_capabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orders": {
         parameters: {
             query?: never;
@@ -516,6 +533,13 @@ export interface components {
         LogoutResponseDto: {
             /** @enum {string} */
             status: "signed-out";
+        };
+        AdminCapabilitiesDto: {
+            /**
+             * @description Current administrator may enter product management.
+             * @example true
+             */
+            productManagement: boolean;
         };
         AllocationUnavailableDto: {
             /** @enum {string} */
@@ -1307,6 +1331,46 @@ export interface operations {
             };
             /** @description Origin or CSRF is not valid */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_capabilities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCapabilitiesDto"];
+                };
+            };
+            /** @description Session is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Administrator access is required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session verification is unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
