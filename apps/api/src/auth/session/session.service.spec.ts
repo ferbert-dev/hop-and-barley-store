@@ -107,6 +107,7 @@ describe('SessionService', () => {
     expect(result).toMatchObject({
       expiresAt: new Date('2026-08-29T10:00:00.000Z'),
       role: 'CUSTOMER',
+      status: 'ACTIVE',
       userId: USER_ID,
     });
   });
@@ -210,6 +211,7 @@ describe('SessionService', () => {
       rawToken: RAW_TOKEN,
       role: 'CUSTOMER',
       sessionId: SESSION_ID,
+      status: 'ACTIVE',
       userId: USER_ID,
     });
   });

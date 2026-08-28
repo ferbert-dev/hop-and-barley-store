@@ -1,0 +1,76 @@
+.screen {
+  padding: clamp(var(--hb-space-6), 7vw, var(--hb-space-16))
+    var(--hb-page-gutter);
+}
+
+.shell {
+  display: grid;
+  gap: var(--hb-space-8);
+  margin-inline: auto;
+  max-inline-size: var(--hb-layout-content);
+}
+
+.eyebrow {
+  color: var(--hb-color-brand);
+  font-size: var(--hb-font-size-xs);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  margin-block-end: var(--hb-space-3);
+  text-transform: uppercase;
+}
+
+.shell > h1 {
+  font-size: clamp(2.5rem, 8vw, 5.25rem);
+  line-height: 0.94;
+  margin: calc(var(--hb-space-6) * -1) 0 0;
+}
+
+.tabs {
+  border-block-end: 1px solid var(--hb-color-border);
+  display: flex;
+  gap: var(--hb-space-6);
+  overflow-x: auto;
+}
+
+.tab,
+.tabActive {
+  display: inline-flex;
+  font-weight: 700;
+  min-block-size: 44px;
+  padding: var(--hb-space-3) var(--hb-space-2);
+  white-space: nowrap;
+}
+
+.tab {
+  color: var(--hb-color-text-muted);
+}
+
+.tabActive {
+  border-block-end: 3px solid var(--hb-color-brand);
+  color: var(--hb-color-brand);
+}
+
+.notice {
+  background: var(--hb-color-surface);
+  border: 1px solid var(--hb-color-border);
+  border-radius: var(--hb-radius-lg);
+  box-shadow: var(--hb-shadow-sm);
+  padding: clamp(var(--hb-space-6), 5vw, var(--hb-space-12));
+}
+
+.notice h2 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 0.95;
+  margin-block-end: var(--hb-space-4);
+}
+
+.notice p {
+  line-height: var(--hb-line-height-relaxed);
+}
+
+@media (max-width: 35rem) {
+  .notice {
+    border-radius: var(--hb-radius-md);
+    padding: var(--hb-space-6) var(--hb-space-4);
+  }
+}

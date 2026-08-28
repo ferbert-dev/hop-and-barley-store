@@ -22,6 +22,7 @@
     "test:catalog:postgres": "bash scripts/test-catalog-postgres.sh",
     "test:a1:postgres": "bash scripts/test-a1-postgres.sh",
     "test:a1b:postgres": "bash scripts/test-a1b-postgres.sh",
+    "test:m1:postgres": "bash scripts/test-m1-postgres.sh",
     "test:o0:postgres": "bash scripts/test-o0-postgres.sh",
     "test:o1b:postgres": "bash scripts/test-o1b-postgres.sh",
     "test:o2:postgres": "bash scripts/test-o2-postgres.sh",
@@ -33,7 +34,8 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "prisma generate && prisma db seed",
-    "generate:openapi": "prisma generate && node --import tsx scripts/generate-openapi.ts"
+    "generate:openapi": "prisma generate && node --import tsx scripts/generate-openapi.ts",
+    "admin:provision:local": "prisma generate && node --import tsx scripts/provision-local-admin.ts"
   },
   "dependencies": {
     "@hop-and-barley/auth-contract": "workspace:*",

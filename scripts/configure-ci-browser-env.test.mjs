@@ -8,6 +8,7 @@ test('masks every generated credential before exporting the exact same values', 
     Buffer.alloc(32, 0x11),
     Buffer.alloc(32, 0x22),
     Buffer.alloc(24, 0x33),
+    Buffer.alloc(24, 0x44),
   ];
   const events = [];
   let generationIndex = 0;
@@ -32,17 +33,18 @@ test('masks every generated credential before exporting the exact same values', 
     settings.AUTH_CSRF_KEYRING,
     settings.CART_CSRF_KEYRING,
     settings.POSTGRES_PASSWORD,
+    settings.HB_LOCAL_ADMIN_PASSWORD,
   ];
-  assert.equal(new Set(credentialValues).size, 3);
+  assert.equal(new Set(credentialValues).size, 4);
   assert.deepEqual(
-    events.slice(0, 3),
+    events.slice(0, 4),
     credentialValues.map((value) => ({ type: 'mask', value })),
   );
-  assert.equal(events[3]?.type, 'append');
-  assert.equal(events.length, 4);
+  assert.equal(events[4]?.type, 'append');
+  assert.equal(events.length, 5);
 
   const exportedSettings = Object.fromEntries(
-    events[3].content
+    events[4].content
       .trimEnd()
       .split('\n')
       .map((line) => {

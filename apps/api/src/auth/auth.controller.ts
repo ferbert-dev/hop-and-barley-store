@@ -187,7 +187,7 @@ function toSessionDto(session: ActiveSession): AuthSessionDto {
     absoluteExpiresAt: session.expiresAt.toISOString(),
     idleExpiresAt: idleExpiresAt.toISOString(),
     issuedAt: session.issuedAt.toISOString(),
-    user: { id: session.userId, role: session.role, status: 'ACTIVE' },
+    user: { id: session.userId, role: session.role, status: session.status },
   };
 }
 

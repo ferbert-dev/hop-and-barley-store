@@ -1,4 +1,10 @@
-import { INestApplication, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  INestApplication,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types';
@@ -138,6 +144,15 @@ jest.mock('./../src/auth/password/password-hash-executor', () => ({
   },
 }));
 
+@ApiExcludeController()
+@Controller('admin')
+class UnmarkedAdminBoundaryProbeController {
+  @Get('unguarded')
+  unguarded(): { status: 'unsafe' } {
+    return { status: 'unsafe' };
+  }
+}
+
 describe('Platform API (e2e)', () => {
   let app: INestApplication;
   const activeSessions = new Map<string, ActiveSession>();
@@ -164,6 +179,7 @@ describe('Platform API (e2e)', () => {
           rawToken,
           role: 'CUSTOMER',
           sessionId: '20000000-0000-4000-8000-000000000001',
+          status: 'ACTIVE',
           userId,
         };
         activeSessions.set(rawToken, session);
@@ -199,6 +215,7 @@ describe('Platform API (e2e)', () => {
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
+      controllers: [UnmarkedAdminBoundaryProbeController],
       imports: [AppModule],
     })
       .overrideProvider(SessionService)
@@ -469,6 +486,74 @@ describe('Platform API (e2e)', () => {
     }
   });
 
+  it('enforces the anonymous, customer and administrator capability matrix', async () => {
+    const server = app.getHttpServer() as App;
+    const anonymous = await request(server)
+      .get('/api/v1/admin/capabilities')
+      .expect(401);
+    expect(anonymous.body).toEqual({ status: 'unauthorized' });
+
+    const customerToken = `${'F'.repeat(42)}A`;
+    activeSessions.set(customerToken, {
+      expiresAt: new Date('2026-08-29T10:00:00.000Z'),
+      issuedAt: new Date('2026-08-22T10:00:00.000Z'),
+      lastSeenAt: new Date('2026-08-22T10:00:00.000Z'),
+      rawToken: customerToken,
+      role: 'CUSTOMER',
+      sessionId: '20000000-0000-4000-8000-000000000003',
+      status: 'ACTIVE',
+      userId: '10000000-0000-4000-8000-000000000002',
+    });
+    const customer = await request(server)
+      .get('/api/v1/admin/capabilities')
+      .set('Cookie', `hb_session=${customerToken}`)
+      .expect(403);
+    expect(customer.body).toEqual({ status: 'forbidden' });
+
+    const adminToken = `${'G'.repeat(42)}A`;
+    activeSessions.set(adminToken, {
+      expiresAt: new Date('2026-08-29T10:00:00.000Z'),
+      issuedAt: new Date('2026-08-22T10:00:00.000Z'),
+      lastSeenAt: new Date('2026-08-22T10:00:00.000Z'),
+      rawToken: adminToken,
+      role: 'ADMIN',
+      sessionId: '20000000-0000-4000-8000-000000000004',
+      status: 'ACTIVE',
+      userId: '10000000-0000-4000-8000-000000000003',
+    });
+    const admin = await request(server)
+      .get('/api/v1/admin/capabilities')
+      .set('Cookie', `hb_session=${adminToken}`)
+      .expect(200);
+    expect(admin.body).toEqual({ productManagement: true });
+
+    for (const response of [anonymous, customer, admin]) {
+      expect(response.headers['cache-control']).toBe('private, no-store');
+      expect(response.headers.vary).toBe('Cookie, Origin');
+    }
+  });
+
+  it('denies mixed-case access to an unmarked admin namespace route', async () => {
+    const customerToken = `${'H'.repeat(42)}A`;
+    activeSessions.set(customerToken, {
+      expiresAt: new Date('2026-08-29T10:00:00.000Z'),
+      issuedAt: new Date('2026-08-22T10:00:00.000Z'),
+      lastSeenAt: new Date('2026-08-22T10:00:00.000Z'),
+      rawToken: customerToken,
+      role: 'CUSTOMER',
+      sessionId: '20000000-0000-4000-8000-000000000006',
+      status: 'ACTIVE',
+      userId: '10000000-0000-4000-8000-000000000006',
+    });
+
+    const response = await request(app.getHttpServer() as App)
+      .get('/api/v1/ADMIN/unguarded')
+      .set('Cookie', `hb_session=${customerToken}`)
+      .expect(403);
+
+    expect(response.body).toEqual({ status: 'forbidden' });
+  });
+
   it('rejects unsafe cookie requests with missing CSRF or non-exact Origin', async () => {
     const server = app.getHttpServer() as App;
     const rawToken = 'E'.repeat(43);
@@ -479,6 +564,7 @@ describe('Platform API (e2e)', () => {
       rawToken,
       role: 'CUSTOMER',
       sessionId: '20000000-0000-4000-8000-000000000002',
+      status: 'ACTIVE',
       userId: '10000000-0000-4000-8000-000000000001',
     });
     const cookie = `hb_session=${rawToken}`;
@@ -602,6 +688,7 @@ describe('Platform API (e2e)', () => {
     const current = document.paths['/api/v1/auth/session'].get;
     const csrf = document.paths['/api/v1/auth/csrf'].get;
     const logout = document.paths['/api/v1/auth/logout'].post;
+    const adminCapabilities = document.paths['/api/v1/admin/capabilities'].get;
     expect(login.security).toBeUndefined();
     expect(login.parameters?.map(({ name }) => name)).toEqual(['Origin']);
     expect(login.responses['200'].headers).toHaveProperty('Set-Cookie');
@@ -622,6 +709,24 @@ describe('Platform API (e2e)', () => {
       'X-CSRF-Token',
     ]);
     expect(logout.responses['200'].headers).toHaveProperty('Set-Cookie');
+    expect(adminCapabilities.security).toEqual([{ sessionCookie: [] }]);
+    expect(Object.keys(adminCapabilities.responses).sort()).toEqual([
+      '200',
+      '401',
+      '403',
+      '503',
+    ]);
+    expect(document.components.schemas.AdminCapabilitiesDto).toEqual({
+      properties: {
+        productManagement: {
+          description: 'Current administrator may enter product management.',
+          example: true,
+          type: 'boolean',
+        },
+      },
+      required: ['productManagement'],
+      type: 'object',
+    });
   });
 
   it('documents the exact catalog query, envelope and nested DTO bounds', async () => {

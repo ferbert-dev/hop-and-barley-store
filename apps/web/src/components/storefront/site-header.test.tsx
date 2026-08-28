@@ -195,8 +195,10 @@ describe('SiteHeader', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows account and logout only for a Nest-verified session', () => {
-    render(<SiteHeader sessionState={{ kind: 'authenticated' }} />);
+  it('shows account and logout but no admin navigation for a Nest-verified customer session', () => {
+    render(
+      <SiteHeader sessionState={{ isAdmin: false, kind: 'authenticated' }} />,
+    );
 
     expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute(
       'href',
@@ -206,6 +208,23 @@ describe('SiteHeader', () => {
     expect(
       screen.queryByRole('link', { name: 'Sign in' }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Product Management' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows Product Management only for a Nest-verified admin session', () => {
+    pathname = '/admin/products';
+    render(
+      <SiteHeader sessionState={{ isAdmin: true, kind: 'authenticated' }} />,
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'Product Management' }),
+    ).toHaveAttribute('href', '/admin/products');
+    expect(
+      screen.getByRole('link', { name: 'Product Management' }),
+    ).toHaveAttribute('aria-current', 'page');
   });
 
   it('exposes authentication unavailability instead of rendering anonymous actions', () => {

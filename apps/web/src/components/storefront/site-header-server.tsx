@@ -8,7 +8,10 @@ export async function SiteHeaderServer() {
   const current = await readCurrentSession();
   const sessionState =
     current.kind === 'authenticated'
-      ? ({ kind: 'authenticated' } as const)
+      ? ({
+          kind: 'authenticated',
+          isAdmin: current.session.user.role === 'ADMIN',
+        } as const)
       : current;
 
   return (
