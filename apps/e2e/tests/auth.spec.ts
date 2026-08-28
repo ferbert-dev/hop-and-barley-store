@@ -84,11 +84,9 @@ test.describe('connected local authentication journey', () => {
     await page.getByLabel('City').fill('Madrid');
     await page.getByRole('button', { name: 'Save' }).click();
     await profileSave;
-    await expect(
-      page.getByRole('status', {
-        name: 'Your account information was saved.',
-      }),
-    ).toBeVisible();
+    await expect(page.getByRole('status')).toHaveText(
+      'Your account information was saved.',
+    );
     await page.reload();
     await expect(page.getByLabel('Full Name')).toHaveValue('Local Brewer');
     await expect(page.getByLabel('Phone number')).toHaveValue(
