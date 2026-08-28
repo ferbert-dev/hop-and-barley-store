@@ -38,16 +38,10 @@
   min-block-size: 2.75rem;
 }
 
-.selectedAmount,
 .supportingText,
 .estimate,
 .error {
   margin: 0;
-}
-
-.selectedAmount {
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
 }
 
 .supportingText {
