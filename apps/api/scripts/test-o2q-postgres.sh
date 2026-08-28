@@ -263,6 +263,17 @@ metadata_shape=$(docker exec "$container_name" psql --tuples-only --no-align \
   ")
 test "$metadata_shape" = 'safale-us05-yeast:PACKAGE:EACH:11500:null,west-coast-ipa-kit:KIT:EACH:null:18927'
 
+# Bring the upgrade fixture to the current schema before exercising the current
+# Prisma seed. The assertions above intentionally prove the O2Q migration in
+# isolation before later migrations are applied.
+for migration in \
+  20260827150000_disable_cart_reservations \
+  20260828153000_add_product_activity_window; do
+  docker exec --interactive "$container_name" psql \
+    --set ON_ERROR_STOP=1 --username "$database_user" --dbname upgrade_o2q \
+    < "$repo_root/apps/api/prisma/migrations/$migration/migration.sql"
+done
+
 stock_before_seed=$(docker exec "$container_name" psql --tuples-only --no-align \
   --username "$database_user" --dbname upgrade_o2q \
   --command "
