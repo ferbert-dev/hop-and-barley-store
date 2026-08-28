@@ -52,6 +52,13 @@ The shared header may show `Product Management` only for a current
 Nest-verified `ADMIN` session. This is a navigation convenience; entering an
 admin URL is always checked again by the nested server layout and Nest.
 
+Nest registers the administrator guard globally. Every request whose path is
+the exact `/api/v1/admin` namespace or a child of it requires a current active
+`ADMIN` principal even when a controller author accidentally omits
+`@AdminOnly()`. The decorator remains useful for OpenAPI documentation and for
+explicitly protecting an administrator operation outside that namespace, but
+it is not what activates the namespace boundary.
+
 There is no M1-specific loading or error presentation because the static shell
 has no independent data state. The root shell owns the shared landmarks; the
 nested layout owns the authorization redirect/not-found boundary.

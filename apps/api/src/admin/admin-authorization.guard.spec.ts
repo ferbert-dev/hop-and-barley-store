@@ -9,7 +9,7 @@ import {
 } from './admin-authorization.guard';
 
 describe('AdminAuthorizationGuard', () => {
-  it('allows only an explicitly marked current ACTIVE ADMIN principal', () => {
+  it('allows a marked route for a current ACTIVE ADMIN principal', () => {
     const { context, reflector } = createFixture({
       role: 'ADMIN',
       status: 'ACTIVE',
@@ -23,7 +23,7 @@ describe('AdminAuthorizationGuard', () => {
     ]);
   });
 
-  it('fails closed when the admin-only policy metadata is absent', () => {
+  it('protects an unmarked admin namespace route for a current ACTIVE ADMIN', () => {
     const { context, reflector } = createFixture({
       role: 'ADMIN',
       status: 'ACTIVE',
@@ -31,7 +31,32 @@ describe('AdminAuthorizationGuard', () => {
     reflector.getAllAndOverride.mockReturnValue(undefined);
     const guard = new AdminAuthorizationGuard(reflector as never);
 
+    expect(guard.canActivate(context)).toBe(true);
+  });
+
+  it('denies a customer on an unmarked admin namespace route', () => {
+    const { context, reflector } = createFixture({
+      role: 'CUSTOMER',
+      status: 'ACTIVE',
+    });
+    reflector.getAllAndOverride.mockReturnValue(undefined);
+    const guard = new AdminAuthorizationGuard(reflector as never);
+
     expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+  });
+
+  it('does not apply admin authorization outside the admin namespace', () => {
+    const { context, reflector } = createFixture(
+      {
+        role: 'CUSTOMER',
+        status: 'ACTIVE',
+      },
+      '/api/v1/catalog/products',
+    );
+    reflector.getAllAndOverride.mockReturnValue(undefined);
+    const guard = new AdminAuthorizationGuard(reflector as never);
+
+    expect(guard.canActivate(context)).toBe(true);
   });
 
   it('returns unauthorized when authentication did not attach a principal', () => {
@@ -56,8 +81,9 @@ function createFixture(
   principal:
     | Readonly<{ role: 'ADMIN' | 'CUSTOMER'; status: 'ACTIVE' | 'DISABLED' }>
     | undefined,
+  path = '/api/v1/admin/capabilities',
 ) {
-  const request = { activeSession: principal };
+  const request = { activeSession: principal, path };
   const reflector = { getAllAndOverride: jest.fn().mockReturnValue(true) };
   const context = {
     getClass: jest.fn(),

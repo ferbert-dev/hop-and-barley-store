@@ -6,9 +6,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { API_GLOBAL_PREFIX } from '../app-routing';
 import type { AuthRequest } from '../auth/auth-request';
 
 export const ADMIN_ONLY_KEY = 'hop-and-barley.auth.admin-only';
+const ADMIN_API_PREFIX = `/${API_GLOBAL_PREFIX}/admin`;
 
 const FORBIDDEN = Object.freeze({ status: 'forbidden' as const });
 const UNAUTHORIZED = Object.freeze({ status: 'unauthorized' as const });
@@ -22,11 +24,11 @@ export class AdminAuthorizationGuard implements CanActivate {
       ADMIN_ONLY_KEY,
       [context.getHandler(), context.getClass()],
     );
-    if (isAdminOnly !== true) {
-      throw new ForbiddenException(FORBIDDEN);
+    const request = context.switchToHttp().getRequest<AuthRequest>();
+    if (!isAdminApiPath(request.path) && isAdminOnly !== true) {
+      return true;
     }
 
-    const request = context.switchToHttp().getRequest<AuthRequest>();
     const principal = request.activeSession;
     if (!principal) {
       throw new UnauthorizedException(UNAUTHORIZED);
@@ -37,4 +39,8 @@ export class AdminAuthorizationGuard implements CanActivate {
 
     return true;
   }
+}
+
+function isAdminApiPath(path: string): boolean {
+  return path === ADMIN_API_PREFIX || path.startsWith(`${ADMIN_API_PREFIX}/`);
 }
