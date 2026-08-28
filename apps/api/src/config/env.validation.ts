@@ -1,4 +1,5 @@
 import Joi from 'joi';
+import { parse, resolve } from 'node:path';
 import { splitOriginList } from './origin-list';
 
 const schema = Joi.object({
@@ -28,6 +29,9 @@ const schema = Joi.object({
     .valid('development', 'test', 'production')
     .default('development'),
   PORT: Joi.number().port().default(3001),
+  PRODUCT_ASSET_STORAGE_PATH: Joi.string()
+    .custom(validateProductAssetStoragePath)
+    .default('.local/product-assets'),
   REGISTRATION_ENABLED: Joi.boolean().default(false),
   REGISTRATION_ORIGIN: Joi.string()
     .custom(validateExactOriginList)
@@ -133,4 +137,25 @@ function originMatchesMode(origin: string, mode: unknown): boolean {
     ? parsed.protocol === 'https:'
     : parsed.protocol === 'http:' &&
         ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
+}
+
+function validateProductAssetStoragePath(
+  value: string,
+  helpers: Joi.CustomHelpers,
+) {
+  const trimmed = value.trim();
+  if (
+    trimmed.length === 0 ||
+    trimmed.length > 1_024 ||
+    trimmed.includes('\0')
+  ) {
+    return helpers.error('any.invalid');
+  }
+
+  const absolutePath = resolve(trimmed);
+  if (absolutePath === parse(absolutePath).root) {
+    return helpers.error('any.invalid');
+  }
+
+  return trimmed;
 }

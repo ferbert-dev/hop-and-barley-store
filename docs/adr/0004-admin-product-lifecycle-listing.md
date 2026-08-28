@@ -40,10 +40,12 @@ Management/Dashboard tabs, a product table/list, price, category, human stock
 information, Add Product and Edit links, and pagination when the fixture has
 more than one page.
 
-The public catalog continues its current `isActive`-only behavior in M2.
-M4 owns lifecycle mutations and storefront window enforcement. The admin
-listing is read-only for this decision; M2 does not assume that Add or Edit
-destinations are implemented or submit either form. Navigation follows the
+M2 originally left the public catalog on `isActive`-only behavior. The later
+M3 user override moved initial activity-window creation and storefront window
+enforcement into the create vertical slice: public list, facets and detail now
+require `isActive`, `activeFrom <= now` when present, and `activeUntil > now`
+when present. M4 still owns later lifecycle edits. The M2 admin listing remains
+read-only for this decision. Navigation follows the
 only add/edit form route named by the supplied Figma: create links use
 `/admin/add`, while a row's edit link carries its encoded product identifier as
 `/admin/add?productId=<id>`. M3/M4 own interpreting that intent and all form or

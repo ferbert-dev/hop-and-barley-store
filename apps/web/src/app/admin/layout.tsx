@@ -1,4 +1,4 @@
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { readAdminCapability } from '../../features/admin/admin-capability';
@@ -12,10 +12,11 @@ type AdminLayoutProps = Readonly<{
 export default async function AdminLayout({ children }: AdminLayoutProps) {
   const capability = await readAdminCapability();
 
-  if (capability.kind === 'anonymous') {
-    redirect('/login?next=%2Fadmin%2Fproducts');
-  }
-  if (capability.kind !== 'authorized') notFound();
+  // Each leaf route owns its exact safe `next` destination. Allowing an
+  // anonymous request to reach the leaf avoids redirecting `/admin/add` to the
+  // product list while the parent boundary still denies every non-anonymous
+  // capability failure neutrally.
+  if (capability.kind === 'denied') notFound();
 
   return children;
 }

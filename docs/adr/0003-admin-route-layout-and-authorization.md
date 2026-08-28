@@ -1,6 +1,6 @@
 # ADR 0003: Guard the M1 admin route in a nested server layout
 
-- **Status:** Accepted — M1 execution contract
+- **Status:** Accepted — evolved by M2/M3 leaf-route authorization
 - **Date:** 2026-08-28
 - **Decision owner:** M1 root orchestrator
 - **Scope:** `/admin/**` route ownership, server authorization, and M1 shell navigation
@@ -39,11 +39,17 @@ It handles results as follows:
 
 | Capability result                                                 | Route behavior                                 |
 | ----------------------------------------------------------------- | ---------------------------------------------- |
-| `401` / no session                                                | Redirect to `/login?next=%2Fadmin%2Fproducts`  |
+| `401` / no session                                                | Let the leaf choose its exact safe `next` path |
 | `200` with the expected capability                                | Render the nested route                        |
 | `403`, malformed body, cache-policy failure, or transport failure | `notFound()` — fail closed without role detail |
 
-`/admin` redirects only after the layout has authorized the request.
+From M3 onward, the parent layout still performs the Nest capability check but
+does not choose one return destination for every child. An anonymous request is
+allowed to reach the leaf so `/admin/products` can redirect to
+`/login?next=%2Fadmin%2Fproducts` and `/admin/add` can redirect to
+`/login?next=%2Fadmin%2Fadd`. A customer, malformed private response, cache
+failure or transport failure remains a neutral `notFound()` at the parent.
+`/admin` redirects to `/admin/products`; that leaf owns its anonymous redirect.
 `/admin/products` contains no product list, CRUD, upload, inventory, schedule,
 or dashboard metrics. Its Product Management tab is current; Dashboard is
 visible but `aria-disabled` and non-interactive until M6.

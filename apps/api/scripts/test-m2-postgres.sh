@@ -7,7 +7,7 @@ database_user='hopbarley_m2'
 database_password='hopbarley_m2_fixture'
 
 cleanup() {
-  docker stop "$container_name" >/dev/null 2>&1 || true
+  docker rm --force "$container_name" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 

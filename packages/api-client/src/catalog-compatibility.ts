@@ -10,7 +10,8 @@ const SORT_VALUES = new Set([
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const IMAGE_PATH = /^\/assets\/products\/[a-z0-9]+(?:-[a-z0-9]+)*[.]webp$/;
+const IMAGE_PATH =
+  /^(?:\/assets\/products\/[a-z0-9]+(?:-[a-z0-9]+)*|\/product-assets\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})[.]webp$/;
 const SEARCH_FORBIDDEN = /[\p{C}\\%_]/u;
 const LEGACY_PROHIBITED_KEYS = new Set([
   'availability',

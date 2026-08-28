@@ -84,7 +84,7 @@ test.describe('database-backed product details', () => {
   test('renders metadata, ordered specifications, not-found and accessible product UI', async ({
     page,
   }) => {
-    await page.goto('/product/citra-hops');
+    await page.goto('/product/citra-hops', { waitUntil: 'commit' });
     await expect(page).toHaveTitle('Citra Hops | Hop & Barley');
     await expect(page.getByText('In stock')).toHaveCount(0);
     await expect(
@@ -105,7 +105,9 @@ test.describe('database-backed product details', () => {
     ]);
     await assertNoBlockingAxeViolations(page, 'in-stock product detail');
 
-    await page.goto('/product/not-a-public-product');
+    await page.goto('/product/not-a-public-product', {
+      waitUntil: 'commit',
+    });
     await expect(
       page.getByRole('heading', { name: 'Product not found' }),
     ).toBeVisible();
@@ -119,7 +121,9 @@ test.describe('database-backed product details', () => {
   }) => {
     await clearGuestCart(page);
     try {
-      await page.goto('/product/mosaic-hops');
+      await page.goto('/product/mosaic-hops', {
+        waitUntil: 'commit',
+      });
 
       const addRequest = page.waitForRequest(
         (request) =>

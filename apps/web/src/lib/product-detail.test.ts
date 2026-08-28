@@ -94,6 +94,22 @@ describe('loadProductDetail', () => {
     });
   });
 
+  it('accepts an immutable UUID WebP path for a product uploaded by an administrator', async () => {
+    const uploadedImagePath =
+      '/product-assets/12345678-1234-4abc-8abc-1234567890ab.webp';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ ...product, imagePath: uploadedImagePath }),
+      ),
+    );
+
+    await expect(loadProductDetail('citra-hops')).resolves.toEqual({
+      kind: 'ready',
+      product: { ...product, imagePath: uploadedImagePath },
+    });
+  });
+
   it.each([
     null,
     {},

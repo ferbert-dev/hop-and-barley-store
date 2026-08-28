@@ -218,6 +218,33 @@ test('normalizer returns a validated paged branch and tolerates additive fields'
   assert.deepEqual(result.meta, meta);
 });
 
+test('normalizer accepts only opaque UUID-v4 dynamic product image paths', () => {
+  const imagePath = '/product-assets/123e4567-e89b-42d3-a456-426614174000.webp';
+  const result = normalizeCatalogResponse({
+    items: [{ ...pagedItem, imagePath }],
+    meta,
+  });
+
+  assert.equal(result.kind, 'paged');
+  assert.equal(result.items[0].imagePath, imagePath);
+
+  for (const invalidPath of [
+    '/product-assets/../secret.webp',
+    '/product-assets/123e4567-e89b-12d3-a456-426614174000.webp',
+    '/product-assets/123e4567-e89b-42d3-c456-426614174000.webp',
+    '/product-assets/123e4567-e89b-42d3-a456-426614174000.png',
+  ]) {
+    assert.throws(
+      () =>
+        normalizeCatalogResponse({
+          items: [{ ...pagedItem, imagePath: invalidPath }],
+          meta,
+        }),
+      CatalogResponseShapeError,
+    );
+  }
+});
+
 test('normalizer rejects malformed common, paged and nested structures', () => {
   const malformed = [
     null,

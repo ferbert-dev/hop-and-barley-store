@@ -106,6 +106,26 @@ void currentSessionRequest;
 void csrfRequest;
 void logoutRequest;
 
+const createAdminProduct = configuredClient.POST('/api/v1/admin/products', {
+  body: {
+    categoryId: '10000000-0000-4000-8000-000000000001',
+    description: 'Bright whole-cone hops for late additions.',
+    image: 'product.webp',
+    isActive: 'true',
+    name: 'Centennial Hops',
+    price: '5.99',
+    saleKind: 'WEIGHT',
+    stockAmount: '100000000',
+  },
+  params: {
+    header: {
+      Origin: 'http://localhost:3000',
+      'X-CSRF-Token': `v1.${'A'.repeat(43)}`,
+    },
+  },
+});
+void createAdminProduct;
+
 const cartRequest = configuredClient.GET('/api/v1/cart');
 const cartCsrfRequest = configuredClient.GET('/api/v1/cart/csrf');
 const firstCartAdd = configuredClient.POST('/api/v1/cart/items', {

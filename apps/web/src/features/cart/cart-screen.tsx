@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { Price } from '../../components/ui/price';
+import { isUploadedProductImagePath } from '../../lib/product-image';
 import {
   EmptyState,
   ErrorState,
@@ -271,6 +272,7 @@ function CartContents({
                     height={160}
                     sizes="(max-width: 47.999rem) 7rem, 10rem"
                     src={item.imagePath}
+                    unoptimized={isUploadedProductImagePath(item.imagePath)}
                     width={160}
                   />
                 </Link>

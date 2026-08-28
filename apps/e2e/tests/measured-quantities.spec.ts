@@ -14,7 +14,7 @@ test.describe('measured product quantities', () => {
   test('supports a kg-only 100g lattice, step buttons and server-owned previews', async ({
     page,
   }) => {
-    await page.goto('/product/citra-hops');
+    await page.goto('/product/citra-hops', { waitUntil: 'commit' });
     await expect(
       page.getByRole('heading', { name: 'Citra Hops' }),
     ).toBeVisible();
@@ -78,7 +78,7 @@ test.describe('measured product quantities', () => {
   test('rejects below-minimum and off-step weight values without submitting', async ({
     page,
   }) => {
-    await page.goto('/product/citra-hops');
+    await page.goto('/product/citra-hops', { waitUntil: 'commit' });
     const amount = amountInput(page);
     const add = page.getByRole('button', { name: /^Add .+ to Cart$/ });
     await expect(add).toBeEnabled();
@@ -112,7 +112,7 @@ test.describe('measured product quantities', () => {
   test('persists an exact physical amount and server total through cart navigation and refresh', async ({
     page,
   }) => {
-    await page.goto('/product/citra-hops');
+    await page.goto('/product/citra-hops', { waitUntil: 'commit' });
     const amount = amountInput(page);
     await amount.fill('0.9');
     await amount.press('Tab');
@@ -151,7 +151,9 @@ test.describe('measured product quantities', () => {
   test('keeps packages as integer packs, reports known SafAle net weight, and does not invent Imperial grams', async ({
     page,
   }) => {
-    await page.goto('/product/safale-us05-yeast');
+    await page.goto('/product/safale-us05-yeast', {
+      waitUntil: 'commit',
+    });
     await expect(
       page.getByRole('heading', { name: 'SafAle US-05 Dry Ale Yeast' }),
     ).toBeVisible();
@@ -177,7 +179,9 @@ test.describe('measured product quantities', () => {
     ).toHaveValue('2');
     await expect(page.getByText(/23(?:\.0+)?\s*g/i).first()).toBeVisible();
 
-    await page.goto('/product/imperial-yeast');
+    await page.goto('/product/imperial-yeast', {
+      waitUntil: 'commit',
+    });
     await expect(
       page.getByRole('heading', { name: 'Imperial Organic Yeast A07' }),
     ).toBeVisible();
@@ -189,7 +193,9 @@ test.describe('measured product quantities', () => {
   test('shows four West Coast kits as 20 gal and approximately 76 L, while the badge counts lines', async ({
     page,
   }) => {
-    await page.goto('/product/west-coast-ipa-kit');
+    await page.goto('/product/west-coast-ipa-kit', {
+      waitUntil: 'commit',
+    });
     await expect(
       page.getByRole('heading', { name: 'West Coast IPA - All-Grain Kit' }),
     ).toBeVisible();
@@ -213,7 +219,7 @@ test.describe('measured product quantities', () => {
       page.getByText(/(?:75(?:\.\d+)?|76)\s*l/i).first(),
     ).toBeVisible();
 
-    await page.goto('/product/citra-hops');
+    await page.goto('/product/citra-hops', { waitUntil: 'commit' });
     const weight = amountInput(page);
     await weight.fill('0.2');
     await weight.press('Tab');
@@ -231,7 +237,7 @@ test.describe('measured product quantities', () => {
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.setViewportSize({ width: 360, height: 800 });
-    await page.goto('/product/citra-hops');
+    await page.goto('/product/citra-hops', { waitUntil: 'commit' });
 
     const amount = amountInput(page);
     await amount.fill('0.9');
