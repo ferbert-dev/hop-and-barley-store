@@ -90,7 +90,7 @@ describe('UsersService self-profile', () => {
     });
   });
 
-  it('maps the normalized-email uniqueness race to a generic conflict', async () => {
+  it('maps the normalized-email uniqueness race to the generic invalid-profile response', async () => {
     const prisma = {
       $transaction: jest.fn().mockRejectedValue({
         code: 'P2002',
@@ -110,11 +110,10 @@ describe('UsersService self-profile', () => {
       service.updateCurrent(USER_ID, { email: 'taken@example.com' }),
     ).rejects.toMatchObject({
       response: {
-        message:
-          'We could not save these changes. Review the form and try again.',
-        status: 'profile-conflict',
+        message: 'Review your account information and try again.',
+        status: 'invalid-profile',
       },
-      status: 409,
+      status: 400,
     });
   });
 

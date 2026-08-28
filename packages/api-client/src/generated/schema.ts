@@ -1726,7 +1726,7 @@ export interface operations {
                     "application/json": components["schemas"]["CurrentUserProfileDto"];
                 };
             };
-            /** @description Invalid or unsupported profile field */
+            /** @description Invalid, unsupported or unavailable profile value */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1742,13 +1742,6 @@ export interface operations {
             };
             /** @description Origin or CSRF is not valid */
             403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Profile values conflict */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };

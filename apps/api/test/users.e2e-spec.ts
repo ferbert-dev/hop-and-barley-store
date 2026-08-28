@@ -176,6 +176,7 @@ describe('Users self-resource API', () => {
       .expect(200);
     expect(read.body).toEqual(bytes);
     expect(read.headers['cache-control']).toBe('private, no-store');
+    expect(read.headers['cross-origin-resource-policy']).toBe('cross-origin');
     expect(read.headers['x-content-type-options']).toBe('nosniff');
 
     await request(server)

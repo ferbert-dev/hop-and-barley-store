@@ -131,11 +131,9 @@ export function AccountProfileForm({
     setFeedback({
       kind: 'error',
       message:
-        result.kind === 'conflict'
-          ? 'That email address is already in use. Use a different email and try again.'
-          : result.kind === 'invalid'
-            ? 'Review your account information and try again.'
-            : 'Your account information could not be saved. Please try again.',
+        result.kind === 'invalid'
+          ? 'Review your account information and try again.'
+          : 'Your account information could not be saved. Please try again.',
     });
   };
 
@@ -243,7 +241,7 @@ export function AccountProfileForm({
 
   return (
     <div className={styles.content}>
-      <nav aria-label="Account sections" className={styles.tabs}>
+      <nav aria-label="Account sections" className={styles.tabs} tabIndex={0}>
         <span aria-disabled="true" className={styles.tab}>
           Order History
         </span>
@@ -287,7 +285,7 @@ export function AccountProfileForm({
               <p>JPEG, PNG, or WebP, up to 2 MB.</p>
             </div>
             <div className={styles.photoControls}>
-              <div aria-label="Profile photo preview" className={styles.avatar}>
+              <div className={styles.avatar}>
                 {avatarDisplayUrl ? (
                   // The avatar endpoint is session-protected and sends private,
                   // no-store responses, so it cannot use Next's public image proxy.
@@ -299,16 +297,16 @@ export function AccountProfileForm({
               </div>
               <div className={styles.photoActions}>
                 <label className={styles.fileLabel} htmlFor="account-avatar">
+                  <input
+                    accept="image/jpeg,image/png,image/webp"
+                    className="visually-hidden"
+                    id="account-avatar"
+                    onChange={selectAvatar}
+                    ref={avatarInputRef}
+                    type="file"
+                  />
                   Choose image
                 </label>
-                <input
-                  accept="image/jpeg,image/png,image/webp"
-                  className="visually-hidden"
-                  id="account-avatar"
-                  onChange={selectAvatar}
-                  ref={avatarInputRef}
-                  type="file"
-                />
                 {selectedAvatar ? (
                   <p className={styles.selectedFile}>{selectedAvatar.name}</p>
                 ) : null}

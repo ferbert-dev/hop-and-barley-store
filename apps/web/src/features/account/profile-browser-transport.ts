@@ -16,7 +16,7 @@ export type AvatarMetadata = components['schemas']['AvatarMetadataDto'];
 export type ProfileSaveResult =
   | Readonly<{ kind: 'saved'; profile: CurrentUserProfile }>
   | Readonly<{
-      kind: 'conflict' | 'invalid' | 'unauthenticated' | 'unavailable';
+      kind: 'invalid' | 'unauthenticated' | 'unavailable';
     }>;
 
 export type AvatarSaveResult =
@@ -46,7 +46,6 @@ export async function saveProfileFromBrowser(
 
     if (response.status === 401) return { kind: 'unauthenticated' };
     if (response.status === 400) return { kind: 'invalid' };
-    if (response.status === 409) return { kind: 'conflict' };
     if (!response.ok || error !== undefined || !isCurrentUserProfile(data)) {
       return { kind: 'unavailable' };
     }

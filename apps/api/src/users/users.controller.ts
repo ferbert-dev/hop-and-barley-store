@@ -17,7 +17,6 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBadRequestResponse,
   ApiBody,
-  ApiConflictResponse,
   ApiConsumes,
   ApiCookieAuth,
   ApiForbiddenResponse,
@@ -62,9 +61,8 @@ export class UsersController {
   @ApiBody({ required: true, type: UpdateCurrentUserDto })
   @ApiOkResponse({ type: CurrentUserProfileDto })
   @ApiBadRequestResponse({
-    description: 'Invalid or unsupported profile field',
+    description: 'Invalid, unsupported or unavailable profile value',
   })
-  @ApiConflictResponse({ description: 'Profile values conflict' })
   @ApiForbiddenResponse({ description: 'Origin or CSRF is not valid' })
   updateCurrent(
     @Req() request: AuthRequest,
@@ -107,6 +105,7 @@ export class UsersController {
   }
 
   @Get('me/avatar')
+  @Header('Cross-Origin-Resource-Policy', 'cross-origin')
   @Header('X-Content-Type-Options', 'nosniff')
   @ApiOperation({ summary: 'Read the active session user avatar' })
   @ApiOkResponse({

@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -21,10 +20,6 @@ import type {
 const PROFILE_INVALID = Object.freeze({
   message: 'Review your account information and try again.',
   status: 'invalid-profile' as const,
-});
-const PROFILE_CONFLICT = Object.freeze({
-  message: 'We could not save these changes. Review the form and try again.',
-  status: 'profile-conflict' as const,
 });
 const UNAUTHORIZED = Object.freeze({ status: 'unauthorized' as const });
 
@@ -109,7 +104,7 @@ export class UsersService {
       return toCurrentUserDto(stored);
     } catch (error) {
       if (isNormalizedEmailConflict(error)) {
-        throw new ConflictException(PROFILE_CONFLICT);
+        throw new BadRequestException(PROFILE_INVALID);
       }
       throw error;
     }

@@ -14,6 +14,11 @@
   overflow-x: auto;
 }
 
+.tabs:focus-visible {
+  outline: 3px solid var(--hb-color-brand);
+  outline-offset: 2px;
+}
+
 .tab {
   color: var(--hb-color-text-muted);
   font-weight: 700;
@@ -108,7 +113,7 @@
   gap: var(--hb-space-2);
 }
 
-.role > span {
+.role > span:first-child {
   color: var(--hb-color-text-muted);
   font-size: var(--hb-font-size-sm);
 }

@@ -92,7 +92,7 @@ describePostgres('A4 profiles with disposable PostgreSQL', () => {
         email: 'TAKEN@example.com',
         profile: { fullName: 'Must roll back' },
       }),
-    ).rejects.toMatchObject({ status: 409 });
+    ).rejects.toMatchObject({ status: 400 });
 
     await expect(users.getCurrent(firstId)).resolves.toMatchObject({
       email: 'first@example.com',

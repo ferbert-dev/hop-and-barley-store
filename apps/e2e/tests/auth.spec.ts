@@ -104,6 +104,11 @@ test.describe('connected local authentication journey', () => {
         response.url().includes('/api/v1/users/me/avatar') &&
         response.request().method() === 'PUT',
     );
+    const avatarRead = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/v1/users/me/avatar') &&
+        response.request().method() === 'GET',
+    );
     await page.getByLabel('Choose image').setInputFiles({
       buffer: ONE_PIXEL_PNG,
       mimeType: 'image/png',
@@ -114,7 +119,18 @@ test.describe('connected local authentication journey', () => {
     await expect(page.getByRole('status')).toHaveText(
       'Your profile photo was updated.',
     );
-    await expect(page.getByAltText('Current profile photo')).toBeVisible();
+    const currentPhoto = page.getByAltText('Current profile photo');
+    await expect(currentPhoto).toBeVisible();
+    await expect
+      .poll(() =>
+        currentPhoto.evaluate((image: HTMLImageElement) =>
+          image.complete ? image.naturalWidth : 0,
+        ),
+      )
+      .toBeGreaterThan(0);
+    expect((await avatarRead).headers()['cross-origin-resource-policy']).toBe(
+      'cross-origin',
+    );
 
     const avatarDelete = page.waitForResponse(
       (response) =>
@@ -199,6 +215,60 @@ test.describe('connected local authentication journey', () => {
     }
   });
 
+  test('keeps the account page keyboard-visible, accessible, and reflowed at 320px', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    await registerAndSignIn(page);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+
+    for (const viewport of [
+      { height: 900, width: 320 },
+      { height: 900, width: 1280 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/account');
+      await expect(
+        page.getByRole('heading', {
+          exact: true,
+          name: 'Account Information',
+        }),
+      ).toBeVisible();
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - window.innerWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(1);
+      const results = await new AxeBuilder({ page })
+        .withTags(wcagTags)
+        .analyze();
+      expect(
+        results.violations.filter(
+          ({ impact }) => impact === 'critical' || impact === 'serious',
+        ),
+      ).toEqual([]);
+    }
+
+    const fullName = page.getByLabel('Full Name');
+    await fullName.focus();
+    await page.keyboard.press('Tab');
+    await expect(page.getByLabel('Phone number')).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(page.getByLabel('Email')).toBeFocused();
+
+    const avatarInput = page.getByLabel('Choose image');
+    await avatarInput.focus();
+    await expect(avatarInput).toBeFocused();
+    expect(
+      await avatarInput.evaluate((input) => {
+        const label = input.closest('label');
+        return label ? getComputedStyle(label).outlineStyle : 'none';
+      }),
+    ).not.toBe('none');
+
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page).toHaveURL(/\/login\?status=signed-out$/);
+  });
+
   test('shows the UI-only neutral forgot-password state without a recovery request', async ({
     page,
   }) => {
@@ -224,6 +294,22 @@ test.describe('connected local authentication journey', () => {
     expect(nonGetRequests).toEqual([]);
   });
 });
+
+async function registerAndSignIn(page: Page): Promise<void> {
+  const email = `a4-accessibility-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
+  const credential = `A1!a${Date.now()}${Math.random().toString(36).slice(2)}`;
+
+  await page.goto('/register');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(credential);
+  await page.getByLabel('Confirm Password').fill(credential);
+  await page.getByRole('button', { name: 'Register' }).click();
+  await page.getByRole('link', { name: 'Continue to sign in' }).click();
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(credential);
+  await page.getByRole('button', { name: 'Sign In' }).click();
+  await expect(page).toHaveURL(/\/$/);
+}
 
 async function readSessionCookieMetadata(page: Page) {
   const matches = (await page.context().cookies()).filter(
