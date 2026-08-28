@@ -81,6 +81,8 @@ jobs:
         run: pnpm test:a1:postgres
       - name: Verify session migration, constraints, and concurrency
         run: pnpm test:a1b:postgres
+      - name: Verify customer-profile migration, constraints, and atomic updates
+        run: pnpm test:a4:postgres
       - name: Verify administrator provisioning and current-principal authorization
         run: pnpm test:m1:postgres
       - name: Verify admin product lifecycle migration, listing, and rollback

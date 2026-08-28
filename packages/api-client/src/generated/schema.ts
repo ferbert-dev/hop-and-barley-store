@@ -294,6 +294,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the active session user profile */
+        get: operations["UsersController_getCurrent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update the active session user profile */
+        patch: operations["UsersController_updateCurrent"];
+        trace?: never;
+    };
+    "/api/v1/users/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the active session user avatar */
+        get: operations["UsersController_readAvatar"];
+        /** Replace the active session user avatar */
+        put: operations["UsersController_saveAvatar"];
+        post?: never;
+        /** Delete the active session user avatar */
+        delete: operations["UsersController_deleteAvatar"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -698,6 +735,55 @@ export interface components {
             placedAt: string;
             /** Format: date-time */
             paidAt: string | null;
+        };
+        AvatarMetadataDto: {
+            /** @enum {string} */
+            contentType: "image/jpeg" | "image/png" | "image/webp";
+            sizeBytes: number;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CustomerProfileDto: {
+            fullName: string | null;
+            phone: string | null;
+            avatar: components["schemas"]["AvatarMetadataDto"] | null;
+        };
+        PrimaryAddressDto: {
+            country: string | null;
+            city: string | null;
+            postalCode: string | null;
+            street: string | null;
+            houseNumber: string | null;
+            apartmentUnit: string | null;
+            floor: string | null;
+            additionalInfo: string | null;
+        };
+        CurrentUserProfileDto: {
+            email: string;
+            /** @enum {string} */
+            role: "CUSTOMER" | "ADMIN";
+            profile: components["schemas"]["CustomerProfileDto"] | null;
+            primaryAddress: components["schemas"]["PrimaryAddressDto"] | null;
+        };
+        CustomerProfilePatchDto: {
+            fullName?: string | null;
+            /** @description Stored exactly as submitted for the MVP. */
+            phone?: string | null;
+        };
+        PrimaryAddressPatchDto: {
+            country?: string | null;
+            city?: string | null;
+            postalCode?: string | null;
+            street?: string | null;
+            houseNumber?: string | null;
+            apartmentUnit?: string | null;
+            floor?: string | null;
+            additionalInfo?: string | null;
+        };
+        UpdateCurrentUserDto: {
+            email?: string;
+            profile?: components["schemas"]["CustomerProfilePatchDto"] | null;
+            primaryAddress?: components["schemas"]["PrimaryAddressPatchDto"] | null;
         };
     };
     responses: never;
@@ -1587,6 +1673,214 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AllocationUnavailableDto"] | components["schemas"]["PaymentUnavailableDto"];
                 };
+            };
+        };
+    };
+    UsersController_getCurrent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentUserProfileDto"];
+                };
+            };
+            /** @description Session is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UsersController_updateCurrent: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCurrentUserDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentUserProfileDto"];
+                };
+            };
+            /** @description Invalid, unsupported or unavailable profile value */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Origin or CSRF is not valid */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UsersController_readAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Private avatar bytes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
+            };
+            /** @description Session is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No avatar is stored */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UsersController_saveAvatar: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvatarMetadataDto"];
+                };
+            };
+            /** @description Missing or invalid avatar */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Origin or CSRF is not valid */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Avatar exceeds 2 MB */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Avatar MIME type and file signature must match JPEG, PNG or WebP */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UsersController_deleteAvatar: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Avatar is absent */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Origin or CSRF is not valid */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

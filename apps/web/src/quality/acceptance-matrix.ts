@@ -492,7 +492,7 @@ export const routeFamilies = [
   {
     id: 'account-profile',
     label: 'Protected customer account and profile',
-    resolution: { status: 'confirmed', pattern: '/account/[id]' },
+    resolution: { status: 'confirmed', pattern: '/account' },
     states: [
       'loading',
       'ready',
