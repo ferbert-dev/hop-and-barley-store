@@ -109,8 +109,7 @@ export function CatalogScreen({
 function CatalogHeading() {
   return (
     <div className={styles.sectionHeading}>
-      <p className="eyebrow">From the database</p>
-      <h2 id="catalog-title">Current selection</h2>
+      <h2 id="catalog-title">Find your ingredients</h2>
     </div>
   );
 }

@@ -102,6 +102,7 @@ function AddToCartControl({
         onSubmit={(amount) => add(productSlug, amount)}
         priceMinor={priceMinor}
         submitLabel={`Add ${productName} to Cart`}
+        weightUnitPlacement="label"
       />
       {loading ? (
         <p className={styles.cartMessage} role="status">

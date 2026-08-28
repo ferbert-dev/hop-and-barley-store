@@ -101,11 +101,11 @@ describe('ProductCartControl', () => {
     });
     renderControl('in-stock', transport);
 
-    await screen.findAllByLabelText('Quantity');
+    await screen.findAllByLabelText('Quantity (kg)');
     await waitFor(() =>
-      expect(screen.getAllByLabelText('Quantity').at(-1)).toBeEnabled(),
+      expect(screen.getAllByLabelText('Quantity (kg)').at(-1)).toBeEnabled(),
     );
-    const input = screen.getAllByLabelText('Quantity').at(-1);
+    const input = screen.getAllByLabelText('Quantity (kg)').at(-1);
     if (!input) throw new Error('Quantity input missing');
     await user.clear(input);
     await user.type(input, '0.2');
@@ -130,11 +130,11 @@ describe('ProductCartControl', () => {
     });
     renderControl('in-stock', transport);
 
-    await screen.findAllByLabelText('Quantity');
+    await screen.findAllByLabelText('Quantity (kg)');
     await waitFor(() =>
-      expect(screen.getAllByLabelText('Quantity').at(-1)).toBeEnabled(),
+      expect(screen.getAllByLabelText('Quantity (kg)').at(-1)).toBeEnabled(),
     );
-    const input = screen.getAllByLabelText('Quantity').at(-1);
+    const input = screen.getAllByLabelText('Quantity (kg)').at(-1);
     if (!input) throw new Error('Quantity input missing');
     await user.clear(input);
     await user.type(input, '0.2');
@@ -177,9 +177,9 @@ describe('ProductCartControl', () => {
     renderControl('in-stock', transport);
 
     await waitFor(() =>
-      expect(screen.getAllByLabelText('Quantity').at(-1)).toBeEnabled(),
+      expect(screen.getAllByLabelText('Quantity (kg)').at(-1)).toBeEnabled(),
     );
-    const input = screen.getAllByLabelText('Quantity').at(-1);
+    const input = screen.getAllByLabelText('Quantity (kg)').at(-1);
     if (!input) throw new Error('Quantity input missing');
     await user.clear(input);
     await user.type(input, '0.2');
@@ -187,7 +187,7 @@ describe('ProductCartControl', () => {
       screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
     );
 
-    expect(screen.getAllByLabelText('Quantity').at(-1)).toBeDisabled();
+    expect(screen.getAllByLabelText('Quantity (kg)').at(-1)).toBeDisabled();
     expect(screen.getByText('Updating cart…')).toBeVisible();
 
     resolveAdd?.(cartWithAmount(300_000));
@@ -214,9 +214,9 @@ describe('ProductCartControl', () => {
     renderControl('in-stock', transport);
 
     await waitFor(() =>
-      expect(screen.getAllByLabelText('Quantity').at(-1)).toBeEnabled(),
+      expect(screen.getAllByLabelText('Quantity (kg)').at(-1)).toBeEnabled(),
     );
-    const input = screen.getAllByLabelText('Quantity').at(-1);
+    const input = screen.getAllByLabelText('Quantity (kg)').at(-1);
     if (!input) throw new Error('Quantity input missing');
     await user.clear(input);
     await user.type(input, '0.2');
@@ -231,6 +231,6 @@ describe('ProductCartControl', () => {
       ).toBeVisible(),
     );
 
-    expect(screen.getAllByLabelText('Quantity').at(-1)).toBeEnabled();
+    expect(screen.getAllByLabelText('Quantity (kg)').at(-1)).toBeEnabled();
   });
 });

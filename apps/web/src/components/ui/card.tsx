@@ -36,7 +36,13 @@ export function ProductCard({
       {...articleProps}
       className={classNames(styles.card, styles.productCard, className)}
     >
-      <div className={styles.productMedia}>{media}</div>
+      <a
+        aria-label={`View ${name} details`}
+        className={styles.productMedia}
+        href={href}
+      >
+        {media}
+      </a>
       <div className={styles.productContent}>
         {badge ? <div>{badge}</div> : null}
         <h3 className={styles.productName}>

@@ -26,7 +26,10 @@ test.describe('database-backed product details', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('status').first()).toHaveText('API connected');
 
-    const productLinks = page.getByRole('article').getByRole('link');
+    const productLinks = page
+      .getByRole('article')
+      .getByRole('heading', { level: 3 })
+      .getByRole('link');
     await expect(productLinks).toHaveCount(12);
     const products = await productLinks.evaluateAll((links) =>
       links.map((link) => ({

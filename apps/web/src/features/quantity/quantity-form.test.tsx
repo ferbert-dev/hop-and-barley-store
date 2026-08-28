@@ -41,6 +41,24 @@ describe('QuantityForm', () => {
     expect(onSubmit).toHaveBeenCalledWith(900_000);
   });
 
+  it('can place the kilogram unit in the input label without a separate inline unit', () => {
+    render(
+      <QuantityForm
+        amount={100_000}
+        currency="USD"
+        metadata={metadata}
+        onSubmit={vi.fn()}
+        priceMinor={599}
+        submitLabel="Add to Cart"
+        weightUnitPlacement="label"
+      />,
+    );
+
+    expect(screen.getByLabelText('Quantity (kg)')).toHaveValue('0.1');
+    expect(screen.getByText('Quantity (kg)')).toBeVisible();
+    expect(screen.queryByText('kg', { exact: true })).not.toBeInTheDocument();
+  });
+
   it('uses 100g +/- steps and exposes invalid increments as an accessible error', async () => {
     const user = userEvent.setup();
     render(
