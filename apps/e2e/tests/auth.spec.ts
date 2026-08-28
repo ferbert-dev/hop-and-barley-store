@@ -5,6 +5,10 @@ const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 const THIRTY_DAYS_SECONDS = 30 * 24 * 60 * 60;
 const COOKIE_EXPIRY_TOLERANCE_SECONDS = 120;
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
 
 test.describe('connected local authentication journey', () => {
   test.describe.configure({ mode: 'serial' });
@@ -94,6 +98,35 @@ test.describe('connected local authentication journey', () => {
     );
     await expect(page.getByLabel('Email')).toHaveValue(email);
     await expect(page.getByLabel('City')).toHaveValue('Madrid');
+
+    const avatarUpload = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/v1/users/me/avatar') &&
+        response.request().method() === 'PUT',
+    );
+    await page.getByLabel('Choose image').setInputFiles({
+      buffer: ONE_PIXEL_PNG,
+      mimeType: 'image/png',
+      name: 'profile.png',
+    });
+    await page.getByRole('button', { name: 'Upload photo' }).click();
+    await avatarUpload;
+    await expect(page.getByRole('status')).toHaveText(
+      'Your profile photo was updated.',
+    );
+    await expect(page.getByAltText('Current profile photo')).toBeVisible();
+
+    const avatarDelete = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/v1/users/me/avatar') &&
+        response.request().method() === 'DELETE',
+    );
+    await page.getByRole('button', { name: 'Remove photo' }).click();
+    await avatarDelete;
+    await expect(page.getByRole('status')).toHaveText(
+      'Your profile photo was removed.',
+    );
+    await expect(page.getByAltText('Current profile photo')).toHaveCount(0);
     expect(
       await page.evaluate(() => ({
         localStorage: localStorage.length,
