@@ -7,6 +7,7 @@ import { catalogCategories, catalogProducts } from '../prisma/catalog-fixtures';
 import { AppModule } from '../src/app.module';
 import { configureAppRouting } from '../src/app-routing';
 import { configureAppValidation } from '../src/app-validation';
+import { CATALOG_INGREDIENT_PRODUCT_TYPES } from '../src/catalog/catalog-product-types';
 import type { Prisma } from '../src/generated/prisma/client';
 import type { CatalogResponseDto } from '../src/catalog/dto/catalog-response.dto';
 import type { ProductDetailDto } from '../src/catalog/dto/product-detail.dto';
@@ -223,7 +224,10 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
         expect.arrayContaining(['hidden-inactive', 'hidden-eur']),
       );
       expect(body.meta.facets.categories).toEqual(
-        catalogCategories.map(({ name, slug }) => ({ name, slug })),
+        CATALOG_INGREDIENT_PRODUCT_TYPES.map(({ name, slug }) => ({
+          name,
+          slug,
+        })),
       );
       expect(body.meta.facets.categories).not.toContainEqual({
         name: 'Excluded currency',
@@ -365,7 +369,10 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
       totalPages: 0,
     });
     expect(body.meta.facets.categories).toEqual(
-      catalogCategories.map(({ name, slug }) => ({ name, slug })),
+      CATALOG_INGREDIENT_PRODUCT_TYPES.map(({ name, slug }) => ({
+        name,
+        slug,
+      })),
     );
   });
 

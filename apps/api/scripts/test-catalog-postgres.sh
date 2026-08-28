@@ -72,7 +72,8 @@ for migration in \
   20260826120000_add_orders \
   20260827100000_add_measured_product_quantities \
   20260827150000_disable_cart_reservations \
-  20260828153000_add_product_activity_window; do
+  20260828153000_add_product_activity_window \
+  20260828163000_align_ingredient_product_types; do
   docker exec --interactive "$container_name" psql \
     --set ON_ERROR_STOP=1 --username "$database_user" --dbname upgrade_catalog \
     < "$repo_root/apps/api/prisma/migrations/$migration/migration.sql"
@@ -124,6 +125,24 @@ test "$upgrade_citra_id" = '20000000-0000-4000-8000-000000000001'
 
 DATABASE_URL="$fresh_url" pnpm --dir "$repo_root" --filter @hop-and-barley/api db:migrate:deploy
 seed_twice_and_verify "$fresh_url" fresh_catalog 12
+
+docker exec "$container_name" createdb -U "$database_user" \
+  --template fresh_catalog rollback_c1a
+c1a_rollback_path="$repo_root/apps/api/prisma/migrations/20260828163000_align_ingredient_product_types/rollback.sql"
+docker exec --interactive "$container_name" psql --no-psqlrc \
+  --set ON_ERROR_STOP=1 --username "$database_user" --dbname rollback_c1a \
+  < "$c1a_rollback_path"
+c1a_rollback_state=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname rollback_c1a \
+  --command 'SELECT (SELECT "name" FROM "Category" WHERE "slug" = '"'"'malts'"'"') || '"'"':'"'"' || (SELECT count(*) FROM "Category") || '"'"':'"'"' || (SELECT count(*) FROM "Product") || '"'"':'"'"' || (SELECT count(*) FROM "Product" WHERE "slug" = '"'"'west-coast-ipa-kit'"'"' AND "saleKind" = '"'"'KIT'"'"');')
+test "$c1a_rollback_state" = 'Malts:5:12:1'
+docker exec --interactive "$container_name" psql --no-psqlrc \
+  --set ON_ERROR_STOP=1 --username "$database_user" --dbname rollback_c1a \
+  < "$repo_root/apps/api/prisma/migrations/20260828163000_align_ingredient_product_types/migration.sql"
+c1a_reapply_state=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname rollback_c1a \
+  --command 'SELECT (SELECT "name" FROM "Category" WHERE "slug" = '"'"'malts'"'"') || '"'"':'"'"' || (SELECT count(*) FROM "Category") || '"'"':'"'"' || (SELECT count(*) FROM "Product") || '"'"':'"'"' || (SELECT count(*) FROM "Product" WHERE "slug" = '"'"'west-coast-ipa-kit'"'"' AND "saleKind" = '"'"'KIT'"'"');')
+test "$c1a_reapply_state" = 'Malt:5:12:1'
 
 DATABASE_URL="$fresh_url" NODE_OPTIONS='--experimental-vm-modules' \
   RUN_CATALOG_POSTGRES_INTEGRATION=1 \

@@ -123,7 +123,10 @@ describe('AdminProductListService', () => {
     expect(findCategories).toHaveBeenCalledWith({
       orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }, { slug: 'asc' }],
       select: { name: true, slug: true },
-      where: { products: { some: { currency: 'USD' } } },
+      where: {
+        products: { some: { currency: 'USD' } },
+        slug: { in: ['hops', 'malts', 'yeast', 'adjuncts'] },
+      },
     });
     expect(result.items[0]).toMatchObject({
       lifecycleStatus: 'SCHEDULED',

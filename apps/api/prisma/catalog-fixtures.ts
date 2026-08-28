@@ -1,5 +1,9 @@
-export type CatalogCategorySlug =
-  'adjuncts' | 'hops' | 'kits' | 'malts' | 'yeast';
+import {
+  CATALOG_INGREDIENT_PRODUCT_TYPES,
+  type CatalogIngredientProductTypeSlug,
+} from '../src/catalog/catalog-product-types';
+
+export type CatalogCategorySlug = CatalogIngredientProductTypeSlug | 'kits';
 
 export type CatalogProductSlug =
   | 'caramel-malt'
@@ -52,30 +56,7 @@ export type CatalogProductFixture = {
 };
 
 export const catalogCategories: CatalogCategoryFixture[] = [
-  {
-    displayOrder: 1,
-    id: '10000000-0000-4000-8000-000000000001',
-    name: 'Hops',
-    slug: 'hops',
-  },
-  {
-    displayOrder: 2,
-    id: '10000000-0000-4000-8000-000000000002',
-    name: 'Malts',
-    slug: 'malts',
-  },
-  {
-    displayOrder: 3,
-    id: '10000000-0000-4000-8000-000000000003',
-    name: 'Yeast',
-    slug: 'yeast',
-  },
-  {
-    displayOrder: 4,
-    id: '10000000-0000-4000-8000-000000000004',
-    name: 'Adjuncts',
-    slug: 'adjuncts',
-  },
+  ...CATALOG_INGREDIENT_PRODUCT_TYPES,
   {
     displayOrder: 5,
     id: '10000000-0000-4000-8000-000000000005',
