@@ -1,1 +1,10 @@
+set -e
+
+if ! command -v ggshield >/dev/null 2>&1; then
+  echo "ggshield is required to commit. Install it, run 'ggshield auth login', and ensure it is on PATH." >&2
+  exit 1
+fi
+
+unset GITGUARDIAN_EXIT_ZERO GITGUARDIAN_FAIL_ON_SERVER_ERROR SKIP
 pnpm exec lint-staged
+exec ggshield secret scan pre-commit --scan-all-merge-files --fail-on-server-error

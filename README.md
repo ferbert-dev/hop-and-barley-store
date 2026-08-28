@@ -74,20 +74,20 @@ security contract.
 
 ## Technology Stack
 
-| Area                 | Technology                                              | Role                                                        |
-| -------------------- | ------------------------------------------------------- | ----------------------------------------------------------- |
-| Runtime              | Node.js `24.5.0`, pnpm `11.21.0`                        | Reproducible workspace runtime and package manager          |
-| Monorepo             | Turborepo `2.10.9`                                      | Task graph, caching, and shared root commands               |
-| Frontend             | Next.js `16.3.1`, React `19.2.8`, Tailwind CSS `4`      | App Router storefront and server rendering                  |
-| Backend              | NestJS `11`, TypeScript, class-validator, Helmet        | Modular REST API and input/security boundaries              |
-| API documentation    | `@nestjs/swagger` `11.4.6`, OpenAPI 3                   | Interactive docs and machine-readable contract              |
-| Data                 | PostgreSQL `17.6`, Prisma `7.9.1`, `@prisma/adapter-pg` | Relational storage, migrations, seed, and typed data access |
-| Typed API client     | `openapi-typescript` `7.13.0`, `openapi-fetch` `0.17.0` | Generated frontend-safe API types and client wrapper        |
-| Web tests            | Vitest, React Testing Library                           | Unit and component behavior                                 |
-| API tests            | Jest, Supertest                                         | Service rules and HTTP contract                             |
-| Browser tests        | Playwright `1.62.1`                                     | Real full-stack user flow                                   |
-| Quality              | ESLint 9, Prettier 3, Husky 9, lint-staged, Commitlint  | Static analysis, formatting, and commit discipline          |
-| Local infrastructure | Docker Engine + Docker Compose                          | Reproducible web/API/database environment                   |
+| Area                 | Technology                                                       | Role                                                                       |
+| -------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Runtime              | Node.js `24.5.0`, pnpm `11.21.0`                                 | Reproducible workspace runtime and package manager                         |
+| Monorepo             | Turborepo `2.10.9`                                               | Task graph, caching, and shared root commands                              |
+| Frontend             | Next.js `16.3.1`, React `19.2.8`, Tailwind CSS `4`               | App Router storefront and server rendering                                 |
+| Backend              | NestJS `11`, TypeScript, class-validator, Helmet                 | Modular REST API and input/security boundaries                             |
+| API documentation    | `@nestjs/swagger` `11.4.6`, OpenAPI 3                            | Interactive docs and machine-readable contract                             |
+| Data                 | PostgreSQL `17.6`, Prisma `7.9.1`, `@prisma/adapter-pg`          | Relational storage, migrations, seed, and typed data access                |
+| Typed API client     | `openapi-typescript` `7.13.0`, `openapi-fetch` `0.17.0`          | Generated frontend-safe API types and client wrapper                       |
+| Web tests            | Vitest, React Testing Library                                    | Unit and component behavior                                                |
+| API tests            | Jest, Supertest                                                  | Service rules and HTTP contract                                            |
+| Browser tests        | Playwright `1.62.1`                                              | Real full-stack user flow                                                  |
+| Quality              | ESLint 9, Prettier 3, Husky 9, lint-staged, Commitlint, ggshield | Static analysis, formatting, commit discipline, and local secret detection |
+| Local infrastructure | Docker Engine + Docker Compose                                   | Reproducible web/API/database environment                                  |
 
 ## Repository Layout
 
@@ -111,6 +111,7 @@ docs/                    # Product brief, architecture blueprint, workflow docs
 
 - Node.js `24.5.0` (see `.node-version` and `.nvmrc`);
 - pnpm `11.21.0` through Corepack;
+- [GitGuardian `ggshield`](https://docs.gitguardian.com/ggshield-docs/getting-started), authenticated locally with `ggshield auth login`;
 - Docker Engine or Docker Desktop with Compose.
 
 Verify the runtime before installing dependencies:
@@ -154,6 +155,32 @@ Do not use `docker compose down -v`, delete a volume, or reset Prisma unless the
 | `pnpm check:full`                      | Run `check` plus API/browser e2e tests; the local stack must be available |
 
 Environment templates live at `.env.example` and inside each app. Real `.env*` files and secrets are ignored and must never be committed.
+
+### Secret-protection hooks
+
+Husky runs two repository-owned, fail-closed GitGuardian checks:
+
+- `pre-commit` runs `lint-staged`, then scans the final staged snapshot,
+  including cleanly merged files;
+- `pre-push` scans each ref update supplied by Git, forwards the target remote to
+  `ggshield`, and raises the scan limit to the repository's local commit count.
+
+Both hooks reject the Git operation when `ggshield` is missing, cannot complete
+the scan, or reports a secret. Keep GitGuardian authentication outside this
+repository, ensure `ggshield` is visible on `PATH` to terminal and GUI Git
+clients, and never pass `--exit-zero`. The repository-owned
+`.gitguardian.yaml`, explicit server-error flags, and sanitized inherited
+environment keep the hooks fail-closed even when a developer's global
+GitGuardian settings are weaker. Verify this hook contract without credentials
+or real secret material:
+
+```bash
+pnpm secret-hooks:check
+```
+
+Local hooks can still be bypassed deliberately with Git's `--no-verify` option
+or `HUSKY=0`. GitGuardian's pull-request scan is therefore the server-side
+backstop; repository rules should keep that check required before merge.
 
 ## Current Slice and Planned Shop
 

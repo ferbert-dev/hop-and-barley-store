@@ -41,6 +41,7 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
     'pnpm install --frozen-lockfile --ignore-scripts',
     'pnpm clean',
     'pnpm ci:contract',
+    'pnpm secret-hooks:check',
     'pnpm generated:verify',
     'pnpm exec turbo run typecheck --force',
     'pnpm format:check',

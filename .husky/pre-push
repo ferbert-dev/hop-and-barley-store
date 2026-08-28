@@ -1,0 +1,29 @@
+set -e
+
+if ! command -v ggshield >/dev/null 2>&1; then
+  echo "ggshield is required to push. Install it, run 'ggshield auth login', and ensure it is on PATH." >&2
+  exit 1
+fi
+
+unset GITGUARDIAN_EXIT_ZERO GITGUARDIAN_FAIL_ON_SERVER_ERROR SKIP
+
+GITGUARDIAN_MAX_COMMITS_FOR_HOOK=$(git rev-list --count --all)
+export GITGUARDIAN_MAX_COMMITS_FOR_HOOK
+
+while IFS=' ' read -r ggshield_local_ref ggshield_local_sha ggshield_remote_ref ggshield_remote_sha ggshield_extra; do
+  if [ -z "$ggshield_local_ref" ] ||
+    [ -z "$ggshield_local_sha" ] ||
+    [ -z "$ggshield_remote_ref" ] ||
+    [ -z "$ggshield_remote_sha" ] ||
+    [ -n "$ggshield_extra" ]; then
+    echo "Cannot scan push: Git supplied an invalid ref update." >&2
+    exit 1
+  fi
+
+  if [ "$ggshield_local_sha" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+
+  printf '%s %s %s %s\n' "$ggshield_local_ref" "$ggshield_local_sha" "$ggshield_remote_ref" "$ggshield_remote_sha" |
+    ggshield secret scan pre-push --fail-on-server-error "$@" || exit $?
+done
