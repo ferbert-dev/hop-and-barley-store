@@ -94,7 +94,7 @@ describe('Users self-resource API', () => {
       .expect(404);
   });
 
-  it.each(['role', 'status', 'password', 'sessionId', 'userId'])(
+  it.each(['email', 'role', 'status', 'password', 'sessionId', 'userId'])(
     'rejects writable %s before the service runs',
     async (field) => {
       const csrf = await csrfToken();
@@ -103,7 +103,14 @@ describe('Users self-resource API', () => {
         .set('Cookie', COOKIE)
         .set('Origin', 'http://localhost:3000')
         .set('X-CSRF-Token', csrf)
-        .send({ [field]: field === 'userId' ? OTHER_USER_ID : 'ADMIN' })
+        .send({
+          [field]:
+            field === 'email'
+              ? 'other@example.com'
+              : field === 'userId'
+                ? OTHER_USER_ID
+                : 'ADMIN',
+        })
         .expect(400);
       expect(users.updateCurrent).not.toHaveBeenCalled();
     },
@@ -134,13 +141,11 @@ describe('Users self-resource API', () => {
       .set('Origin', 'http://localhost:3000')
       .set('X-CSRF-Token', csrf)
       .send({
-        email: 'Brew.Master@example.com',
         primaryAddress: { city: 'Madrid' },
         profile: { phone: '  +49 123  ' },
       })
       .expect(200);
     expect(users.updateCurrent).toHaveBeenCalledWith(USER_ID, {
-      email: 'Brew.Master@example.com',
       primaryAddress: { city: 'Madrid' },
       profile: { phone: '  +49 123  ' },
     });

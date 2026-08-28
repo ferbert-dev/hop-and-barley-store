@@ -915,7 +915,6 @@ export interface components {
             additionalInfo?: string | null;
         };
         UpdateCurrentUserDto: {
-            email?: string;
             profile?: components["schemas"]["CustomerProfilePatchDto"] | null;
             primaryAddress?: components["schemas"]["PrimaryAddressPatchDto"] | null;
         };

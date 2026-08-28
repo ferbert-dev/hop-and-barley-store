@@ -77,12 +77,6 @@ export class PrimaryAddressPatchDto {
 }
 
 export class UpdateCurrentUserDto {
-  @ApiPropertyOptional({ maxLength: 320, type: String })
-  @IsOptional()
-  @IsString()
-  @MaxLength(320)
-  email?: string;
-
   @ApiPropertyOptional({
     nullable: true,
     type: () => CustomerProfilePatchDto,

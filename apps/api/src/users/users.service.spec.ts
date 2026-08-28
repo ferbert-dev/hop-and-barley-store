@@ -45,7 +45,7 @@ describe('UsersService self-profile', () => {
     );
   });
 
-  it('uses only the supplied session user id and writes user/profile/address in one transaction', async () => {
+  it('uses only the supplied session user id and writes profile/address in one transaction', async () => {
     const transaction = transactionClient();
     const prisma = {
       $transaction: jest.fn(
@@ -56,7 +56,6 @@ describe('UsersService self-profile', () => {
     const service = new UsersService(prisma as never);
 
     await service.updateCurrent(USER_ID, {
-      email: 'Brew.Master@Example.com',
       primaryAddress: { city: 'Madrid' },
       profile: { fullName: 'Brew Master', phone: '  +49 123  ' },
     });
@@ -64,14 +63,6 @@ describe('UsersService self-profile', () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(transaction.user.findUnique).toHaveBeenCalledWith({
       select: { id: true, status: true },
-      where: { id: USER_ID },
-    });
-    expect(transaction.user.update).toHaveBeenCalledWith({
-      data: {
-        email: 'Brew.Master@Example.com',
-        normalizedEmail: 'brew.master@example.com',
-      },
-      select: { id: true },
       where: { id: USER_ID },
     });
     expect(transaction.customerProfile.upsert).toHaveBeenCalledWith({
@@ -87,33 +78,6 @@ describe('UsersService self-profile', () => {
       create: { city: 'Madrid', userId: USER_ID },
       update: { city: 'Madrid' },
       where: { userId: USER_ID },
-    });
-  });
-
-  it('maps the normalized-email uniqueness race to the generic invalid-profile response', async () => {
-    const prisma = {
-      $transaction: jest.fn().mockRejectedValue({
-        code: 'P2002',
-        meta: {
-          driverAdapterError: {
-            cause: {
-              constraint: { index: 'User_normalizedEmail_key' },
-              kind: 'UniqueConstraintViolation',
-            },
-          },
-        },
-      }),
-    };
-    const service = new UsersService(prisma as never);
-
-    await expect(
-      service.updateCurrent(USER_ID, { email: 'taken@example.com' }),
-    ).rejects.toMatchObject({
-      response: {
-        message: 'Review your account information and try again.',
-        status: 'invalid-profile',
-      },
-      status: 400,
     });
   });
 
@@ -208,7 +172,6 @@ function transactionClient() {
         .fn()
         .mockResolvedValue({ id: USER_ID, status: 'ACTIVE' }),
       findUniqueOrThrow: jest.fn().mockResolvedValue(currentUser()),
-      update: jest.fn().mockResolvedValue({ id: USER_ID }),
     },
   };
 }

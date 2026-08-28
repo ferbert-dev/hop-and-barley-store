@@ -42,7 +42,6 @@ type ProfileValues = {
   apartmentUnit: string;
   city: string;
   country: string;
-  email: string;
   floor: string;
   fullName: string;
   houseNumber: string;
@@ -113,21 +112,62 @@ export function AccountProfileForm({
     setFeedback(null);
 
     const result = await saveProfileFromBrowser(toProfilePatch(values));
-    setSaving(false);
 
     if (result.kind === 'unauthenticated') {
+      setSaving(false);
       redirectToLogin();
       return;
     }
     if (result.kind === 'saved') {
       setProfile(result.profile);
       setValues(profileToValues(result.profile));
+
+      if (selectedAvatar) {
+        const avatarResult = await saveAvatarFromBrowser(selectedAvatar);
+        setSaving(false);
+
+        if (avatarResult.kind === 'unauthenticated') {
+          redirectToLogin();
+          return;
+        }
+        if (avatarResult.kind === 'saved') {
+          setProfile({
+            ...result.profile,
+            profile: {
+              avatar: avatarResult.avatar,
+              fullName: result.profile.profile?.fullName ?? null,
+              phone: result.profile.profile?.phone ?? null,
+            },
+          });
+          clearSelectedAvatar();
+          if (avatarInputRef.current) avatarInputRef.current.value = '';
+          setFeedback({
+            kind: 'success',
+            message: 'Your account information and profile photo were saved.',
+          });
+          return;
+        }
+
+        setFeedback({
+          kind: 'error',
+          message:
+            avatarResult.kind === 'too-large'
+              ? 'Your account information was saved, but the profile photo is too large.'
+              : avatarResult.kind === 'invalid'
+                ? 'Your account information was saved, but the profile photo is not a valid JPEG, PNG, or WebP image.'
+                : 'Your account information was saved, but the profile photo could not be updated. Please try again.',
+        });
+        return;
+      }
+
+      setSaving(false);
       setFeedback({
         kind: 'success',
         message: 'Your account information was saved.',
       });
       return;
     }
+    setSaving(false);
     setFeedback({
       kind: 'error',
       message:
@@ -167,46 +207,6 @@ export function AccountProfileForm({
     previewUrlRef.current = nextPreviewUrl;
     setPreviewUrl(nextPreviewUrl);
     setSelectedAvatar(file);
-  };
-
-  const uploadAvatar = async () => {
-    if (!selectedAvatar) return;
-    setAvatarPending(true);
-    setFeedback(null);
-
-    const result = await saveAvatarFromBrowser(selectedAvatar);
-    setAvatarPending(false);
-
-    if (result.kind === 'unauthenticated') {
-      redirectToLogin();
-      return;
-    }
-    if (result.kind === 'saved') {
-      setProfile((current) => ({
-        ...current,
-        profile: {
-          avatar: result.avatar,
-          fullName: current.profile?.fullName ?? null,
-          phone: current.profile?.phone ?? null,
-        },
-      }));
-      clearSelectedAvatar();
-      if (avatarInputRef.current) avatarInputRef.current.value = '';
-      setFeedback({
-        kind: 'success',
-        message: 'Your profile photo was updated.',
-      });
-      return;
-    }
-    setFeedback({
-      kind: 'error',
-      message:
-        result.kind === 'too-large'
-          ? 'Choose a profile photo smaller than 2 MB.'
-          : result.kind === 'invalid'
-            ? 'Choose a valid JPEG, PNG, or WebP image.'
-            : 'Your profile photo could not be updated. Please try again.',
-    });
   };
 
   const deleteAvatar = async () => {
@@ -308,19 +308,11 @@ export function AccountProfileForm({
                   Choose image
                 </label>
                 {selectedAvatar ? (
-                  <p className={styles.selectedFile}>{selectedAvatar.name}</p>
+                  <p className={styles.selectedFile}>
+                    {selectedAvatar.name} will be uploaded when you save.
+                  </p>
                 ) : null}
                 <div className={styles.inlineActions}>
-                  <Button
-                    disabled={!selectedAvatar}
-                    onClick={() => void uploadAvatar()}
-                    pending={avatarPending}
-                    pendingLabel="Uploading…"
-                    type="button"
-                    variant="secondary"
-                  >
-                    Upload photo
-                  </Button>
                   {avatar ? (
                     <Button
                       onClick={() => void deleteAvatar()}
@@ -382,17 +374,14 @@ export function AccountProfileForm({
               />
               <Field
                 autoComplete="email"
+                description="Email cannot be changed from account information."
                 id="account-email"
                 inputMode="email"
                 label="Email"
                 maxLength={320}
-                name="email"
-                onChange={(event) =>
-                  setValue('email', event.currentTarget.value)
-                }
-                required
+                readOnly
                 type="email"
-                value={values.email}
+                value={profile.email}
               />
             </div>
           </section>
@@ -545,7 +534,6 @@ function profileToValues(profile: CurrentUserProfile): ProfileValues {
     apartmentUnit: address?.apartmentUnit ?? '',
     city: address?.city ?? '',
     country: address?.country ?? '',
-    email: profile.email,
     floor: address?.floor ?? '',
     fullName: profile.profile?.fullName ?? '',
     houseNumber: address?.houseNumber ?? '',
@@ -571,7 +559,6 @@ function toProfilePatch(values: ProfileValues): ProfilePatch {
   );
 
   return {
-    email: values.email,
     primaryAddress: addressIsEmpty ? null : address,
     profile: {
       fullName: optionalValue(values.fullName),
