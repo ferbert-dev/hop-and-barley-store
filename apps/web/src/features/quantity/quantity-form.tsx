@@ -6,7 +6,6 @@ import { Button } from '../../components/ui/button';
 import { Price } from '../../components/ui/price';
 import {
   estimateLineTotalMinor,
-  formatAmount,
   formatPackageNetWeight,
   formatWeightInput,
   parseWeightInput,
@@ -217,18 +216,14 @@ function QuantityFormEditor({
       </div>
       {mode === 'submit' ? (
         <>
-          <p className={styles.selectedAmount} aria-live="polite">
-            {formatAmount(selectedAmount, metadata)} selected
-          </p>
           {formatPackageNetWeight(metadata) ? (
             <p className={styles.supportingText}>
               {formatPackageNetWeight(metadata)}
             </p>
           ) : null}
           {estimatedPrice !== null ? (
-            <p className={styles.estimate}>
-              Selection price{' '}
-              <Price currency={currency} minorUnits={estimatedPrice} />
+            <p aria-live="polite" className={styles.estimate}>
+              Price <Price currency={currency} minorUnits={estimatedPrice} />
             </p>
           ) : null}
         </>

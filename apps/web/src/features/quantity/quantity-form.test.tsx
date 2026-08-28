@@ -33,10 +33,11 @@ describe('QuantityForm', () => {
     const input = screen.getByLabelText('Quantity');
     expect(input).toHaveValue('0.1');
     expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.getByText('Price')).toHaveTextContent('US$5.99');
     await user.clear(input);
     await user.type(input, '0.9');
-    expect(screen.getByText('900g selected')).toBeVisible();
-    expect(screen.getByText('Selection price')).toHaveTextContent('US$53.91');
+    expect(screen.queryByText(/selected$/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Price')).toHaveTextContent('US$53.91');
     await user.click(screen.getByRole('button', { name: 'Add to Cart' }));
     expect(onSubmit).toHaveBeenCalledWith(900_000);
   });
@@ -75,7 +76,8 @@ describe('QuantityForm', () => {
     await user.click(
       screen.getByRole('button', { name: 'Increase weight amount' }),
     );
-    expect(screen.getByText('200g selected')).toBeVisible();
+    expect(screen.queryByText(/selected$/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Price')).toHaveTextContent('US$11.98');
     await user.clear(screen.getByLabelText('Quantity'));
     await user.type(screen.getByLabelText('Quantity'), '0.15');
     await user.click(screen.getByRole('button', { name: 'Update cart' }));
@@ -137,7 +139,8 @@ describe('QuantityForm', () => {
     );
 
     expect(screen.getByLabelText('Quantity')).toHaveValue('0.2');
-    expect(screen.getByText('200g selected')).toBeVisible();
+    expect(screen.queryByText(/selected$/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Price')).toHaveTextContent('US$11.98');
   });
 
   it('auto-commits step buttons and valid direct entry without redundant summary UI', async () => {
@@ -177,7 +180,7 @@ describe('QuantityForm', () => {
     expect(onSubmit).toHaveBeenLastCalledWith(1_100_000);
     expect(onSubmit).toHaveBeenCalledTimes(3);
     expect(screen.queryByText(/selected$/i)).not.toBeInTheDocument();
-    expect(screen.queryByText('Selection price')).not.toBeInTheDocument();
+    expect(screen.queryByText('Price')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /update/i }),
     ).not.toBeInTheDocument();

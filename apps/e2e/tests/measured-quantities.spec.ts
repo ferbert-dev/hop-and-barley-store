@@ -46,7 +46,8 @@ test.describe('measured product quantities', () => {
     await amount.fill('0.9');
     await amount.press('Tab');
     await expect(amount).toHaveValue('0.9');
-    await expect(page.getByText('900g selected')).toBeVisible();
+    await expect(page.getByText(/selected$/i)).toHaveCount(0);
+    await expect(page.getByText(/^Price\b/)).toBeVisible();
     await expect(
       page.getByText('US$53.91', { exact: true }).first(),
     ).toBeVisible();
@@ -54,7 +55,6 @@ test.describe('measured product quantities', () => {
     await amount.fill('10');
     await amount.press('Tab');
     await expect(amount).toHaveValue('10');
-    await expect(page.getByText(/10\s*kg/i).first()).toBeVisible();
     await expect(
       page.getByText('US$599.00', { exact: true }).first(),
     ).toBeVisible();
@@ -62,7 +62,6 @@ test.describe('measured product quantities', () => {
     await amount.fill('100');
     await amount.press('Tab');
     await expect(amount).toHaveValue('100');
-    await expect(page.getByText(/100\s*kg/i).first()).toBeVisible();
     await expect(
       page.getByText('US$5,990.00', { exact: true }).first(),
     ).toBeVisible();
@@ -172,8 +171,10 @@ test.describe('measured product quantities', () => {
     });
     await page.getByRole('link', { name: /Shopping cart, 1 item/ }).click();
     await expect(
-      page.getByText(/2\s*(?:packs?|sachets?)/i).first(),
-    ).toBeVisible();
+      page
+        .getByLabel('SafAle US-05 Dry Ale Yeast quantity')
+        .getByLabel('Packs'),
+    ).toHaveValue('2');
     await expect(page.getByText(/23(?:\.0+)?\s*g/i).first()).toBeVisible();
 
     await page.goto('/product/imperial-yeast');
@@ -246,7 +247,8 @@ test.describe('measured product quantities', () => {
     await increase.focus();
     await page.keyboard.press('Enter');
     await expect(amount).toHaveValue('1');
-    await expect(page.getByText('1kg selected')).toBeVisible();
+    await expect(page.getByText(/selected$/i)).toHaveCount(0);
+    await expect(page.getByText(/^Price\b/)).toBeVisible();
 
     const overflow = await page.evaluate(
       () =>
