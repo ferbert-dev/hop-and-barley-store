@@ -31,9 +31,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    command: >-
-      sh -c "pnpm --filter @hop-and-barley/api db:migrate:deploy &&
-      pnpm --filter @hop-and-barley/api db:seed"
+      target: migrate
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,8 +42,10 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      target: api
+    image: ${COMPOSE_PROJECT_NAME:-hop-and-barley}-api:latest
     depends_on:
-      migrate:
+      seed:
         condition: service_completed_successfully
     environment:
       <<: *api-environment
@@ -77,6 +77,15 @@ services:
     volumes:
       - product-assets:/var/lib/hop-and-barley/product-assets
 
+  seed:
+    image: ${COMPOSE_PROJECT_NAME:-hop-and-barley}-api:latest
+    command: ['node', 'dist/seed/prisma/seed.js']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment: *api-environment
+    restart: 'no'
+
   web:
     build:
       args:
@@ -84,6 +93,7 @@ services:
         NEXT_PUBLIC_API_HOST_ALIASES: ${NEXT_PUBLIC_API_HOST_ALIASES:?Set NEXT_PUBLIC_API_HOST_ALIASES in the root .env}
       context: .
       dockerfile: apps/web/Dockerfile
+      target: web
     depends_on:
       api:
         condition: service_healthy

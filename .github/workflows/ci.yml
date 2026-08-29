@@ -127,7 +127,7 @@ jobs:
       - name: Start the isolated full stack
         run: docker compose up -d --build --wait
       - name: Provision the isolated browser-test administrator
-        run: docker compose exec -T -e HB_LOCAL_ADMIN_PASSWORD api pnpm --filter @hop-and-barley/api admin:provision:local
+        run: docker compose exec -T -e HB_LOCAL_ADMIN_PASSWORD api node dist/seed/scripts/provision-local-admin.js
       - name: Test the connected storefront
         run: pnpm --filter @hop-and-barley/e2e test:e2e
       - name: Remove only the isolated API service

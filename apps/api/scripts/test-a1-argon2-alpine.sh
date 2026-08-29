@@ -9,11 +9,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker build --file "$repo_root/apps/api/Dockerfile" --tag "$image_name" "$repo_root" >/dev/null
+docker build \
+  --file "$repo_root/apps/api/Dockerfile" \
+  --target api \
+  --tag "$image_name" \
+  "$repo_root" >/dev/null
 docker run --rm \
   --cpus 1 \
   --memory 512m \
   --network none \
   --pids-limit 256 \
+  --volume "$repo_root/apps/api/scripts/benchmark-a1-argon2.mjs:/app/benchmark-a1-argon2.mjs:ro" \
   "$image_name" \
-  node apps/api/scripts/benchmark-a1-argon2.mjs
+  node /app/benchmark-a1-argon2.mjs
