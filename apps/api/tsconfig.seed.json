@@ -10,6 +10,7 @@
   "include": [
     "prisma/seed.ts",
     "prisma/catalog-fixtures.ts",
+    "scripts/provision-local-admin.ts",
     "src/catalog/catalog-product-types.ts",
     "src/generated/prisma/**/*.ts"
   ]

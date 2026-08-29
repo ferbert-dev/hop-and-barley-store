@@ -29,5 +29,7 @@
 **/*.tsbuildinfo
 apps/api/README.md
 apps/api/scripts
+!apps/api/scripts/
+!apps/api/scripts/provision-local-admin.ts
 apps/api/src/generated
 apps/api/test
