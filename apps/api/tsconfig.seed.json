@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "incremental": false,
+    "outDir": "./dist/seed",
+    "rootDir": ".",
+    "sourceMap": false
+  },
+  "include": [
+    "prisma/seed.ts",
+    "prisma/catalog-fixtures.ts",
+    "src/catalog/catalog-product-types.ts",
+    "src/generated/prisma/**/*.ts"
+  ]
+}

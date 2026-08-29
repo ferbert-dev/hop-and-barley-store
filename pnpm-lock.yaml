@@ -68,6 +68,9 @@ importers:
       class-validator:
         specifier: 0.15.1
         version: 0.15.1
+      dotenv:
+        specifier: 17.4.1
+        version: 17.4.1
       helmet:
         specifier: 8.3.0
         version: 8.3.0
@@ -165,6 +168,15 @@ importers:
       typescript-eslint:
         specifier: ^8.20.0
         version: 8.67.0(eslint@9.39.5(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.9.3)
+
+  apps/api-migrate:
+    dependencies:
+      dotenv:
+        specifier: 17.4.1
+        version: 17.4.1
+      prisma:
+        specifier: 7.9.1
+        version: 7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)
 
   apps/e2e:
     devDependencies:
