@@ -43,7 +43,7 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
       target: api
-    image: hop-and-barley-api:latest
+    image: ${COMPOSE_PROJECT_NAME:-hop-and-barley}-api:latest
     depends_on:
       seed:
         condition: service_completed_successfully
@@ -78,7 +78,7 @@ services:
       - product-assets:/var/lib/hop-and-barley/product-assets
 
   seed:
-    image: hop-and-barley-api:latest
+    image: ${COMPOSE_PROJECT_NAME:-hop-and-barley}-api:latest
     command: ['node', 'dist/seed/prisma/seed.js']
     depends_on:
       migrate:

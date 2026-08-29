@@ -67,7 +67,9 @@ WORKDIR /app
 
 COPY --from=builder /opt/api/package.json ./package.json
 COPY --from=builder /opt/api/node_modules ./node_modules
-COPY --from=builder /opt/auth-contract ./packages/auth-contract
+COPY --from=builder /opt/auth-contract/package.json ./packages/auth-contract/package.json
+COPY --from=builder /opt/auth-contract/node_modules ./packages/auth-contract/node_modules
+COPY --from=builder /opt/auth-contract/dist ./packages/auth-contract/dist
 COPY --from=builder /workspace/apps/api/dist ./dist
 
 RUN rm -f node_modules/@hop-and-barley/auth-contract && \
@@ -86,7 +88,8 @@ WORKDIR /app
 
 COPY --from=builder /opt/migrate/package.json ./package.json
 COPY --from=builder /opt/migrate/node_modules ./node_modules
-COPY --from=builder /workspace/apps/api/prisma ./prisma
+COPY --from=builder /workspace/apps/api/prisma/schema.prisma ./prisma/schema.prisma
+COPY --from=builder /workspace/apps/api/prisma/migrations ./prisma/migrations
 COPY --from=builder /workspace/apps/api/prisma.config.ts ./prisma.config.ts
 
 CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
