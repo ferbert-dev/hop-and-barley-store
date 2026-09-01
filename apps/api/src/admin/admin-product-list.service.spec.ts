@@ -133,6 +133,7 @@ describe('AdminProductListService', () => {
       },
       where: {
         products: { some: { currency: 'USD' } },
+        slug: { in: ['hops', 'malts', 'yeast', 'adjuncts'] },
       },
     });
     expect(result.items[0]).toMatchObject({

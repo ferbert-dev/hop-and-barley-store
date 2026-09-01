@@ -4,19 +4,23 @@ import {
 } from './catalog-list-query';
 
 describe('catalog Product Type facets', () => {
-  it.each(['public', 'admin'] as const)(
-    'discovers %s selectors from categories with matching products',
-    (visibility) => {
-      expect(buildCatalogFacetQuery(visibility)).toMatchObject({
-        where: {
-          products: { some: { currency: 'USD' } },
-        },
-      });
-      expect(buildCatalogFacetQuery(visibility).where).not.toHaveProperty(
-        'slug',
-      );
-    },
-  );
+  it('discovers public selectors from categories with matching products', () => {
+    expect(buildCatalogFacetQuery('public')).toMatchObject({
+      where: {
+        products: { some: { currency: 'USD' } },
+      },
+    });
+    expect(buildCatalogFacetQuery('public').where).not.toHaveProperty('slug');
+  });
+
+  it('preserves the ingredient-only admin selector boundary', () => {
+    expect(buildCatalogFacetQuery('admin')).toMatchObject({
+      where: {
+        products: { some: { currency: 'USD' } },
+        slug: { in: ['hops', 'malts', 'yeast', 'adjuncts'] },
+      },
+    });
+  });
 });
 
 describe('public product activity windows', () => {
