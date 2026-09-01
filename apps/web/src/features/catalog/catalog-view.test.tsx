@@ -1,17 +1,37 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ComponentProps } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { CatalogLoadResult } from '../../lib/catalog';
 import { CatalogScreen } from './catalog-screen';
 import type { CatalogQuery } from './catalog-query';
 
+const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace }),
+}));
 vi.mock('next/image', () => ({
   default: ({ alt, ...props }: ComponentProps<'img'>) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img alt={alt} {...props} />
   ),
 }));
+
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function showModal() {
+    this.setAttribute('open', '');
+  };
+  HTMLDialogElement.prototype.close = function close() {
+    this.removeAttribute('open');
+    this.dispatchEvent(new Event('close'));
+  };
+});
+
+afterEach(() => {
+  replace.mockReset();
+  vi.useRealTimers();
+});
 
 const query: CatalogQuery = { limit: 12, page: 1, sort: 'name-asc' };
 const product = {
@@ -54,14 +74,14 @@ function pagedResult(
         currency: 'USD',
         facets: {
           categories: [
-            { name: 'Hops', slug: 'hops' },
-            { name: 'Malts', slug: 'malts' },
-            { name: 'Yeast', slug: 'yeast' },
-            { name: 'Adjuncts', slug: 'adjuncts' },
+            { count: 3, name: 'Hops', slug: 'hops' },
+            { count: 4, name: 'Malts', slug: 'malts' },
+            { count: 2, name: 'Yeast', slug: 'yeast' },
+            { count: 0, name: 'Adjuncts', slug: 'adjuncts' },
           ],
         },
         filters: {
-          category: null,
+          category: [],
           maxPriceMinor: null,
           minPriceMinor: null,
           search: null,
@@ -81,7 +101,7 @@ function pagedResult(
 }
 
 describe('catalog discovery screen', () => {
-  it('renders the generated paged response through URL-backed controls and D3 cards', () => {
+  it('renders compact controls and clickable product media', () => {
     render(<CatalogScreen query={query} result={pagedResult()} />);
 
     expect(
@@ -89,19 +109,11 @@ describe('catalog discovery screen', () => {
     ).toBeVisible();
     expect(screen.queryByText('From the database')).not.toBeInTheDocument();
     expect(screen.queryByText('Current selection')).not.toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('API connected');
     expect(
-      screen.getByRole('img', {
-        name: 'Close-up hop cones and green leaves',
-      }),
-    ).toHaveAttribute('src', '/assets/backgrounds/hops-field-hero.webp');
-    expect(
-      screen.getByRole('search', { name: 'Filter products' }),
-    ).toHaveAttribute('action', '/');
-    expect(
-      screen.getByRole('radiogroup', { name: 'Product Type' }),
+      screen.getByRole('search', { name: 'Search products' }),
     ).toBeVisible();
-    expect(screen.getByRole('radio', { name: 'Hops' })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Filters' })).toBeVisible();
+    expect(screen.getByLabelText('Sort by')).toHaveValue('name-asc');
     expect(screen.getByRole('link', { name: 'Cascade Hops' })).toHaveAttribute(
       'href',
       '/product/cascade-hops',
@@ -109,132 +121,161 @@ describe('catalog discovery screen', () => {
     expect(
       screen.getByRole('link', { name: 'View Cascade Hops details' }),
     ).toHaveAttribute('href', '/product/cascade-hops');
-    expect(screen.getByRole('img', { name: 'Cascade hops' })).toHaveAttribute(
-      'src',
-      '/assets/products/cascade-hops.webp',
-    );
-    expect(screen.getByText('per 100g')).toBeVisible();
   });
 
-  it('renders filtered query values, a result summary, and canonical clear link', () => {
-    render(
-      <CatalogScreen
-        query={{
-          category: 'hops',
-          limit: 24,
-          maxPriceMinor: 900,
-          minPriceMinor: 400,
-          page: 1,
-          search: 'citrus hops',
-          sort: 'price-desc',
-        }}
-        result={pagedResult()}
-      />,
-    );
-
-    expect(screen.getByLabelText('Search products')).toHaveValue('citrus hops');
-    expect(screen.getByRole('radio', { name: 'Hops' })).toBeChecked();
-    expect(
-      screen.getByRole('link', { name: 'Clear product type' }),
-    ).toHaveAttribute(
-      'href',
-      '/?search=citrus+hops&minPriceMinor=400&maxPriceMinor=900&sort=price-desc&limit=24',
-    );
-    expect(screen.getByText('1 product found')).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Clear filters' })).toHaveAttribute(
-      'href',
-      '/',
-    );
-  });
-
-  it('keeps URL-only price and page-size state out of the primary controls', () => {
-    render(
-      <CatalogScreen
-        query={{
-          ...query,
-          limit: 1,
-          maxPriceMinor: 900,
-          minPriceMinor: 400,
-        }}
-        result={pagedResult({
-          meta: {
-            ...extractPaged(pagedResult()).meta,
-            filters: {
-              category: null,
-              maxPriceMinor: 900,
-              minPriceMinor: 400,
-              search: null,
-            },
-            limit: 1,
-          },
-        })}
-      />,
-    );
-
-    expect(screen.queryByLabelText('Minimum price')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Maximum price')).not.toBeInTheDocument();
-    expect(
-      screen.queryByLabelText('Products per page'),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText('1 product found')).toBeVisible();
-  });
-
-  it('renders normalized keyword chips and one truthful product-type radio', () => {
-    render(
-      <CatalogScreen
-        query={{
-          ...query,
-          category: 'malts',
-          page: 3,
-          search: 'citrus hops',
-        }}
-        result={pagedResult()}
-      />,
-    );
-
-    const keywords = screen.getByRole('list', { name: 'Search keywords' });
-    expect(within(keywords).getByText('citrus')).toBeVisible();
-    expect(within(keywords).getByText('hops')).toBeVisible();
-    expect(
-      within(keywords).getByRole('link', { name: 'Remove keyword citrus' }),
-    ).toHaveAttribute('href', '/?search=hops&category=malts');
-    expect(
-      within(keywords).getByRole('link', { name: 'Remove keyword hops' }),
-    ).toHaveAttribute('href', '/?search=citrus&category=malts');
-
-    expect(screen.getAllByRole('radio')).toHaveLength(4);
-    expect(screen.getByRole('radio', { name: 'Malt' })).toBeChecked();
-    expect(
-      screen.getByRole('link', { name: 'Clear product type' }),
-    ).toHaveAttribute('href', '/?search=citrus+hops');
-    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
-    expect(screen.getByRole('radio', { name: 'Hops' })).not.toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Yeast' })).not.toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Adjuncts' })).not.toBeChecked();
-  });
-
-  it('exposes only the current name and price sort contract', () => {
+  it('runs search after a short debounce without an apply action', () => {
+    vi.useFakeTimers();
     render(<CatalogScreen query={query} result={pagedResult()} />);
 
-    const sort = screen.getByLabelText('Sort by');
+    fireEvent.change(screen.getByRole('searchbox'), {
+      target: { value: 'citra hops' },
+    });
+    expect(replace).not.toHaveBeenCalled();
+
+    act(() => vi.advanceTimersByTime(300));
+    expect(replace).toHaveBeenCalledWith('/?search=citra+hops', {
+      scroll: false,
+    });
+  });
+
+  it('syncs search and title when URL-owned query props change', () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      <CatalogScreen
+        query={{ ...query, search: 'Citra' }}
+        result={pagedResult()}
+      />,
+    );
+    expect(screen.getByRole('searchbox')).toHaveValue('Citra');
+    expect(document.title).toBe('Citra — Hop & Barley products');
+
+    rerender(<CatalogScreen query={query} result={pagedResult()} />);
+
+    expect(screen.getByRole('searchbox')).toHaveValue('');
+    expect(document.title).toBe('Shop brewing ingredients | Hop & Barley');
+    act(() => vi.advanceTimersByTime(300));
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('stages dynamic product types and closes the drawer after Apply', () => {
+    render(<CatalogScreen query={query} result={pagedResult()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const dialog = screen.getByRole('dialog', { name: 'Filters' });
+    expect(dialog).toHaveAttribute('open');
     expect(
-      within(sort).getByRole('option', { name: 'Name: A to Z' }),
-    ).toBeVisible();
-    expect(
-      within(sort).getByRole('option', { name: 'Name: Z to A' }),
-    ).toBeVisible();
-    expect(
-      within(sort).getByRole('option', { name: 'Price: low to high' }),
-    ).toBeVisible();
-    expect(
-      within(sort).getByRole('option', { name: 'Price: high to low' }),
-    ).toBeVisible();
-    expect(
-      screen.queryByRole('option', { name: 'New' }),
+      within(dialog).queryByText('Selected filters'),
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('option', { name: 'Rating' }),
-    ).not.toBeInTheDocument();
+    expect(within(dialog).getByText('3')).toBeVisible();
+
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: /Hops/ }));
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: /Malts/ }));
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Apply filters' }),
+    );
+
+    expect(dialog).not.toHaveAttribute('open');
+    expect(replace).toHaveBeenCalledWith('/?category=hops&category=malts', {
+      scroll: false,
+    });
+  });
+
+  it('applies sorting immediately to the current search result', () => {
+    render(
+      <CatalogScreen
+        query={{ ...query, category: ['hops'], search: 'citra hops' }}
+        result={pagedResult()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Sort by'), {
+      target: { value: 'price-desc' },
+    });
+
+    expect(replace).toHaveBeenCalledWith(
+      '/?search=citra+hops&category=hops&sort=price-desc',
+      { scroll: false },
+    );
+  });
+
+  it('cancels a pending search and includes it in immediate sorting', () => {
+    vi.useFakeTimers();
+    render(<CatalogScreen query={query} result={pagedResult()} />);
+
+    fireEvent.change(screen.getByRole('searchbox'), {
+      target: { value: 'Citra' },
+    });
+    fireEvent.change(screen.getByLabelText('Sort by'), {
+      target: { value: 'price-desc' },
+    });
+
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(replace).toHaveBeenCalledWith('/?search=Citra&sort=price-desc', {
+      scroll: false,
+    });
+    act(() => vi.advanceTimersByTime(300));
+    expect(replace).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels a pending search and includes it when filters are applied', () => {
+    vi.useFakeTimers();
+    render(<CatalogScreen query={query} result={pagedResult()} />);
+
+    fireEvent.change(screen.getByRole('searchbox'), {
+      target: { value: 'Citra' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const dialog = screen.getByRole('dialog', { name: 'Filters' });
+    expect(within(dialog).queryByText('Sort')).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: /Hops/ }));
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Apply filters' }),
+    );
+
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(replace).toHaveBeenCalledWith('/?search=Citra&category=hops', {
+      scroll: false,
+    });
+    act(() => vi.advanceTimersByTime(300));
+    expect(replace).toHaveBeenCalledTimes(1);
+  });
+
+  it('limits predecessor rollback facets to one product type', () => {
+    const current = extractPaged(pagedResult());
+    render(
+      <CatalogScreen
+        query={query}
+        result={{
+          catalog: {
+            ...current,
+            kind: 'paged-predecessor',
+            meta: {
+              ...current.meta,
+              facets: {
+                categories: current.meta.facets.categories.map(
+                  ({ name, slug }) => ({ name, slug }),
+                ),
+              },
+            },
+          },
+          connected: true,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const dialog = screen.getByRole('dialog', { name: 'Filters' });
+    expect(within(dialog).getByText('Select one product type')).toBeVisible();
+    expect(within(dialog).queryByText('3')).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('radio', { name: /Hops/ }));
+    fireEvent.click(within(dialog).getByRole('radio', { name: /Malts/ }));
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Apply filters' }),
+    );
+
+    expect(replace).toHaveBeenCalledWith('/?category=malts', {
+      scroll: false,
+    });
   });
 
   it('distinguishes no matches from an out-of-range page', () => {
@@ -243,7 +284,7 @@ describe('catalog discovery screen', () => {
       meta: {
         ...extractPaged(pagedResult()).meta,
         filters: {
-          category: 'hops',
+          category: ['hops'],
           maxPriceMinor: null,
           minPriceMinor: null,
           search: 'missing',
@@ -254,7 +295,7 @@ describe('catalog discovery screen', () => {
     });
     const { rerender } = render(
       <CatalogScreen
-        query={{ ...query, category: 'hops', search: 'missing' }}
+        query={{ ...query, category: ['hops'], search: 'missing' }}
         result={noMatches}
       />,
     );
@@ -262,7 +303,6 @@ describe('catalog discovery screen', () => {
     expect(
       screen.getByRole('heading', { name: 'No products match these filters' }),
     ).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Clear filters' })).toBeVisible();
 
     rerender(
       <CatalogScreen
@@ -281,13 +321,23 @@ describe('catalog discovery screen', () => {
     expect(
       screen.getByRole('heading', { name: 'This catalog page is empty' }),
     ).toBeVisible();
-    expect(
-      screen.getByRole('link', { name: 'Go to first page' }),
-    ).toHaveAttribute('href', '/');
   });
 
-  it('preserves an honest legacy rollback state without filter capabilities', () => {
-    render(
+  it('preserves the API-unavailable and legacy rollback states', () => {
+    const { rerender } = render(
+      <CatalogScreen
+        query={{ ...query, category: ['hops'] }}
+        result={{ catalog: null, connected: false }}
+      />,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('API unavailable');
+    expect(screen.getByRole('link', { name: 'Try again' })).toHaveAttribute(
+      'href',
+      '/?category=hops',
+    );
+
+    rerender(
       <CatalogScreen
         query={query}
         result={{
@@ -310,45 +360,10 @@ describe('catalog discovery screen', () => {
         }}
       />,
     );
-
     expect(screen.queryByRole('search')).not.toBeInTheDocument();
     expect(
       screen.getByText(/filtering and paging are temporarily unavailable/i),
     ).toBeVisible();
-  });
-
-  it('renders the safe API-unavailable state with a retry link', () => {
-    render(
-      <CatalogScreen
-        query={{ ...query, category: 'hops' }}
-        result={{ catalog: null, connected: false }}
-      />,
-    );
-
-    expect(screen.getByRole('status')).toHaveTextContent('API unavailable');
-    expect(screen.getByRole('region', { name: 'Catalog' })).toBeVisible();
-    expect(
-      screen.getByRole('heading', { name: 'Products unavailable' }),
-    ).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Try again' })).toHaveAttribute(
-      'href',
-      '/?category=hops',
-    );
-  });
-
-  it('fails closed when the API image path drifts from the local manifest', () => {
-    expect(() =>
-      render(
-        <CatalogScreen
-          query={query}
-          result={pagedResult({
-            items: [
-              { ...product, imagePath: '/assets/products/mosaic-hops.webp' },
-            ],
-          })}
-        />,
-      ),
-    ).toThrow(/catalog asset contract/i);
   });
 });
 

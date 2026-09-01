@@ -59,7 +59,7 @@ export function CatalogScreen({
   const { items, meta } = result.catalog;
   const hasFilters = Boolean(
     query.search ||
-    query.category ||
+    query.category?.length ||
     query.minPriceMinor !== undefined ||
     query.maxPriceMinor !== undefined,
   );
@@ -72,8 +72,12 @@ export function CatalogScreen({
         <div className={styles.discoveryLayout}>
           <CatalogControls
             categories={meta.facets.categories}
+            categorySelection={
+              result.catalog.kind === 'paged-predecessor'
+                ? 'single'
+                : 'multiple'
+            }
             query={query}
-            showClear={hasFilters && items.length > 0}
           />
           <div className={styles.results}>
             <div className={styles.resultHeading}>

@@ -1,6 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { CatalogQueryDto } from './catalog-query.dto';
+import { AdminCatalogQueryDto, CatalogQueryDto } from './catalog-query.dto';
 
 async function validateQuery(query: Record<string, unknown>) {
   const value = plainToInstance(CatalogQueryDto, query);
@@ -45,7 +45,7 @@ describe('CatalogQueryDto', () => {
 
   it('accepts every bounded filter at its public edge', async () => {
     const { errors, value } = await validateQuery({
-      category: 'hop-pellets-2',
+      category: ['hop-pellets-2', 'malts'],
       limit: '48',
       maxPriceMinor: '2147483647',
       minPriceMinor: '0',
@@ -56,7 +56,7 @@ describe('CatalogQueryDto', () => {
 
     expect(errors).toEqual([]);
     expect(value).toMatchObject({
-      category: 'hop-pellets-2',
+      category: ['hop-pellets-2', 'malts'],
       limit: 48,
       maxPriceMinor: 2147483647,
       minPriceMinor: 0,
@@ -91,7 +91,7 @@ describe('CatalogQueryDto', () => {
     'two--hops',
     'hops_and_malts',
     'x'.repeat(65),
-    ['hops', 'malts'],
+    ['hops', 'hops'],
   ])('rejects invalid category %p', async (category) => {
     const { errors } = await validateQuery({ category });
 
@@ -136,7 +136,6 @@ describe('CatalogQueryDto', () => {
 
   it.each([
     ['search', ['aa', 'bb']],
-    ['category', ['hops', 'malts']],
     ['minPriceMinor', ['1', '2']],
     ['maxPriceMinor', ['1', '2']],
     ['sort', ['name-asc', 'name-desc']],
@@ -146,6 +145,34 @@ describe('CatalogQueryDto', () => {
     const result = await validateQuery({ [field]: values });
 
     expect(result.errors).not.toEqual([]);
+  });
+
+  it('normalizes one category and accepts unique repeated categories', async () => {
+    const single = await validateQuery({ category: 'hops' });
+    const repeated = await validateQuery({
+      category: ['hops', 'malts', 'yeast', 'adjuncts'],
+    });
+
+    expect(single.errors).toEqual([]);
+    expect(single.value.category).toEqual(['hops']);
+    expect(repeated.errors).toEqual([]);
+    expect(repeated.value.category).toEqual([
+      'hops',
+      'malts',
+      'yeast',
+      'adjuncts',
+    ]);
+  });
+
+  it('keeps the admin category query scalar', async () => {
+    const value = plainToInstance(AdminCatalogQueryDto, { category: 'hops' });
+    const errors = await validate(value, {
+      forbidNonWhitelisted: true,
+      whitelist: true,
+    });
+
+    expect(errors).toEqual([]);
+    expect(value.category).toBe('hops');
   });
 
   it('rejects list syntax, unknown parameters, unsupported sort and min > max', async () => {

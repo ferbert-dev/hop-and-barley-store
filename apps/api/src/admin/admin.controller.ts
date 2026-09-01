@@ -26,7 +26,7 @@ import {
 import { AdminOnly } from './admin-only.decorator';
 import { AdminCapabilitiesDto } from './dto/admin-capabilities.dto';
 import {
-  CatalogQueryDto,
+  AdminCatalogQueryDto,
   CATALOG_SORT_VALUES,
 } from '../catalog/dto/catalog-query.dto';
 import { AdminProductListService } from './admin-product-list.service';
@@ -157,7 +157,7 @@ export class AdminController {
     },
   })
   listProducts(
-    @Query() query: CatalogQueryDto,
+    @Query() query: AdminCatalogQueryDto,
   ): Promise<AdminProductListResponseDto> {
     return this.products.listProducts(query);
   }

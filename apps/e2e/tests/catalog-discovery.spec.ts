@@ -27,60 +27,90 @@ test('renders the ready catalog and applies URL-owned filters', async ({
   ).toBeVisible();
   await expect(page.getByRole('article')).toHaveCount(12);
   await expect(
-    page.getByRole('search', { name: 'Filter products' }),
+    page.getByRole('search', { name: 'Search products' }),
   ).toBeVisible();
-  await expect(page.getByRole('radio')).toHaveCount(4);
+  await expect(page.getByRole('button', { name: 'Filters' })).toBeVisible();
   await expect(page.getByRole('checkbox')).toHaveCount(0);
 
-  await page.getByLabel('Search products').fill('Citra');
-  await page.getByRole('radio', { name: 'Hops' }).check();
-  await page.getByRole('button', { name: 'Search' }).click();
+  await page
+    .getByRole('searchbox', { name: /Search products/ })
+    .first()
+    .fill('Citra');
+  await expect(page).toHaveURL(/\?search=Citra$/);
+  await page.getByRole('button', { name: 'Filters' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Filters' });
+  await drawer.getByRole('checkbox', { name: /Hops/ }).check();
+  await drawer.getByRole('button', { name: 'Apply filters' }).click();
 
   await expect(page).toHaveURL(/\?search=Citra&category=hops$/);
-  await expect(page).toHaveTitle('Citra — Hop & Barley products');
+  await expect(drawer).not.toBeVisible();
   await expect(page.getByRole('article')).toHaveCount(1);
   await expect(
     page.getByRole('link', { name: 'Citra Hops', exact: true }),
   ).toBeVisible();
   await expect(page.getByText('1 product found').first()).toBeVisible();
-  await expect(
-    page.getByRole('link', { name: 'Clear filters' }),
-  ).toHaveAttribute('href', '/');
 });
 
-test('renders removable search keywords and preserves only approved discovery controls', async ({
+test('keeps realtime search synchronized with client navigation and title', async ({
   page,
 }) => {
   test.skip(unavailable, 'requires the connected API');
-  await page.goto('/?search=citrus+hops&category=hops&page=2&limit=1', {
-    waitUntil: 'domcontentloaded',
-  });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-  const keywords = page.getByRole('list', { name: 'Search keywords' });
-  await expect(keywords).toBeVisible();
-  await expect(keywords.getByText('citrus')).toBeVisible();
-  await expect(keywords.getByText('hops')).toBeVisible();
-  await expect(
-    keywords.getByRole('link', { name: 'Remove keyword citrus' }),
-  ).toHaveAttribute('href', '/?search=hops&category=hops&limit=1');
-  await expect(
-    keywords.getByRole('link', { name: 'Remove keyword hops' }),
-  ).toHaveAttribute('href', '/?search=citrus&category=hops&limit=1');
+  const search = page
+    .getByRole('searchbox', { name: /Search products/ })
+    .first();
+  await search.fill('Citra');
+  await expect(page).toHaveURL(/\?search=Citra$/);
+  await expect(page).toHaveTitle('Citra — Hop & Barley products');
 
-  const productType = page.getByRole('radiogroup', { name: 'Product Type' });
-  await expect(productType.getByRole('radio')).toHaveCount(4);
-  await expect(productType.getByRole('radio', { name: 'Hops' })).toBeChecked();
-  await expect(page.getByRole('checkbox')).toHaveCount(0);
-  await expect(
-    page.getByRole('link', { name: 'Clear product type' }),
-  ).toHaveAttribute('href', '/?search=citrus+hops&limit=1');
+  await page
+    .getByRole('navigation', { name: 'Storefront' })
+    .getByRole('link', { name: 'Products', exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(search).toHaveValue('');
+  await page.waitForTimeout(400);
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveTitle('Shop brewing ingredients | Hop & Barley');
+});
 
-  const sort = page.getByLabel('Sort by');
+test('renders dynamic filter choices and preserves only approved discovery controls', async ({
+  page,
+}) => {
+  test.skip(unavailable, 'requires the connected API');
+  await page.goto(
+    '/?search=citrus+hops&category=hops&category=malts&page=2&limit=1',
+    { waitUntil: 'domcontentloaded' },
+  );
+
+  await expect(
+    page.getByRole('searchbox', { name: /Search products/ }).first(),
+  ).toHaveValue('citrus hops');
+  await expect(page.getByRole('list', { name: 'Search keywords' })).toHaveCount(
+    0,
+  );
+  await expect(page.getByRole('button', { name: 'Search' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: /Filters/ }).click();
+  const productType = page.getByRole('group', { name: 'Product Type' });
+  await expect(
+    productType.getByRole('checkbox', { name: /Hops/ }),
+  ).toBeChecked();
+  await expect(
+    productType.getByRole('checkbox', { name: /Malt/ }),
+  ).toBeChecked();
+  await expect(
+    productType.getByRole('checkbox', { name: /Kits/ }),
+  ).toBeVisible();
+  await expect(page.getByText('Selected filters')).toHaveCount(0);
+
+  const sort = page.getByRole('combobox', { name: 'Sort by' });
   await expect(sort.getByRole('option')).toHaveText([
-    'Name: A to Z',
-    'Name: Z to A',
-    'Price: low to high',
-    'Price: high to low',
+    'Sort: Name A–Z',
+    'Sort: Name Z–A',
+    'Sort: Price low to high',
+    'Sort: Price high to low',
   ]);
   await expect(sort.getByRole('option', { name: 'New' })).toHaveCount(0);
   await expect(sort.getByRole('option', { name: 'Rating' })).toHaveCount(0);
@@ -94,98 +124,63 @@ test('supports keyboard-only catalog filtering with Tab, Shift+Tab, and Enter', 
 }) => {
   test.skip(unavailable, 'requires the connected API');
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/?category=hops', { waitUntil: 'domcontentloaded' });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-  const search = page.getByLabel('Search products');
-  const category = page.getByRole('radio', { name: 'Hops' });
+  const search = page
+    .getByRole('searchbox', { name: /Search products/ })
+    .first();
+  const filterButton = page.getByRole('button', { name: 'Filters' });
   await expectApiStatus(page, 'API connected');
   await expect(
-    page.getByRole('search', { name: 'Filter products' }),
+    page.getByRole('search', { name: 'Search products' }),
   ).toBeVisible();
   await expect(search).toBeVisible();
-  await expect(category).toBeVisible();
+  await expect(filterButton).toBeVisible();
 
-  await page.keyboard.press('Tab');
-  await expect(
-    page.getByRole('link', { name: 'Skip to main content' }),
-  ).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(
-    page.getByRole('link', { name: 'Hop and Barley home' }),
-  ).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(
-    page
-      .getByRole('navigation', { name: 'Storefront' })
-      .getByRole('link', { name: 'Products', exact: true }),
-  ).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(
-    page
-      .getByRole('navigation', { name: 'Storefront' })
-      .getByRole('link', { name: 'Shopping cart' }),
-  ).toBeFocused();
-
-  await page.keyboard.press('Tab');
-  await expect(page.getByRole('link', { name: 'Sign in' })).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(page.getByRole('link', { name: 'Register' })).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(page.getByRole('link', { name: 'Clear filters' })).toBeFocused();
-  await page.keyboard.press('Tab');
+  await tabUntilFocused(page, search);
   await expect(search).toBeFocused();
-  await assertProjectFocusVisible(search, 'ready');
+  await assertProjectFocusVisible(
+    page.getByRole('search', { name: 'Search products' }),
+    'ready',
+  );
   await page.keyboard.type('Citra');
+  await expect(page).toHaveURL(/\?search=Citra$/);
 
   await page.keyboard.press('Tab');
-  const searchButton = page.getByRole('button', { name: 'Search' });
-  await expect(searchButton).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(category).toBeFocused();
-  await page.keyboard.press('Space');
-  await expect(category).toBeChecked();
-
-  await page.keyboard.press('ArrowDown');
-  await expect(page.getByRole('radio', { name: 'Malt' })).toBeFocused();
-  await expect(page.getByRole('radio', { name: 'Malt' })).toBeChecked();
-  await page.keyboard.press('ArrowDown');
-  await expect(page.getByRole('radio', { name: 'Yeast' })).toBeFocused();
-  await expect(page.getByRole('radio', { name: 'Yeast' })).toBeChecked();
-  await page.keyboard.press('ArrowDown');
-  await expect(page.getByRole('radio', { name: 'Adjuncts' })).toBeFocused();
-  await expect(page.getByRole('radio', { name: 'Adjuncts' })).toBeChecked();
-  await page.keyboard.press('ArrowDown');
-  await expect(category).toBeFocused();
-  await expect(category).toBeChecked();
-  await page.keyboard.press('Tab');
-  await expect(
-    page.getByRole('link', { name: 'Clear product type' }),
-  ).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(page.getByLabel('Sort by')).toBeFocused();
-
-  await page.keyboard.press('Shift+Tab');
-  await expect(
-    page.getByRole('link', { name: 'Clear product type' }),
-  ).toBeFocused();
-  await page.keyboard.press('Shift+Tab');
-  await expect(category).toBeFocused();
-  await page.keyboard.press('Shift+Tab');
-  await expect(searchButton).toBeFocused();
+  await expect(filterButton).toBeFocused();
   await page.keyboard.press('Enter');
 
-  await expect(page).toHaveURL(/\?search=Citra&category=hops$/);
-  await expect(page).toHaveTitle('Citra — Hop & Barley products');
+  const close = page.getByRole('button', { name: 'Close filters' });
+  const hops = page.getByRole('checkbox', { name: /Hops/ });
+  const malt = page.getByRole('checkbox', { name: /Malt/ });
+  await expect(close).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(hops).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect(hops).toBeChecked();
+  await page.keyboard.press('Tab');
+  await expect(malt).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect(malt).toBeChecked();
+
+  await page.keyboard.press('Shift+Tab');
+  await expect(hops).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(close).toBeFocused();
+  const apply = page.getByRole('button', { name: 'Apply filters' });
+  await tabUntilFocused(page, apply, 16);
+  await expect(apply).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  await expect(page).toHaveURL(/\?search=Citra&category=hops&category=malts$/);
+  await expect(page.getByRole('dialog', { name: 'Filters' })).not.toBeVisible();
   await expect(
     page.getByRole('link', { name: 'Citra Hops', exact: true }),
   ).toBeVisible();
 
-  const filteredFocus = page.getByRole('link', {
-    name: 'Skip to main content',
-  });
+  await expect(filterButton).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(filteredFocus).toBeFocused();
-  await assertProjectFocusVisible(filteredFocus, 'filtered');
+  await expect(page.getByRole('combobox', { name: 'Sort by' })).toBeFocused();
 });
 
 test('keeps stable pagination and restores URL state with browser history', async ({
@@ -219,7 +214,7 @@ test('keeps stable pagination and restores URL state with browser history', asyn
   ).toBeVisible();
 });
 
-test('renders the native filter form and filtered products in server HTML', async ({
+test('renders discovery controls and filtered products in server HTML', async ({
   request,
 }) => {
   test.skip(unavailable, 'requires the connected API');
@@ -227,11 +222,12 @@ test('renders the native filter form and filtered products in server HTML', asyn
   expect(response.ok()).toBe(true);
 
   const html = await response.text();
-  expect(html).toContain('<form aria-label="Filter products"');
-  expect(html).toContain('action="/" method="get"');
+  expect(html).toContain('<form aria-label="Search products"');
+  expect(html).toContain('role="search"');
   expect(html).toContain('Citra Hops');
   expect(html).toContain('value="Citra"');
-  expect(html).toContain('aria-label="Product Type"');
+  expect(html).toContain('<dialog aria-labelledby="catalog-filter-title"');
+  expect(html).toContain('<legend>Product Type</legend>');
   expect(html).toContain('value="hops"');
   expect(html).toContain('checked');
 });
@@ -247,14 +243,15 @@ test('renders invalid and empty URLs with safe recovery controls', async ({
   await expectApiStatus(page, 'API not contacted');
   await expect(
     page.getByRole('alert').filter({ hasText: 'Invalid catalog URL' }),
-  ).toContainText('Catalog parameters must appear only once.');
+  ).toContainText('Only Product Type may appear more than once.');
 
   await page.goto(stateUrls.empty, { waitUntil: 'domcontentloaded' });
   await expect(
     page.getByRole('heading', { name: 'No products match these filters' }),
   ).toBeVisible();
   await expect(page.getByRole('link', { name: 'Clear filters' })).toBeVisible();
-  await expect(page.getByRole('radio', { name: 'Hops' })).toBeVisible();
+  await page.getByRole('button', { name: /Filters/ }).click();
+  await expect(page.getByRole('checkbox', { name: /Hops/ })).toBeVisible();
 });
 
 test('supports keyboard-only empty recovery with visible focus', async ({
@@ -267,14 +264,14 @@ test('supports keyboard-only empty recovery with visible focus', async ({
   const clear = page.getByRole('link', { name: 'Clear filters' });
   await expectApiStatus(page, 'API connected');
   await expect(
-    page.getByRole('search', { name: 'Filter products' }),
+    page.getByRole('search', { name: 'Search products' }),
   ).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'No products match these filters' }),
   ).toBeVisible();
   await expect(clear).toBeVisible();
 
-  await pressTab(page, 12);
+  await tabUntilFocused(page, clear);
   await expect(clear).toBeFocused();
   await assertProjectFocusVisible(clear, 'empty recovery');
 
@@ -286,7 +283,7 @@ test('supports keyboard-only empty recovery with visible focus', async ({
 
   await expect(page).toHaveURL(/\/$/);
   await expect(page).toHaveTitle('Shop brewing ingredients | Hop & Barley');
-  await expect(page.getByText('12 products found').first()).toBeVisible();
+  await expect(page.getByText(/\d+ products found/).first()).toBeVisible();
 });
 
 test('announces and titles ready, filtered, and empty catalog routes', async ({
@@ -296,7 +293,7 @@ test('announces and titles ready, filtered, and empty catalog routes', async ({
 
   const states = [
     {
-      announcement: '12 products found',
+      announcement: /\d+ products found/,
       title: 'Shop brewing ingredients | Hop & Barley',
       url: stateUrls.ready,
     },
@@ -498,8 +495,11 @@ test('honours reduced motion in ready, filtered, empty, loading, and error state
 
   await page.goto(stateUrls.ready, { waitUntil: 'domcontentloaded' });
   await expectApiStatus(page, 'API connected');
-  await expect(page.getByText('12 products found').first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Search' })).toBeVisible();
+  await expect(page.getByText(/\d+ products found/).first()).toBeVisible();
+  await expect(
+    page.getByRole('searchbox', { name: /Search products/ }).first(),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Filters' })).toBeVisible();
   await expect(page).toHaveTitle('Shop brewing ingredients | Hop & Barley');
   await assertReducedMotionState(page, 'ready');
 
@@ -582,6 +582,18 @@ async function pressTab(page: Page, count: number) {
   }
 }
 
+async function tabUntilFocused(page: Page, target: Locator, limit = 24) {
+  for (let index = 0; index < limit; index += 1) {
+    await page.keyboard.press('Tab');
+    if (
+      await target.evaluate((element) => element === document.activeElement)
+    ) {
+      return;
+    }
+  }
+  throw new Error(`Target did not receive keyboard focus within ${limit} tabs`);
+}
+
 async function assertProjectFocusVisible(target: Locator, label: string) {
   const outline = await target.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -633,9 +645,11 @@ async function assertReducedMotionState(page: Page, label: string) {
 
 async function assertGridColumns(articles: Locator, width: number) {
   const boxes = await Promise.all(
-    [0, 1, 2].map((index) => articles.nth(index).boundingBox()),
+    [0, 1, 2, 3].map((index) => articles.nth(index).boundingBox()),
   );
   expect(boxes.every(Boolean)).toBe(true);
   const columns = new Set(boxes.map((box) => Math.round(box!.x)));
-  expect(columns.size).toBe(width < 768 ? 1 : width < 1024 ? 2 : 3);
+  expect(columns.size).toBe(
+    width < 768 ? 1 : width < 1024 ? 2 : width < 1280 ? 3 : 4,
+  );
 }

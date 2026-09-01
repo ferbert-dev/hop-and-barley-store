@@ -60,19 +60,33 @@ export function parseCatalogSearchParams(
   if (Object.keys(raw).some((key) => !ALLOWED_KEYS.has(key))) {
     return invalid('The catalog URL contains an unsupported parameter.');
   }
-  if (Object.values(raw).some(Array.isArray)) {
-    return invalid('Catalog parameters must appear only once.');
+  if (
+    Object.entries(raw).some(
+      ([key, value]) => key !== 'category' && Array.isArray(value),
+    )
+  ) {
+    return invalid('Only Product Type may appear more than once.');
   }
 
-  const scalar = raw as Readonly<Record<string, string | undefined>>;
+  const scalar = raw as Readonly<
+    Record<string, string | readonly string[] | undefined>
+  >;
 
-  const search = parseSearch(scalar.search);
-  const category = parseCategory(scalar.category);
-  const minPriceMinor = parseInteger(scalar.minPriceMinor, 0, MAX_INT32);
-  const maxPriceMinor = parseInteger(scalar.maxPriceMinor, 0, MAX_INT32);
-  const sort = parseSort(scalar.sort);
-  const page = parseInteger(scalar.page, 1, 200);
-  const limit = parseInteger(scalar.limit, 1, 48);
+  const search = parseSearch(asScalar(scalar.search));
+  const category = parseCategories(scalar.category);
+  const minPriceMinor = parseInteger(
+    asScalar(scalar.minPriceMinor),
+    0,
+    MAX_INT32,
+  );
+  const maxPriceMinor = parseInteger(
+    asScalar(scalar.maxPriceMinor),
+    0,
+    MAX_INT32,
+  );
+  const sort = parseSort(asScalar(scalar.sort));
+  const page = parseInteger(asScalar(scalar.page), 1, 200);
+  const limit = parseInteger(asScalar(scalar.limit), 1, 48);
 
   if (
     search.kind === 'invalid' ||
@@ -129,7 +143,9 @@ export function buildCatalogHref(
   const parameters = new URLSearchParams();
 
   if (query.search) parameters.set('search', query.search);
-  if (query.category) parameters.set('category', query.category);
+  for (const category of query.category ?? []) {
+    parameters.append('category', category);
+  }
   if (query.minPriceMinor !== undefined) {
     parameters.set('minPriceMinor', String(query.minPriceMinor));
   }
@@ -148,6 +164,25 @@ export function buildCatalogHref(
 
   const serialized = parameters.toString();
   return serialized.length === 0 ? '/' : `/?${serialized}`;
+}
+
+export function buildCatalogTitle(query: CatalogQuery): string {
+  if (query.search) return `${query.search} — Hop & Barley products`;
+  if (query.category?.length) {
+    const category = query.category.map(titleCaseSlug).join(' and ');
+    return `${category} — Hop & Barley products`;
+  }
+  if (query.page > 1) {
+    return `Shop brewing ingredients — Page ${String(query.page)} | Hop & Barley`;
+  }
+  return 'Shop brewing ingredients | Hop & Barley';
+}
+
+function titleCaseSlug(slug: string): string {
+  return slug
+    .split('-')
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ');
 }
 
 type Parsed<T> = { kind: 'valid'; value: T | undefined } | { kind: 'invalid' };
@@ -172,11 +207,25 @@ function parseSearch(value: string | undefined): Parsed<string> {
   return valid(collapsed);
 }
 
-function parseCategory(value: string | undefined): Parsed<string> {
+function parseCategories(
+  value: string | readonly string[] | undefined,
+): Parsed<string[]> {
   if (value === undefined || value === '') return valid();
-  return value.length <= 64 && CATEGORY_SLUG.test(value)
-    ? valid(value)
-    : invalidValue();
+  const categories = (Array.isArray(value) ? [...value] : [value]).toSorted();
+  if (
+    categories.length === 0 ||
+    categories.length > 8 ||
+    new Set(categories).size !== categories.length ||
+    categories.some(
+      (category) =>
+        category.length === 0 ||
+        category.length > 64 ||
+        !CATEGORY_SLUG.test(category),
+    )
+  ) {
+    return invalidValue();
+  }
+  return valid(categories);
 }
 
 function parseInteger(
@@ -203,9 +252,18 @@ function serializeRawHref(raw: CatalogSearchParams): string {
   const parameters = new URLSearchParams();
   for (const [key, value] of Object.entries(raw)) {
     if (typeof value === 'string') parameters.append(key, value);
+    if (Array.isArray(value)) {
+      for (const item of value) parameters.append(key, item);
+    }
   }
   const serialized = parameters.toString();
   return serialized.length === 0 ? '/' : `/?${serialized}`;
+}
+
+function asScalar(
+  value: string | readonly string[] | undefined,
+): string | undefined {
+  return typeof value === 'string' ? value : undefined;
 }
 
 function valid<T>(value?: T): Parsed<T> {

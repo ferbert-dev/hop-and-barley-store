@@ -164,6 +164,7 @@ model Product {
   activeFrom         DateTime?         @db.Timestamptz(3)
   activeUntil        DateTime?         @db.Timestamptz(3)
   imagePath          String            @db.VarChar(255)
+  searchDocument     Unsupported("tsvector")?
   specifications     Json              @db.JsonB
   categoryId         String            @db.Uuid
   category           Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Product_categoryId_fkey")

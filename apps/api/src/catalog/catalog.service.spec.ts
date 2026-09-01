@@ -56,10 +56,19 @@ const publicLifecycleWhere = {
 
 const facetQuery = {
   orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }, { slug: 'asc' }],
-  select: { name: true, slug: true },
+  select: {
+    _count: {
+      select: {
+        products: {
+          where: { currency: 'USD', ...publicLifecycleWhere },
+        },
+      },
+    },
+    name: true,
+    slug: true,
+  },
   where: {
     products: { some: { currency: 'USD', ...publicLifecycleWhere } },
-    slug: { in: ['hops', 'malts', 'yeast', 'adjuncts'] },
   },
 };
 
@@ -72,7 +81,9 @@ describe('CatalogService', () => {
   const rootProductFindFirst = jest.fn();
   const rootProductFindMany = jest.fn();
   const transaction = jest.fn();
+  const queryRaw = jest.fn();
   const transactionClient = {
+    $queryRaw: queryRaw,
     category: { findMany: findCategories },
     product: { count, findMany: findProducts },
   };
@@ -111,7 +122,9 @@ describe('CatalogService', () => {
         callback(transactionClient),
     );
     count.mockResolvedValue(1);
-    findCategories.mockResolvedValue([{ name: 'Hops', slug: 'hops' }]);
+    findCategories.mockResolvedValue([
+      { _count: { products: 1 }, name: 'Hops', slug: 'hops' },
+    ]);
     findProducts.mockResolvedValue([
       {
         ...saleRuleValues,
@@ -261,9 +274,9 @@ describe('CatalogService', () => {
       ],
       meta: {
         currency: 'USD',
-        facets: { categories: [{ name: 'Hops', slug: 'hops' }] },
+        facets: { categories: [{ count: 1, name: 'Hops', slug: 'hops' }] },
         filters: {
-          category: null,
+          category: [],
           maxPriceMinor: null,
           minPriceMinor: null,
           search: null,
@@ -279,11 +292,13 @@ describe('CatalogService', () => {
     });
   });
 
-  it('builds token-AND/field-OR filters once and applies deterministic price paging', async () => {
-    count.mockResolvedValue(5);
-    findProducts.mockResolvedValue([]);
+  it('uses indexed full-text search with OR categories and deterministic page ordering', async () => {
+    queryRaw
+      .mockResolvedValueOnce([{ totalItems: 5 }])
+      .mockResolvedValueOnce([{ id: 'product-id' }])
+      .mockResolvedValueOnce([{ count: 1, name: 'Hops', slug: 'hops' }]);
     const query = {
-      category: 'hops',
+      category: ['hops', 'malts'],
       limit: 2,
       maxPriceMinor: 900,
       minPriceMinor: 100,
@@ -293,37 +308,19 @@ describe('CatalogService', () => {
     } satisfies CatalogQueryDto;
 
     const result = await service.listProducts(query);
-    const textFilter = (token: string) => ({
-      OR: [
-        { name: { contains: token, mode: 'insensitive' } },
-        { teaser: { contains: token, mode: 'insensitive' } },
-        { description: { contains: token, mode: 'insensitive' } },
-      ],
-    });
-    const where = {
-      AND: [
-        ...publicLifecycleWhere.AND,
-        textFilter('Café'),
-        textFilter('hops'),
-      ],
-      category: { slug: 'hops' },
-      currency: 'USD',
-      isActive: true,
-      priceMinor: { gte: 100, lte: 900 },
-    };
-
-    expect(count).toHaveBeenCalledWith({ where });
+    expect(queryRaw).toHaveBeenCalledTimes(3);
+    expect(count).not.toHaveBeenCalled();
     expect(findProducts).toHaveBeenCalledWith({
-      orderBy: [{ priceMinor: 'desc' }, { name: 'asc' }, { slug: 'asc' }],
       select: productSelect,
-      skip: 2,
-      take: 2,
-      where,
+      where: { id: { in: ['product-id'] } },
     });
-    expect(findCategories).toHaveBeenCalledWith(facetQuery);
+    expect(findCategories).not.toHaveBeenCalled();
+    expect(result.meta.facets.categories).toEqual([
+      { count: 1, name: 'Hops', slug: 'hops' },
+    ]);
     expect(result.meta).toMatchObject({
       filters: {
-        category: 'hops',
+        category: ['hops', 'malts'],
         maxPriceMinor: 900,
         minPriceMinor: 100,
         search: 'Café hops',
@@ -354,7 +351,7 @@ describe('CatalogService', () => {
     findProducts.mockResolvedValue([]);
 
     const result = await service.listProducts({
-      category: 'valid-but-unknown',
+      category: ['valid-but-unknown'],
       limit: 12,
       page: 7,
       sort: 'name-asc',
@@ -384,6 +381,23 @@ describe('CatalogService', () => {
 
     expect(count).toHaveBeenCalledWith({
       where: { currency: 'USD', ...publicLifecycleWhere, priceMinor },
+    });
+    expect(findCategories).toHaveBeenCalledWith({
+      ...facetQuery,
+      select: {
+        ...facetQuery.select,
+        _count: {
+          select: {
+            products: {
+              where: {
+                currency: 'USD',
+                ...publicLifecycleWhere,
+                priceMinor,
+              },
+            },
+          },
+        },
+      },
     });
   });
 

@@ -7,7 +7,6 @@ import { catalogCategories, catalogProducts } from '../prisma/catalog-fixtures';
 import { AppModule } from '../src/app.module';
 import { configureAppRouting } from '../src/app-routing';
 import { configureAppValidation } from '../src/app-validation';
-import { CATALOG_INGREDIENT_PRODUCT_TYPES } from '../src/catalog/catalog-product-types';
 import type { Prisma } from '../src/generated/prisma/client';
 import type { CatalogResponseDto } from '../src/catalog/dto/catalog-response.dto';
 import type { ProductDetailDto } from '../src/catalog/dto/product-detail.dto';
@@ -223,12 +222,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
       expect(body.items.map(({ slug }) => slug)).not.toEqual(
         expect.arrayContaining(['hidden-inactive', 'hidden-eur']),
       );
-      expect(body.meta.facets.categories).toEqual(
-        CATALOG_INGREDIENT_PRODUCT_TYPES.map(({ name, slug }) => ({
-          name,
-          slug,
-        })),
-      );
+      expect(body.meta.facets.categories).toEqual(expectedCategoryFacets());
       expect(body.meta.facets.categories).not.toContainEqual({
         name: 'Excluded currency',
         slug: 'excluded-currency',
@@ -286,7 +280,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
     ).toEqual([{ priceMinor: 749, slug: 'cascade-hops' }]);
     expect(first.meta).toMatchObject({
       filters: {
-        category: 'hops',
+        category: ['hops'],
         maxPriceMinor: 800,
         minPriceMinor: 500,
         search: 'hops',
@@ -309,10 +303,41 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
     expect(first.items.map(({ id }) => id)).not.toEqual(
       expect.arrayContaining(second.items.map(({ id }) => id)),
     );
+    expect(first.meta.facets.categories).toEqual(
+      expectedCategoryFacets(
+        (product) =>
+          product.categorySlug === 'hops' &&
+          product.priceMinor >= 500 &&
+          product.priceMinor <= 800,
+      ),
+    );
 
     const fullwidthLiteral = await getCatalog('?search=ab％cd＿ef');
     expect(fullwidthLiteral.items).toEqual([]);
     expect(fullwidthLiteral.meta.totalItems).toBe(0);
+  });
+
+  it('combines full-text search with repeated product types using OR semantics', async () => {
+    const body = await getCatalog(
+      '?search=american&category=yeast&category=hops&sort=name-asc',
+    );
+
+    expect(body.items.length).toBeGreaterThan(1);
+    expect(new Set(body.items.map(({ category }) => category.slug))).toEqual(
+      new Set(['hops', 'yeast']),
+    );
+    expect(body.meta.filters).toMatchObject({
+      category: ['yeast', 'hops'],
+      search: 'american',
+    });
+  });
+
+  it('scopes facet counts to price while retaining available zero-count types', async () => {
+    const body = await getCatalog('?minPriceMinor=700');
+
+    expect(body.meta.facets.categories).toEqual(
+      expectedCategoryFacets((product) => product.priceMinor >= 700),
+    );
   });
 
   it('keeps unique slug tie-breaks deterministic across page boundaries', async () => {
@@ -368,12 +393,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
       totalItems: 0,
       totalPages: 0,
     });
-    expect(body.meta.facets.categories).toEqual(
-      CATALOG_INGREDIENT_PRODUCT_TYPES.map(({ name, slug }) => ({
-        name,
-        slug,
-      })),
-    );
+    expect(body.meta.facets.categories).toEqual(expectedCategoryFacets());
   });
 
   it('holds the HTTP service count, items and facets to one repeatable-read snapshot', async () => {
@@ -406,12 +426,13 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
       })();
       await writer;
     };
+    let firstRawQueryCompleted = false;
     const transactionSpy = jest
       .spyOn(transactionHost, '$transaction')
       .mockImplementation(async (callback, options) =>
         originalTransaction(async (transaction) => {
           const product = new Proxy(transaction.product, {
-            get(target, property) {
+            get(target, property): unknown {
               if (property === 'count') {
                 return async (args: Prisma.ProductCountArgs) => {
                   const count = await target.count(args);
@@ -443,7 +464,23 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
             get(target, property) {
               if (property === 'product') return product;
               if (property === 'category') return category;
-              return undefined;
+              if (property === '$queryRaw') {
+                return async (...args: unknown[]) => {
+                  const result = await (
+                    target.$queryRaw as (
+                      ...queryArgs: unknown[]
+                    ) => Promise<unknown>
+                  )(...args);
+                  if (!firstRawQueryCompleted) {
+                    firstRawQueryCompleted = true;
+                    releaseCount();
+                    await writeAfterCount();
+                  }
+                  return result;
+                };
+              }
+              const value: unknown = Reflect.get(target, property);
+              return value;
             },
           });
           return callback(wrappedTransaction);
@@ -613,4 +650,20 @@ let invalidProductSequence = 1;
 
 function literal(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
+}
+
+function expectedCategoryFacets(
+  matches: (product: (typeof catalogProducts)[number]) => boolean = () => true,
+) {
+  return catalogCategories
+    .map((category) => ({
+      count: catalogProducts.filter(
+        (product) => product.categorySlug === category.slug && matches(product),
+      ).length,
+      name: category.name,
+      slug: category.slug,
+    }))
+    .filter(({ slug }) =>
+      catalogProducts.some((product) => product.categorySlug === slug),
+    );
 }

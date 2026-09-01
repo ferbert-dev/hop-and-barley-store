@@ -48,7 +48,7 @@ void futureCachedClient;
 const request = configuredClient.GET('/api/v1/products', {
   params: {
     query: {
-      category: 'hops',
+      category: ['hops', 'malts'],
       limit: 12,
       maxPriceMinor: 900,
       minPriceMinor: 100,

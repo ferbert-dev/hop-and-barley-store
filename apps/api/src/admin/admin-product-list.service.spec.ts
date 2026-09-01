@@ -58,7 +58,9 @@ describe('AdminProductListService', () => {
         callback(transactionClient),
     );
     count.mockResolvedValue(1);
-    findCategories.mockResolvedValue([{ name: 'Hops', slug: 'hops' }]);
+    findCategories.mockResolvedValue([
+      { _count: { products: 1 }, name: 'Hops', slug: 'hops' },
+    ]);
     findProducts.mockResolvedValue([
       {
         activeFrom: new Date('2026-08-29T12:00:00.000Z'),
@@ -122,7 +124,13 @@ describe('AdminProductListService', () => {
     });
     expect(findCategories).toHaveBeenCalledWith({
       orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }, { slug: 'asc' }],
-      select: { name: true, slug: true },
+      select: {
+        _count: {
+          select: { products: { where: { currency: 'USD' } } },
+        },
+        name: true,
+        slug: true,
+      },
       where: {
         products: { some: { currency: 'USD' } },
         slug: { in: ['hops', 'malts', 'yeast', 'adjuncts'] },

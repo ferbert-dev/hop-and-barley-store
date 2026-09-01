@@ -66,11 +66,13 @@ flowchart LR
 
 The contract pipeline is operational end to end. The storefront calls the
 generated path through `@hop-and-barley/api-client`, revalidates each canonical
-public catalog query for 60 seconds, and validates either the paged C2 envelope
-or the exact legacy six-field rollback array before rendering. Malformed
-payloads fail closed as `API unavailable` rather than appearing as an empty
-catalog. Future authenticated/private requests remain uncached by a separate
-security contract.
+public catalog query for 60 seconds, and validates the current paged envelope,
+the immediate paged predecessor, or the exact legacy six-field rollback array
+before rendering. The predecessor supports zero or one category and facets
+without counts; repeated-category URLs are retried safely with one category and
+then canonicalized. Malformed payloads fail closed as `API unavailable` rather
+than appearing as an empty catalog. Future authenticated/private requests
+remain uncached by a separate security contract.
 
 ## Technology Stack
 

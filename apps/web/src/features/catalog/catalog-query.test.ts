@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildCatalogHref,
+  buildCatalogTitle,
   DEFAULT_CATALOG_QUERY,
   parseCatalogSearchParams,
 } from './catalog-query';
@@ -33,7 +34,7 @@ describe('catalog URL query contract', () => {
       isCanonical: false,
       kind: 'valid',
       query: {
-        category: 'hops',
+        category: ['hops'],
         limit: 24,
         maxPriceMinor: 900,
         minPriceMinor: 400,
@@ -99,18 +100,44 @@ describe('catalog URL query contract', () => {
 
   it('builds filter and paging links without carrying a stale page', () => {
     const current = {
-      category: 'hops',
+      category: ['hops'],
       limit: 24,
       page: 7,
       search: 'citrus hops',
       sort: 'price-desc' as const,
     };
 
-    expect(buildCatalogHref(current, { category: 'malts' }, true)).toBe(
+    expect(buildCatalogHref(current, { category: ['malts'] }, true)).toBe(
       '/?search=citrus+hops&category=malts&sort=price-desc&limit=24',
     );
     expect(buildCatalogHref(current, { page: 8 })).toBe(
       '/?search=citrus+hops&category=hops&sort=price-desc&page=8&limit=24',
     );
+  });
+
+  it('canonicalizes repeated product types in a stable order', () => {
+    expect(
+      parseCatalogSearchParams({ category: ['malts', 'hops'] }),
+    ).toMatchObject({
+      canonicalHref: '/?category=hops&category=malts',
+      isCanonical: false,
+      kind: 'valid',
+      query: { category: ['hops', 'malts'] },
+    });
+  });
+
+  it('builds the document title from canonical catalog state', () => {
+    expect(buildCatalogTitle(DEFAULT_CATALOG_QUERY)).toBe(
+      'Shop brewing ingredients | Hop & Barley',
+    );
+    expect(
+      buildCatalogTitle({ ...DEFAULT_CATALOG_QUERY, search: 'Citra' }),
+    ).toBe('Citra — Hop & Barley products');
+    expect(
+      buildCatalogTitle({
+        ...DEFAULT_CATALOG_QUERY,
+        category: ['brewing-salts', 'yeast'],
+      }),
+    ).toBe('Brewing Salts and Yeast — Hop & Barley products');
   });
 });

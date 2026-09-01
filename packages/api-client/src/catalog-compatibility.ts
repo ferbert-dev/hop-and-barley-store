@@ -27,8 +27,22 @@ const LEGACY_PROHIBITED_KEYS = new Set([
 
 export type PagedCatalogProduct = components['schemas']['ProductDto'];
 export type PagedCatalogResponse = components['schemas']['CatalogResponseDto'];
-type CatalogMeta = components['schemas']['CatalogMetaDto'];
+type CurrentCatalogMeta = components['schemas']['CatalogMetaDto'];
 type ProductCategory = components['schemas']['ProductCategoryDto'];
+
+export type CompatibleCatalogCategoryFacet = ProductCategory & {
+  count?: number;
+};
+
+export type CompatibleCatalogMeta = Omit<
+  CurrentCatalogMeta,
+  'facets' | 'filters'
+> & {
+  facets: { categories: CompatibleCatalogCategoryFacet[] };
+  filters: Omit<CurrentCatalogMeta['filters'], 'category'> & {
+    category: string[];
+  };
+};
 
 export type LegacyCatalogProduct = Pick<
   PagedCatalogProduct,
@@ -46,7 +60,13 @@ export type CatalogCompatibilityResult =
       capabilities: { facets: 'available'; pagination: 'available' };
       items: PagedCatalogProduct[];
       kind: 'paged';
-      meta: CatalogMeta;
+      meta: CompatibleCatalogMeta;
+    }
+  | {
+      capabilities: { facets: 'available'; pagination: 'available' };
+      items: PagedCatalogProduct[];
+      kind: 'paged-predecessor';
+      meta: CompatibleCatalogMeta;
     };
 
 export class CatalogResponseShapeError extends TypeError {
@@ -70,7 +90,7 @@ export function normalizeCatalogResponse(
 
   if (!isRecord(value) || !Array.isArray(value.items)) fail();
   const items = value.items.map(projectPagedProduct);
-  const meta = projectMeta(value.meta);
+  const { kind, meta } = projectMeta(value.meta);
   const availableItems = Math.max(
     0,
     meta.totalItems - (meta.page - 1) * meta.limit,
@@ -84,7 +104,7 @@ export function normalizeCatalogResponse(
   return {
     capabilities: { facets: 'available', pagination: 'available' },
     items,
-    kind: 'paged',
+    kind,
     meta,
   };
 }
@@ -183,14 +203,41 @@ function projectCategory(value: unknown): ProductCategory {
   return { name: value.name, slug: value.slug };
 }
 
-function projectMeta(value: unknown): CatalogMeta {
+function projectMeta(value: unknown): {
+  kind: 'paged' | 'paged-predecessor';
+  meta: CompatibleCatalogMeta;
+} {
   if (!isRecord(value) || !isRecord(value.filters) || !isRecord(value.facets)) {
     fail();
   }
   const categories = value.facets.categories;
   if (!Array.isArray(categories)) fail();
-  const projectedCategories = categories.map(projectCategory);
-  const filters = projectFilters(value.filters);
+  const hasCurrentFacets = categories.every(
+    (category) => isRecord(category) && 'count' in category,
+  );
+  const hasPredecessorFacets = categories.every(
+    (category) => isRecord(category) && !('count' in category),
+  );
+  if (!hasCurrentFacets && !hasPredecessorFacets) fail();
+  const filterKind = Array.isArray(value.filters.category)
+    ? 'paged'
+    : isNullableCategory(value.filters.category)
+      ? 'paged-predecessor'
+      : fail();
+  const facetKind =
+    categories.length === 0
+      ? filterKind
+      : hasCurrentFacets
+        ? 'paged'
+        : 'paged-predecessor';
+  if (facetKind !== filterKind) fail();
+  const kind = filterKind;
+  const projectedCategories = categories.map((category) =>
+    hasCurrentFacets
+      ? projectCategoryFacet(category)
+      : projectCategory(category),
+  );
+  const filters = projectFilters(value.filters, kind);
 
   if (
     !isBoundedInteger(value.page, 1, 200) ||
@@ -219,25 +266,31 @@ function projectMeta(value: unknown): CatalogMeta {
   }
 
   return {
-    currency: 'USD',
-    facets: { categories: projectedCategories },
-    filters,
-    hasNextPage: value.hasNextPage,
-    hasPreviousPage: value.hasPreviousPage,
-    limit: value.limit,
-    page: value.page,
-    sort: value.sort as CatalogMeta['sort'],
-    totalItems: value.totalItems,
-    totalPages: value.totalPages,
+    kind,
+    meta: {
+      currency: 'USD',
+      facets: { categories: projectedCategories },
+      filters,
+      hasNextPage: value.hasNextPage,
+      hasPreviousPage: value.hasPreviousPage,
+      limit: value.limit,
+      page: value.page,
+      sort: value.sort as CompatibleCatalogMeta['sort'],
+      totalItems: value.totalItems,
+      totalPages: value.totalPages,
+    },
   };
 }
 
 function projectFilters(
   value: Record<string, unknown>,
-): CatalogMeta['filters'] {
+  kind: 'paged' | 'paged-predecessor',
+): CompatibleCatalogMeta['filters'] {
   const { category, maxPriceMinor, minPriceMinor, search } = value;
   if (
-    !isNullableCategory(category) ||
+    (kind === 'paged'
+      ? !isCategoryList(category)
+      : !isNullableCategory(category)) ||
     !isNullableInt32(minPriceMinor) ||
     !isNullableInt32(maxPriceMinor) ||
     !isNullableSearch(search) ||
@@ -247,7 +300,30 @@ function projectFilters(
   ) {
     fail();
   }
-  return { category, maxPriceMinor, minPriceMinor, search };
+  return {
+    category:
+      kind === 'paged'
+        ? (category as string[])
+        : typeof category === 'string'
+          ? [category]
+          : [],
+    maxPriceMinor,
+    minPriceMinor,
+    search,
+  };
+}
+
+function projectCategoryFacet(value: unknown): CompatibleCatalogCategoryFacet {
+  const category = projectCategory(value);
+  if (!isRecord(value) || !isInt32(value.count)) fail();
+  return { ...category, count: value.count };
+}
+
+function isNullableCategory(value: unknown): value is string | null {
+  return (
+    value === null ||
+    (typeof value === 'string' && SLUG.test(value) && value.length <= 64)
+  );
 }
 
 function isNullableSearch(value: unknown): value is string | null {
@@ -270,10 +346,17 @@ function isNullableSearch(value: unknown): value is string | null {
   );
 }
 
-function isNullableCategory(value: unknown): value is string | null {
+function isCategoryList(value: unknown): value is string[] {
   return (
-    value === null ||
-    (typeof value === 'string' && SLUG.test(value) && value.length <= 64)
+    Array.isArray(value) &&
+    value.length <= 8 &&
+    value.every(
+      (category) =>
+        typeof category === 'string' &&
+        SLUG.test(category) &&
+        category.length <= 64,
+    ) &&
+    new Set(value).size === value.length
   );
 }
 

@@ -5,8 +5,9 @@ import { Button } from '../../components/ui/button';
 import { ErrorState } from '../../components/ui/status';
 import { CatalogHero } from '../../features/catalog/catalog-hero';
 import {
+  buildCatalogHref,
+  buildCatalogTitle,
   parseCatalogSearchParams,
-  type CatalogQuery,
   type CatalogSearchParams,
 } from '../../features/catalog/catalog-query';
 import { CatalogScreen } from '../../features/catalog/catalog-screen';
@@ -25,6 +26,19 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   if (!parsed.isCanonical) redirect(parsed.canonicalHref);
 
   const result = await loadCatalog(parsed.query);
+  if (
+    result.connected &&
+    result.catalog.kind === 'paged-predecessor' &&
+    (parsed.query.category?.length ?? 0) > 1
+  ) {
+    redirect(
+      buildCatalogHref(
+        parsed.query,
+        { category: parsed.query.category?.slice(0, 1) },
+        true,
+      ),
+    );
+  }
   return <CatalogScreen query={parsed.query} result={result} />;
 }
 
@@ -38,21 +52,6 @@ export async function generateMetadata({
         ? 'Invalid catalog URL | Hop & Barley'
         : buildCatalogTitle(parsed.query),
   };
-}
-
-function buildCatalogTitle(query: CatalogQuery): string {
-  if (query.search) return `${query.search} — Hop & Barley products`;
-  if (query.category) {
-    const category = query.category
-      .split('-')
-      .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
-      .join(' ');
-    return `${category} — Hop & Barley products`;
-  }
-  if (query.page > 1) {
-    return `Shop brewing ingredients — Page ${query.page} | Hop & Barley`;
-  }
-  return 'Shop brewing ingredients | Hop & Barley';
 }
 
 function InvalidCatalogUrl({ message }: { message: string }) {

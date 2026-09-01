@@ -4,7 +4,6 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Price } from '../../components/ui/price';
 import { EmptyState, ErrorState } from '../../components/ui/status';
-import { CatalogControls } from '../catalog/catalog-controls';
 import { getVisiblePages } from '../catalog/catalog-pagination';
 import {
   formatActivationWindow,
@@ -12,6 +11,7 @@ import {
   formatUtc,
   getLifecyclePresentation,
 } from './admin-product-format';
+import { AdminProductFilters } from './admin-product-filters';
 import {
   buildAdminProductsHref,
   type AdminProductsQuery,
@@ -57,9 +57,7 @@ function AdminProductResults({
 
   return (
     <>
-      <CatalogControls
-        action="/admin/products"
-        buildHref={buildAdminProductsHref}
+      <AdminProductFilters
         categories={meta.facets.categories}
         query={query}
         showClear={hasFilters}
