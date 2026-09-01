@@ -186,6 +186,22 @@ describe('catalog discovery screen', () => {
     expect(replace).toHaveBeenCalledWith('/', { scroll: false });
   });
 
+  it('supersedes an in-flight search when cleared before URL props commit', () => {
+    vi.useFakeTimers();
+    render(<CatalogScreen query={query} result={pagedResult()} />);
+
+    fireEvent.change(screen.getByRole('searchbox'), {
+      target: { value: 'Ca' },
+    });
+    act(() => vi.advanceTimersByTime(300));
+    expect(replace).toHaveBeenLastCalledWith('/?search=Ca', { scroll: false });
+
+    fireEvent.change(screen.getByRole('searchbox'), {
+      target: { value: '' },
+    });
+    expect(replace).toHaveBeenLastCalledWith('/', { scroll: false });
+  });
+
   it('syncs search and title when URL-owned query props change', () => {
     vi.useFakeTimers();
     const { rerender } = render(

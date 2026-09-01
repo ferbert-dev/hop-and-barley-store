@@ -90,6 +90,7 @@ export function CatalogControls({
 
     const timeout = window.setTimeout(() => {
       searchTimeoutRef.current = null;
+      immediateSearchRef.current = normalized;
       startTransition(() => {
         router.replace(
           buildHref(
@@ -119,8 +120,12 @@ export function CatalogControls({
 
     if (normalizeSearch(value).length !== 0) return;
 
+    const requestedSearch = immediateSearchRef.current;
     cancelPendingSearch();
-    if (activeSearch.length === 0) {
+    if (
+      activeSearch.length === 0 &&
+      (requestedSearch === null || requestedSearch.length === 0)
+    ) {
       immediateSearchRef.current = null;
       return;
     }
