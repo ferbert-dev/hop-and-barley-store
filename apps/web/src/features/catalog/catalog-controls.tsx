@@ -2,6 +2,7 @@
 
 import type { CompatibleCatalogCategoryFacet } from '@hop-and-barley/api-client';
 import {
+  CircleNotch,
   MagnifyingGlass,
   SlidersHorizontal,
   X,
@@ -62,6 +63,9 @@ export function CatalogControls({
   const search = searchState.value;
   const [isPending, startTransition] = useTransition();
   const catalogTitle = buildCatalogTitle(query);
+  const normalizedSearch = normalizeSearch(search);
+  const isSearchUpdating =
+    isSearchReady(normalizedSearch) && normalizedSearch !== activeSearch;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -108,6 +112,25 @@ export function CatalogControls({
   function openDrawer() {
     setDraftCategories(query.category ?? []);
     setDrawerOpen(true);
+  }
+
+  function updateSearch(value: string) {
+    setSearchState((current) => ({ ...current, value }));
+
+    if (normalizeSearch(value).length !== 0) return;
+
+    cancelPendingSearch();
+    if (activeSearch.length === 0) {
+      immediateSearchRef.current = null;
+      return;
+    }
+
+    immediateSearchRef.current = '';
+    startTransition(() => {
+      router.replace(buildHref(query, { search: undefined }, true), {
+        scroll: false,
+      });
+    });
   }
 
   function closeDrawer() {
@@ -184,6 +207,7 @@ export function CatalogControls({
     <section aria-label="Catalog discovery controls" className={styles.filters}>
       <form
         aria-label="Search products"
+        aria-busy={isSearchUpdating}
         className={styles.searchForm}
         onSubmit={(event) => event.preventDefault()}
         role="search"
@@ -198,24 +222,34 @@ export function CatalogControls({
           className={styles.searchInput}
           id="catalog-search"
           maxLength={80}
-          onChange={(event) => {
-            const value = event.currentTarget.value;
-            setSearchState((current) => ({
-              ...current,
-              value,
-            }));
-          }}
+          onChange={(event) => updateSearch(event.currentTarget.value)}
           placeholder="Search products, varieties, or flavors"
           type="search"
           value={search}
         />
-        <span
-          aria-live="polite"
-          className="visually-hidden"
-          id="catalog-search-status"
-        >
-          {isPending ? 'Updating products' : 'Products updated'}
-        </span>
+        {isSearchUpdating ? (
+          <span
+            aria-live="polite"
+            className={styles.searchProgress}
+            id="catalog-search-status"
+          >
+            <CircleNotch
+              aria-hidden="true"
+              className={styles.searchSpinner}
+              size={18}
+              weight="bold"
+            />
+            Searching…
+          </span>
+        ) : (
+          <span
+            aria-live="polite"
+            className="visually-hidden"
+            id="catalog-search-status"
+          >
+            Products updated
+          </span>
+        )}
       </form>
 
       <button

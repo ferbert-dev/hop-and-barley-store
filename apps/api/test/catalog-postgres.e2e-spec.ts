@@ -317,9 +317,31 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
     expect(fullwidthLiteral.meta.totalItems).toBe(0);
   });
 
+  it('matches case-insensitive prefixes with AND semantics', async () => {
+    const capitalized = await getCatalog('?search=Ca');
+    const lowercase = await getCatalog('?search=ca');
+    const multiplePrefixes = await getCatalog('?search=cas%20hop');
+    const operatorLikeInput = await getCatalog('?search=cas%20%7C%20hop');
+
+    expect(capitalized.items.map(({ slug }) => slug)).toEqual([
+      'caramel-malt',
+      'cascade-hops',
+    ]);
+    expect(lowercase.items.map(({ slug }) => slug)).toEqual([
+      'caramel-malt',
+      'cascade-hops',
+    ]);
+    expect(multiplePrefixes.items.map(({ slug }) => slug)).toEqual([
+      'cascade-hops',
+    ]);
+    expect(operatorLikeInput.items.map(({ slug }) => slug)).toEqual([
+      'cascade-hops',
+    ]);
+  });
+
   it('combines full-text search with repeated product types using OR semantics', async () => {
     const body = await getCatalog(
-      '?search=american&category=yeast&category=hops&sort=name-asc',
+      '?search=sa&category=yeast&category=hops&sort=name-asc',
     );
 
     expect(body.items.length).toBeGreaterThan(1);
@@ -328,7 +350,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
     );
     expect(body.meta.filters).toMatchObject({
       category: ['yeast', 'hops'],
-      search: 'american',
+      search: 'sa',
     });
   });
 
