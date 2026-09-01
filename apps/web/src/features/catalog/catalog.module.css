@@ -244,6 +244,7 @@
 
 .results {
   min-width: 0;
+  position: relative;
 }
 
 .searchResultsLoading {

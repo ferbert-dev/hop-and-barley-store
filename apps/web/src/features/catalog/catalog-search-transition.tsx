@@ -46,8 +46,27 @@ export function CatalogSearchResults({ children }: { children: ReactNode }) {
   const { isSearchPending } = useCatalogSearchTransition();
 
   return (
-    <div aria-busy={isSearchPending} className={styles.results}>
-      {isSearchPending ? <CatalogSearchSkeleton /> : children}
+    <div className={styles.results}>
+      {isSearchPending ? (
+        <div
+          aria-label="Searching products"
+          aria-live="polite"
+          className={styles.searchResultsProgress}
+          role="status"
+        >
+          <span className={styles.searchResultsSpinnerFrame}>
+            <CircleNotch
+              aria-hidden="true"
+              className={styles.searchResultsSpinner}
+              size={30}
+              weight="bold"
+            />
+          </span>
+        </div>
+      ) : null}
+      <div aria-busy={isSearchPending}>
+        {isSearchPending ? <CatalogSearchSkeleton /> : children}
+      </div>
     </div>
   );
 }
@@ -89,21 +108,6 @@ function CatalogSearchSkeleton() {
             />
           </div>
         ))}
-      </div>
-      <div
-        aria-label="Searching products"
-        aria-live="polite"
-        className={styles.searchResultsProgress}
-        role="status"
-      >
-        <span className={styles.searchResultsSpinnerFrame}>
-          <CircleNotch
-            aria-hidden="true"
-            className={styles.searchResultsSpinner}
-            size={30}
-            weight="bold"
-          />
-        </span>
       </div>
     </div>
   );

@@ -232,7 +232,6 @@ export function CatalogControls({
           Search products
         </label>
         <input
-          aria-describedby="catalog-search-status"
           autoComplete="off"
           className={styles.searchInput}
           id="catalog-search"
@@ -243,28 +242,14 @@ export function CatalogControls({
           value={search}
         />
         {isSearchUpdating ? (
-          <span
-            aria-live="polite"
-            className={styles.searchProgress}
-            id="catalog-search-status"
-          >
+          <span aria-hidden="true" className={styles.searchProgress}>
             <CircleNotch
-              aria-hidden="true"
               className={styles.searchSpinner}
               size={18}
               weight="bold"
             />
-            <span className="visually-hidden">Search is updating</span>
           </span>
-        ) : (
-          <span
-            aria-live="polite"
-            className="visually-hidden"
-            id="catalog-search-status"
-          >
-            Products updated
-          </span>
-        )}
+        ) : null}
       </form>
 
       <button

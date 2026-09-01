@@ -158,9 +158,12 @@ describe('catalog discovery screen', () => {
     expect(screen.getByRole('link', { name: 'Cascade Hops' })).toBeVisible();
 
     act(() => vi.advanceTimersByTime(1));
-    expect(
-      screen.getByRole('status', { name: 'Searching products' }),
-    ).toBeVisible();
+    const loadingStatuses = screen.getAllByRole('status', {
+      name: 'Searching products',
+    });
+    expect(loadingStatuses).toHaveLength(1);
+    expect(loadingStatuses[0]).toBeVisible();
+    expect(loadingStatuses[0]?.closest('[aria-busy="true"]')).toBeNull();
     expect(screen.getAllByTestId('catalog-product-skeleton')).toHaveLength(8);
     expect(
       screen.queryByRole('link', { name: 'Cascade Hops' }),
