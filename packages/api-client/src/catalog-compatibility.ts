@@ -189,7 +189,7 @@ function projectMeta(value: unknown): CatalogMeta {
   }
   const categories = value.facets.categories;
   if (!Array.isArray(categories)) fail();
-  const projectedCategories = categories.map(projectCategory);
+  const projectedCategories = categories.map(projectCategoryFacet);
   const filters = projectFilters(value.filters);
 
   if (
@@ -237,7 +237,7 @@ function projectFilters(
 ): CatalogMeta['filters'] {
   const { category, maxPriceMinor, minPriceMinor, search } = value;
   if (
-    !isNullableCategory(category) ||
+    !isCategoryList(category) ||
     !isNullableInt32(minPriceMinor) ||
     !isNullableInt32(maxPriceMinor) ||
     !isNullableSearch(search) ||
@@ -248,6 +248,14 @@ function projectFilters(
     fail();
   }
   return { category, maxPriceMinor, minPriceMinor, search };
+}
+
+function projectCategoryFacet(
+  value: unknown,
+): CatalogMeta['facets']['categories'][number] {
+  const category = projectCategory(value);
+  if (!isRecord(value) || !isInt32(value.count)) fail();
+  return { ...category, count: value.count };
 }
 
 function isNullableSearch(value: unknown): value is string | null {
@@ -270,10 +278,17 @@ function isNullableSearch(value: unknown): value is string | null {
   );
 }
 
-function isNullableCategory(value: unknown): value is string | null {
+function isCategoryList(value: unknown): value is string[] {
   return (
-    value === null ||
-    (typeof value === 'string' && SLUG.test(value) && value.length <= 64)
+    Array.isArray(value) &&
+    value.length <= 8 &&
+    value.every(
+      (category) =>
+        typeof category === 'string' &&
+        SLUG.test(category) &&
+        category.length <= 64,
+    ) &&
+    new Set(value).size === value.length
   );
 }
 

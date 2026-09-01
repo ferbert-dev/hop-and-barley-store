@@ -1,5 +1,9 @@
 import { Transform } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
   IsIn,
   IsInt,
   IsString,
@@ -44,6 +48,11 @@ function normalizeSearchValue(value: unknown): unknown {
   return collapsed.length === 0 ? undefined : collapsed;
 }
 
+function normalizeCategoryValues(value: unknown): unknown {
+  if (typeof value === 'string') return [value];
+  return value;
+}
+
 function transformCanonicalInteger(
   value: unknown,
   minimum: number,
@@ -80,11 +89,11 @@ function isMaxNotLessThanMin(
   arguments_: ValidationArguments,
 ): boolean {
   if (typeof value !== 'number') return true;
-  const minimum = (arguments_.object as CatalogQueryDto).minPriceMinor;
+  const minimum = (arguments_.object as CatalogQueryBaseDto).minPriceMinor;
   return typeof minimum !== 'number' || minimum <= value;
 }
 
-export class CatalogQueryDto {
+export class CatalogQueryBaseDto {
   @ApiPropertyOptional({
     description:
       'Unicode NFC search (2-80 characters, at most 8 space-delimited tokens and 32 characters per token); control characters and literal backslash, percent and underscore are forbidden.',
@@ -99,17 +108,6 @@ export class CatalogQueryDto {
     validator: { validate: isValidSearch },
   })
   search?: string;
-
-  @ApiPropertyOptional({
-    maxLength: 64,
-    pattern: CATEGORY_SLUG.source,
-    type: String,
-  })
-  @ValidateIf((_object, value) => value !== undefined)
-  @IsString()
-  @MaxLength(64)
-  @Matches(CATEGORY_SLUG)
-  category?: string;
 
   @ApiPropertyOptional({
     format: 'int32',
@@ -178,4 +176,36 @@ export class CatalogQueryDto {
   @Min(1)
   @Max(48)
   limit = 12;
+}
+
+export class CatalogQueryDto extends CatalogQueryBaseDto {
+  @ApiPropertyOptional({
+    isArray: true,
+    maxLength: 64,
+    pattern: CATEGORY_SLUG.source,
+    type: String,
+  })
+  @Transform(({ value }) => normalizeCategoryValues(value))
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(8)
+  @ArrayUnique()
+  @IsString({ each: true })
+  @MaxLength(64, { each: true })
+  @Matches(CATEGORY_SLUG, { each: true })
+  category?: string[];
+}
+
+export class AdminCatalogQueryDto extends CatalogQueryBaseDto {
+  @ApiPropertyOptional({
+    maxLength: 64,
+    pattern: CATEGORY_SLUG.source,
+    type: String,
+  })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsString()
+  @MaxLength(64)
+  @Matches(CATEGORY_SLUG)
+  category?: string;
 }

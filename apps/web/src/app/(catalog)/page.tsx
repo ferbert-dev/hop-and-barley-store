@@ -42,17 +42,21 @@ export async function generateMetadata({
 
 function buildCatalogTitle(query: CatalogQuery): string {
   if (query.search) return `${query.search} — Hop & Barley products`;
-  if (query.category) {
-    const category = query.category
-      .split('-')
-      .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
-      .join(' ');
+  if (query.category?.length) {
+    const category = query.category.map(titleCaseSlug).join(' and ');
     return `${category} — Hop & Barley products`;
   }
   if (query.page > 1) {
     return `Shop brewing ingredients — Page ${query.page} | Hop & Barley`;
   }
   return 'Shop brewing ingredients | Hop & Barley';
+}
+
+function titleCaseSlug(slug: string): string {
+  return slug
+    .split('-')
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ');
 }
 
 function InvalidCatalogUrl({ message }: { message: string }) {

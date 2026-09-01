@@ -33,10 +33,13 @@ export class CatalogController {
     type: String,
   })
   @ApiQuery({
+    explode: true,
+    isArray: true,
     maxLength: 64,
     name: 'category',
     pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$',
     required: false,
+    style: 'form',
     type: String,
   })
   @ApiQuery({

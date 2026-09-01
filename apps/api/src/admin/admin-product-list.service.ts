@@ -5,7 +5,7 @@ import {
   buildCatalogProductWhere,
   CATALOG_PRODUCT_SORT_ORDER,
 } from '../catalog/catalog-list-query';
-import type { CatalogQueryDto } from '../catalog/dto/catalog-query.dto';
+import type { AdminCatalogQueryDto } from '../catalog/dto/catalog-query.dto';
 import { PrismaService } from '../database/prisma.service';
 import type {
   AdminProductLifecycleStatus,
@@ -41,7 +41,7 @@ export class AdminProductListService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listProducts(
-    query: CatalogQueryDto,
+    query: AdminCatalogQueryDto,
   ): Promise<AdminProductListResponseDto> {
     const evaluatedAt = new Date();
     const where = buildCatalogProductWhere(query, 'admin');
@@ -75,7 +75,9 @@ export class AdminProductListService {
       })),
       meta: {
         currency: 'USD',
-        facets: { categories },
+        facets: {
+          categories: categories.map(({ name, slug }) => ({ name, slug })),
+        },
         filters: {
           category: query.category ?? null,
           maxPriceMinor: query.maxPriceMinor ?? null,

@@ -14,6 +14,7 @@
   "dependencies": {
     "@hop-and-barley/api-client": "workspace:*",
     "@hop-and-barley/auth-contract": "workspace:*",
+    "@phosphor-icons/react": "2.1.10",
     "next": "16.3.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",

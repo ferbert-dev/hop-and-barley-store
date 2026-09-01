@@ -36,9 +36,9 @@ const pagedItem = {
 
 const meta = {
   currency: 'USD',
-  facets: { categories: [{ name: 'Hops', slug: 'hops' }] },
+  facets: { categories: [{ count: 1, name: 'Hops', slug: 'hops' }] },
   filters: {
-    category: null,
+    category: [],
     maxPriceMinor: null,
     minPriceMinor: null,
     search: null,
@@ -93,7 +93,7 @@ describe('loadCatalog', () => {
 
     await expect(
       loadCatalog(
-        { category: 'hops', limit: 12, page: 1, sort: 'name-asc' },
+        { category: ['hops'], limit: 12, page: 1, sort: 'name-asc' },
         'http://api:3001/api/v1',
       ),
     ).resolves.toMatchObject({

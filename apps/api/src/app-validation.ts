@@ -6,7 +6,10 @@ import {
   type INestApplication,
   type PipeTransform,
 } from '@nestjs/common';
-import { CatalogQueryDto } from './catalog/dto/catalog-query.dto';
+import {
+  AdminCatalogQueryDto,
+  CatalogQueryDto,
+} from './catalog/dto/catalog-query.dto';
 
 const CATALOG_QUERY_KEYS = new Set([
   'category',
@@ -23,7 +26,8 @@ export class CatalogQueryKeysPipe implements PipeTransform {
   transform(value: unknown, metadata: ArgumentMetadata): unknown {
     if (
       metadata.type !== 'query' ||
-      metadata.metatype !== CatalogQueryDto ||
+      (metadata.metatype !== CatalogQueryDto &&
+        metadata.metatype !== AdminCatalogQueryDto) ||
       value === null ||
       typeof value !== 'object'
     ) {

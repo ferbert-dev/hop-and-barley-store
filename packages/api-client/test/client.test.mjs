@@ -36,9 +36,9 @@ const pagedItem = {
 
 const meta = {
   currency: 'USD',
-  facets: { categories: [{ name: 'Hops', slug: 'hops' }] },
+  facets: { categories: [{ count: 1, name: 'Hops', slug: 'hops' }] },
   filters: {
-    category: null,
+    category: [],
     maxPriceMinor: null,
     minPriceMinor: null,
     search: null,
@@ -93,7 +93,7 @@ test('createApiClient forwards no-store and catalog query exactly', async () => 
   await client.GET('/api/v1/products', {
     params: {
       query: {
-        category: 'hops',
+        category: ['hops'],
         limit: 12,
         maxPriceMinor: 900,
         minPriceMinor: 100,

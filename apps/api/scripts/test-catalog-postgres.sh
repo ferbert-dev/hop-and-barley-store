@@ -74,7 +74,8 @@ for migration in \
   20260827150000_disable_cart_reservations \
   20260828153000_add_product_activity_window \
   20260828163000_align_ingredient_product_types \
-  20260828170000_enable_uploaded_product_assets; do
+  20260828170000_enable_uploaded_product_assets \
+  20260901110000_add_catalog_full_text_search; do
   docker exec --interactive "$container_name" psql \
     --set ON_ERROR_STOP=1 --username "$database_user" --dbname upgrade_catalog \
     < "$repo_root/apps/api/prisma/migrations/$migration/migration.sql"
@@ -126,6 +127,24 @@ test "$upgrade_citra_id" = '20000000-0000-4000-8000-000000000001'
 
 DATABASE_URL="$fresh_url" pnpm --dir "$repo_root" --filter @hop-and-barley/api db:migrate:deploy
 seed_twice_and_verify "$fresh_url" fresh_catalog 12
+
+docker exec "$container_name" createdb -U "$database_user" \
+  --template fresh_catalog rollback_f5_search
+f5_search_rollback_path="$repo_root/apps/api/prisma/migrations/20260901110000_add_catalog_full_text_search/rollback.sql"
+docker exec --interactive "$container_name" psql --no-psqlrc \
+  --set ON_ERROR_STOP=1 --username "$database_user" --dbname rollback_f5_search \
+  < "$f5_search_rollback_path"
+f5_search_rollback_state=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname rollback_f5_search \
+  --command 'SELECT (SELECT count(*) FROM information_schema.columns WHERE table_schema = '"'"'public'"'"' AND table_name = '"'"'Product'"'"' AND column_name = '"'"'searchDocument'"'"') || '"'"':'"'"' || (SELECT count(*) FROM pg_indexes WHERE schemaname = '"'"'public'"'"' AND tablename = '"'"'Product'"'"' AND indexname = '"'"'Product_searchDocument_idx'"'"');')
+test "$f5_search_rollback_state" = '0:0'
+docker exec --interactive "$container_name" psql --no-psqlrc \
+  --set ON_ERROR_STOP=1 --username "$database_user" --dbname rollback_f5_search \
+  < "$repo_root/apps/api/prisma/migrations/20260901110000_add_catalog_full_text_search/migration.sql"
+f5_search_reapply_state=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname rollback_f5_search \
+  --command 'SELECT (SELECT count(*) FROM pg_indexes WHERE schemaname = '"'"'public'"'"' AND tablename = '"'"'Product'"'"' AND indexname = '"'"'Product_searchDocument_idx'"'"') || '"'"':'"'"' || (SELECT count(*) FROM "Product" WHERE "searchDocument" @@ websearch_to_tsquery('"'"'simple'"'"', '"'"'citra'"'"'));')
+test "$f5_search_reapply_state" = '1:1'
 
 docker exec "$container_name" createdb -U "$database_user" \
   --template fresh_catalog rollback_c1a

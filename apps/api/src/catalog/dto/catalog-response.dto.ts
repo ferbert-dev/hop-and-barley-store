@@ -14,12 +14,12 @@ export class CatalogFiltersDto {
   search!: string | null;
 
   @ApiProperty({
+    isArray: true,
     maxLength: 64,
-    nullable: true,
     pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$',
     type: String,
   })
-  category!: string | null;
+  category!: string[];
 
   @ApiProperty({
     format: 'int32',
@@ -41,8 +41,13 @@ export class CatalogFiltersDto {
 }
 
 export class CatalogFacetsDto {
-  @ApiProperty({ isArray: true, type: () => ProductCategoryDto })
-  categories!: ProductCategoryDto[];
+  @ApiProperty({ isArray: true, type: () => CatalogCategoryFacetDto })
+  categories!: CatalogCategoryFacetDto[];
+}
+
+export class CatalogCategoryFacetDto extends ProductCategoryDto {
+  @ApiProperty({ format: 'int32', minimum: 0, type: 'integer' })
+  count!: number;
 }
 
 export class CatalogMetaDto {

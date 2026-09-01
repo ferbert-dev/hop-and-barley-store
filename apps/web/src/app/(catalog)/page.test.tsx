@@ -12,7 +12,10 @@ const { redirect } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../lib/catalog', () => ({ loadCatalog: vi.fn() }));
-vi.mock('next/navigation', () => ({ redirect }));
+vi.mock('next/navigation', () => ({
+  redirect,
+  useRouter: () => ({ replace: vi.fn() }),
+}));
 vi.mock('next/image', () => ({
   default: ({ alt, ...props }: ComponentProps<'img'>) => (
     // eslint-disable-next-line @next/next/no-img-element
@@ -30,9 +33,9 @@ const pagedResult = {
     kind: 'paged' as const,
     meta: {
       currency: 'USD' as const,
-      facets: { categories: [{ name: 'Hops', slug: 'hops' }] },
+      facets: { categories: [{ count: 1, name: 'Hops', slug: 'hops' }] },
       filters: {
-        category: null,
+        category: [],
         maxPriceMinor: null,
         minPriceMinor: null,
         search: null,
@@ -86,7 +89,7 @@ describe('catalog route', () => {
     expect(loadCatalog).not.toHaveBeenCalled();
     expect(screen.getByRole('status')).toHaveTextContent('API not contacted');
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Catalog parameters must appear only once.',
+      'Only Product Type may appear more than once.',
     );
     expect(
       screen.getByRole('link', { name: 'Clear catalog URL' }),

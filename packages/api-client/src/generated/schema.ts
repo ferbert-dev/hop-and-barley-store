@@ -426,14 +426,20 @@ export interface components {
         CatalogFiltersDto: {
             /** @description Normalized Unicode NFC search; null when omitted. Control characters and literal backslash, percent and underscore are forbidden. */
             search: string | null;
-            category: string | null;
+            category: string[];
             /** Format: int32 */
             minPriceMinor: number | null;
             /** Format: int32 */
             maxPriceMinor: number | null;
         };
+        CatalogCategoryFacetDto: {
+            slug: string;
+            name: string;
+            /** Format: int32 */
+            count: number;
+        };
         CatalogFacetsDto: {
-            categories: components["schemas"]["ProductCategoryDto"][];
+            categories: components["schemas"]["CatalogCategoryFacetDto"][];
         };
         CatalogMetaDto: {
             /** Format: int32 */
@@ -1072,7 +1078,7 @@ export interface operations {
                 sort?: "name-asc" | "name-desc" | "price-asc" | "price-desc";
                 maxPriceMinor?: number;
                 minPriceMinor?: number;
-                category?: string;
+                category?: string[];
                 /** @description Unicode NFC search; control characters and literal backslash, percent and underscore are forbidden. */
                 search?: string;
             };

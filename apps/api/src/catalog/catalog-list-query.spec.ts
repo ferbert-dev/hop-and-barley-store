@@ -3,15 +3,18 @@ import {
   buildCatalogProductWhere,
 } from './catalog-list-query';
 
-describe('catalog ingredient Product Type facets', () => {
+describe('catalog Product Type facets', () => {
   it.each(['public', 'admin'] as const)(
-    'limits %s selectors to the four approved ingredient types',
+    'discovers %s selectors from categories with matching products',
     (visibility) => {
       expect(buildCatalogFacetQuery(visibility)).toMatchObject({
         where: {
-          slug: { in: ['hops', 'malts', 'yeast', 'adjuncts'] },
+          products: { some: { currency: 'USD' } },
         },
       });
+      expect(buildCatalogFacetQuery(visibility).where).not.toHaveProperty(
+        'slug',
+      );
     },
   );
 });

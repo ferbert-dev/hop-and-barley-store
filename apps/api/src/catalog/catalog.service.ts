@@ -11,6 +11,8 @@ import {
   buildCatalogFacetQuery,
   buildCatalogProductWhere,
   buildPublicProductLifecycleWhere,
+  buildCatalogSearchCountQuery,
+  buildCatalogSearchPageQuery,
   CATALOG_PRODUCT_SORT_ORDER,
 } from './catalog-list-query';
 
@@ -77,6 +79,39 @@ export class CatalogService {
     const facetQuery = buildCatalogFacetQuery('public', evaluatedAt);
     const { categories, products, totalItems } = await this.prisma.$transaction(
       async (transaction) => {
+        if (query.search) {
+          const [countRows, idRows, facets] = await Promise.all([
+            transaction.$queryRaw<{ totalItems: number }[]>(
+              buildCatalogSearchCountQuery(query, evaluatedAt),
+            ),
+            transaction.$queryRaw<{ id: string }[]>(
+              buildCatalogSearchPageQuery(query, evaluatedAt),
+            ),
+            transaction.category.findMany(facetQuery),
+          ]);
+          const orderedIds = idRows.map(({ id }) => id);
+          const unorderedProducts =
+            orderedIds.length === 0
+              ? []
+              : await transaction.product.findMany({
+                  select: productSelect,
+                  where: { id: { in: orderedIds } },
+                });
+          const order = new Map(
+            orderedIds.map((id, index) => [id, index] as const),
+          );
+
+          return {
+            categories: facets,
+            products: unorderedProducts.toSorted(
+              (left, right) =>
+                (order.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+                (order.get(right.id) ?? Number.MAX_SAFE_INTEGER),
+            ),
+            totalItems: countRows[0]?.totalItems ?? 0,
+          };
+        }
+
         const [count, items, facets] = await Promise.all([
           transaction.product.count({ where }),
           transaction.product.findMany({
@@ -107,9 +142,15 @@ export class CatalogService {
       })),
       meta: {
         currency: 'USD',
-        facets: { categories },
+        facets: {
+          categories: categories.map(({ _count, name, slug }) => ({
+            count: _count.products,
+            name,
+            slug,
+          })),
+        },
         filters: {
-          category: query.category ?? null,
+          category: query.category ?? [],
           maxPriceMinor: query.maxPriceMinor ?? null,
           minPriceMinor: query.minPriceMinor ?? null,
           search: query.search ?? null,

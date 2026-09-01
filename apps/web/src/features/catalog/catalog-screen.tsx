@@ -59,7 +59,7 @@ export function CatalogScreen({
   const { items, meta } = result.catalog;
   const hasFilters = Boolean(
     query.search ||
-    query.category ||
+    query.category?.length ||
     query.minPriceMinor !== undefined ||
     query.maxPriceMinor !== undefined,
   );
@@ -70,11 +70,7 @@ export function CatalogScreen({
       <section className={styles.catalog} aria-labelledby="catalog-title">
         <CatalogHeading />
         <div className={styles.discoveryLayout}>
-          <CatalogControls
-            categories={meta.facets.categories}
-            query={query}
-            showClear={hasFilters && items.length > 0}
-          />
+          <CatalogControls categories={meta.facets.categories} query={query} />
           <div className={styles.results}>
             <div className={styles.resultHeading}>
               <p aria-live="polite">
