@@ -16,7 +16,11 @@ import {
 } from 'react';
 
 import { Button } from '../../components/ui/button';
-import { buildCatalogHref, type CatalogQuery } from './catalog-query';
+import {
+  buildCatalogHref,
+  buildCatalogTitle,
+  type CatalogQuery,
+} from './catalog-query';
 import styles from './catalog.module.css';
 
 type CatalogHrefBuilder = (
@@ -30,10 +34,12 @@ const DEFAULT_SORT: CatalogQuery['sort'] = 'name-asc';
 
 export function CatalogControls({
   buildHref = buildCatalogHref,
+  categorySelection = 'multiple',
   categories,
   query,
 }: {
   buildHref?: CatalogHrefBuilder;
+  categorySelection?: 'multiple' | 'single';
   categories: CompatibleCatalogCategoryFacet[];
   query: CatalogQuery;
 }) {
@@ -47,6 +53,8 @@ export function CatalogControls({
   const [draftSort, setDraftSort] = useState<CatalogQuery['sort']>(query.sort);
   const [search, setSearch] = useState(query.search ?? '');
   const [isPending, startTransition] = useTransition();
+  const activeSearch = query.search ?? '';
+  const catalogTitle = buildCatalogTitle(query);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -57,8 +65,11 @@ export function CatalogControls({
   }, [drawerOpen]);
 
   useEffect(() => {
+    document.title = catalogTitle;
+  }, [catalogTitle]);
+
+  useEffect(() => {
     const normalized = normalizeSearch(search);
-    const activeSearch = query.search ?? '';
     if (normalized === activeSearch) return;
     if (!isSearchReady(normalized)) return;
 
@@ -76,7 +87,7 @@ export function CatalogControls({
     }, SEARCH_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timeout);
-  }, [buildHref, query, router, search]);
+  }, [activeSearch, buildHref, query, router, search]);
 
   function openDrawer() {
     setDraftCategories(query.category ?? []);
@@ -90,6 +101,10 @@ export function CatalogControls({
   }
 
   function applyFilters() {
+    const selectedCategories =
+      categorySelection === 'single'
+        ? draftCategories.slice(0, 1)
+        : draftCategories;
     closeDrawer();
     startTransition(() => {
       router.replace(
@@ -97,9 +112,9 @@ export function CatalogControls({
           query,
           {
             category:
-              draftCategories.length === 0
+              selectedCategories.length === 0
                 ? undefined
-                : draftCategories.toSorted(),
+                : selectedCategories.toSorted(),
             sort: draftSort,
           },
           true,
@@ -117,6 +132,10 @@ export function CatalogControls({
   }
 
   function toggleCategory(slug: string) {
+    if (categorySelection === 'single') {
+      setDraftCategories([slug]);
+      return;
+    }
     setDraftCategories((current) =>
       current.includes(slug)
         ? current.filter((category) => category !== slug)
@@ -214,14 +233,19 @@ export function CatalogControls({
 
         <fieldset className={styles.productTypes}>
           <legend>Product Type</legend>
-          <p className={styles.filterLogic}>Match any selected type</p>
+          <p className={styles.filterLogic}>
+            {categorySelection === 'single'
+              ? 'Select one product type'
+              : 'Match any selected type'}
+          </p>
           <div className={styles.productTypeList}>
             {categories.map((category) => (
               <label className={styles.productType} key={category.slug}>
                 <input
                   checked={draftCategories.includes(category.slug)}
+                  name="product-type"
                   onChange={() => toggleCategory(category.slug)}
-                  type="checkbox"
+                  type={categorySelection === 'single' ? 'radio' : 'checkbox'}
                   value={category.slug}
                 />
                 <span>{category.name}</span>

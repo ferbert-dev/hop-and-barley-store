@@ -138,6 +138,25 @@ describe('catalog discovery screen', () => {
     });
   });
 
+  it('syncs search and title when URL-owned query props change', () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      <CatalogScreen
+        query={{ ...query, search: 'Citra' }}
+        result={pagedResult()}
+      />,
+    );
+    expect(screen.getByRole('searchbox')).toHaveValue('Citra');
+    expect(document.title).toBe('Citra — Hop & Barley products');
+
+    rerender(<CatalogScreen query={query} result={pagedResult()} />);
+
+    expect(screen.getByRole('searchbox')).toHaveValue('');
+    expect(document.title).toBe('Shop brewing ingredients | Hop & Barley');
+    act(() => vi.advanceTimersByTime(300));
+    expect(replace).not.toHaveBeenCalled();
+  });
+
   it('stages dynamic product types and closes the drawer after Apply', () => {
     render(<CatalogScreen query={query} result={pagedResult()} />);
 
@@ -177,6 +196,44 @@ describe('catalog discovery screen', () => {
       '/?search=citra+hops&category=hops&sort=price-desc',
       { scroll: false },
     );
+  });
+
+  it('limits predecessor rollback facets to one product type', () => {
+    const current = extractPaged(pagedResult());
+    render(
+      <CatalogScreen
+        query={query}
+        result={{
+          catalog: {
+            ...current,
+            kind: 'paged-predecessor',
+            meta: {
+              ...current.meta,
+              facets: {
+                categories: current.meta.facets.categories.map(
+                  ({ name, slug }) => ({ name, slug }),
+                ),
+              },
+            },
+          },
+          connected: true,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const dialog = screen.getByRole('dialog', { name: 'Filters' });
+    expect(within(dialog).getByText('Select one product type')).toBeVisible();
+    expect(within(dialog).queryByText('3')).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('radio', { name: /Hops/ }));
+    fireEvent.click(within(dialog).getByRole('radio', { name: /Malts/ }));
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Apply filters' }),
+    );
+
+    expect(replace).toHaveBeenCalledWith('/?category=malts', {
+      scroll: false,
+    });
   });
 
   it('distinguishes no matches from an out-of-range page', () => {

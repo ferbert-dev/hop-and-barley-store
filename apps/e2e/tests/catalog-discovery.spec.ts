@@ -51,6 +51,30 @@ test('renders the ready catalog and applies URL-owned filters', async ({
   await expect(page.getByText('1 product found').first()).toBeVisible();
 });
 
+test('keeps realtime search synchronized with client navigation and title', async ({
+  page,
+}) => {
+  test.skip(unavailable, 'requires the connected API');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+  const search = page
+    .getByRole('searchbox', { name: /Search products/ })
+    .first();
+  await search.fill('Citra');
+  await expect(page).toHaveURL(/\?search=Citra$/);
+  await expect(page).toHaveTitle('Citra — Hop & Barley products');
+
+  await page
+    .getByRole('navigation', { name: 'Storefront' })
+    .getByRole('link', { name: 'Products', exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(search).toHaveValue('');
+  await page.waitForTimeout(400);
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveTitle('Shop brewing ingredients | Hop & Barley');
+});
+
 test('renders dynamic filter choices and preserves only approved discovery controls', async ({
   page,
 }) => {
@@ -621,9 +645,11 @@ async function assertReducedMotionState(page: Page, label: string) {
 
 async function assertGridColumns(articles: Locator, width: number) {
   const boxes = await Promise.all(
-    [0, 1, 2].map((index) => articles.nth(index).boundingBox()),
+    [0, 1, 2, 3].map((index) => articles.nth(index).boundingBox()),
   );
   expect(boxes.every(Boolean)).toBe(true);
   const columns = new Set(boxes.map((box) => Math.round(box!.x)));
-  expect(columns.size).toBe(width < 768 ? 1 : width < 1024 ? 2 : 3);
+  expect(columns.size).toBe(
+    width < 768 ? 1 : width < 1024 ? 2 : width < 1280 ? 3 : 4,
+  );
 }

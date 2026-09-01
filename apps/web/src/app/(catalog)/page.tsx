@@ -5,8 +5,8 @@ import { Button } from '../../components/ui/button';
 import { ErrorState } from '../../components/ui/status';
 import { CatalogHero } from '../../features/catalog/catalog-hero';
 import {
+  buildCatalogTitle,
   parseCatalogSearchParams,
-  type CatalogQuery,
   type CatalogSearchParams,
 } from '../../features/catalog/catalog-query';
 import { CatalogScreen } from '../../features/catalog/catalog-screen';
@@ -38,25 +38,6 @@ export async function generateMetadata({
         ? 'Invalid catalog URL | Hop & Barley'
         : buildCatalogTitle(parsed.query),
   };
-}
-
-function buildCatalogTitle(query: CatalogQuery): string {
-  if (query.search) return `${query.search} — Hop & Barley products`;
-  if (query.category?.length) {
-    const category = query.category.map(titleCaseSlug).join(' and ');
-    return `${category} — Hop & Barley products`;
-  }
-  if (query.page > 1) {
-    return `Shop brewing ingredients — Page ${query.page} | Hop & Barley`;
-  }
-  return 'Shop brewing ingredients | Hop & Barley';
-}
-
-function titleCaseSlug(slug: string): string {
-  return slug
-    .split('-')
-    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
-    .join(' ');
 }
 
 function InvalidCatalogUrl({ message }: { message: string }) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildCatalogHref,
+  buildCatalogTitle,
   DEFAULT_CATALOG_QUERY,
   parseCatalogSearchParams,
 } from './catalog-query';
@@ -123,5 +124,20 @@ describe('catalog URL query contract', () => {
       kind: 'valid',
       query: { category: ['hops', 'malts'] },
     });
+  });
+
+  it('builds the document title from canonical catalog state', () => {
+    expect(buildCatalogTitle(DEFAULT_CATALOG_QUERY)).toBe(
+      'Shop brewing ingredients | Hop & Barley',
+    );
+    expect(
+      buildCatalogTitle({ ...DEFAULT_CATALOG_QUERY, search: 'Citra' }),
+    ).toBe('Citra — Hop & Barley products');
+    expect(
+      buildCatalogTitle({
+        ...DEFAULT_CATALOG_QUERY,
+        category: ['brewing-salts', 'yeast'],
+      }),
+    ).toBe('Brewing Salts and Yeast — Hop & Barley products');
   });
 });

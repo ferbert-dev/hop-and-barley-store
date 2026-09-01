@@ -166,6 +166,25 @@ export function buildCatalogHref(
   return serialized.length === 0 ? '/' : `/?${serialized}`;
 }
 
+export function buildCatalogTitle(query: CatalogQuery): string {
+  if (query.search) return `${query.search} — Hop & Barley products`;
+  if (query.category?.length) {
+    const category = query.category.map(titleCaseSlug).join(' and ');
+    return `${category} — Hop & Barley products`;
+  }
+  if (query.page > 1) {
+    return `Shop brewing ingredients — Page ${String(query.page)} | Hop & Barley`;
+  }
+  return 'Shop brewing ingredients | Hop & Barley';
+}
+
+function titleCaseSlug(slug: string): string {
+  return slug
+    .split('-')
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ');
+}
+
 type Parsed<T> = { kind: 'valid'; value: T | undefined } | { kind: 'invalid' };
 
 function parseSearch(value: string | undefined): Parsed<string> {

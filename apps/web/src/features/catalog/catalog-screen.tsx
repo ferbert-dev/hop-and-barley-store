@@ -70,7 +70,16 @@ export function CatalogScreen({
       <section className={styles.catalog} aria-labelledby="catalog-title">
         <CatalogHeading />
         <div className={styles.discoveryLayout}>
-          <CatalogControls categories={meta.facets.categories} query={query} />
+          <CatalogControls
+            categories={meta.facets.categories}
+            categorySelection={
+              result.catalog.kind === 'paged-predecessor'
+                ? 'single'
+                : 'multiple'
+            }
+            key={query.search ?? ''}
+            query={query}
+          />
           <div className={styles.results}>
             <div className={styles.resultHeading}>
               <p aria-live="polite">

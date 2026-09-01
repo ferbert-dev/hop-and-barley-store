@@ -73,8 +73,9 @@ fails closed as an unavailable catalog.
   one-column product grid;
 - `48rem` through `63.999rem`: compact discovery controls, a right-side filter
   drawer, and a two-column product grid;
-- at `64rem` and wider: compact discovery controls, a right-side filter drawer,
-  and a four-column product grid;
+- `64rem` through `79.999rem`: compact discovery controls, a right-side filter
+  drawer, and a three-column product grid;
+- at `80rem` and wider: the product grid expands to four columns;
 - all Q1 probe widths allow at most one CSS pixel of unexpected horizontal
   overflow;
 - every visible catalog link, button, input, and select is at least 44 CSS
@@ -102,5 +103,6 @@ loading/error behavior, focus visibility and responsive layout against the
 running Docker stack.
 
 Application rollback restores the predecessor catalog route and client. The
-database migration may be rolled back separately with its checked `down.sql`;
+database migration may be rolled back separately with its checked
+`rollback.sql`;
 the generated full-text-search column and GIN index contain derived data only.
