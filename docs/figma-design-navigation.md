@@ -189,6 +189,20 @@ Page 1 (0:1)
   two different product types always returns no products. Do not change the
   query/API contract until OR versus literal AND is confirmed.
 
+**User-confirmed catalog search loading extension — 2026-09-01**
+
+- Product-title/name search starts after the user pauses typing; the accepted
+  debounce remains 300 ms.
+- During the server-rendered search navigation, stale product cards are
+  replaced by responsive product-card skeletons with one small centered
+  spinner. The loading UI disappears when the matching database results arrive.
+- The search field may retain a compact activity glyph, but it does not repeat
+  visible loading copy. The result region owns the accessible live status.
+- Reduced-motion users receive the same loading structure without looping
+  spinner or skeleton animation.
+- This loading state is user-approved behavior absent from the source frame; it
+  does not change the existing product-name prefix search contract.
+
 ### Product details — `product`
 
 [Open node `9:2284`](https://www.figma.com/design/H7jIUNYzAGc7o8R0iABQjy/Project-M4-1--Next.js--share-?node-id=9-2284)

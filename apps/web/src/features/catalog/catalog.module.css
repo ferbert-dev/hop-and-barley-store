@@ -246,6 +246,85 @@
   min-width: 0;
 }
 
+.searchResultsLoading {
+  min-block-size: 34rem;
+  position: relative;
+}
+
+.productSkeleton {
+  display: grid;
+  gap: var(--hb-space-3);
+}
+
+.skeletonSurface {
+  animation: catalog-skeleton-pulse 900ms ease-in-out infinite alternate;
+  background: var(--hb-color-surface-muted);
+  border-radius: var(--hb-radius-sm);
+  display: block;
+}
+
+.skeletonMedia {
+  aspect-ratio: 3 / 2;
+  border-radius: var(--hb-radius-md);
+}
+
+.skeletonEyebrow {
+  block-size: 0.65rem;
+  inline-size: 22%;
+  margin-block-start: var(--hb-space-1);
+}
+
+.skeletonTitle {
+  block-size: 1.35rem;
+  inline-size: 68%;
+}
+
+.skeletonPrice {
+  block-size: 1rem;
+  inline-size: 45%;
+}
+
+.skeletonDescription {
+  block-size: 0.9rem;
+  inline-size: 82%;
+}
+
+.searchResultsProgress {
+  align-items: center;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  pointer-events: none;
+  position: absolute;
+}
+
+.searchResultsSpinnerFrame {
+  align-items: center;
+  background: var(--hb-color-surface);
+  border: 1px solid var(--hb-color-border);
+  border-radius: 999px;
+  box-shadow: var(--hb-shadow-md);
+  color: var(--hb-color-brand);
+  display: inline-flex;
+  justify-content: center;
+  min-block-size: 3.5rem;
+  min-inline-size: 3.5rem;
+}
+
+.searchResultsSpinner {
+  animation: catalog-search-spin 700ms linear infinite;
+}
+
+@keyframes catalog-skeleton-pulse {
+  from {
+    opacity: 0.48;
+  }
+
+  to {
+    opacity: 0.9;
+  }
+}
+
 .resultHeading {
   align-items: center;
   display: flex;
@@ -341,6 +420,14 @@
 
 .pagination [aria-disabled='true'] {
   opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .searchSpinner,
+  .searchResultsSpinner,
+  .skeletonSurface {
+    animation: none;
+  }
 }
 
 @media (min-width: 48rem) {
