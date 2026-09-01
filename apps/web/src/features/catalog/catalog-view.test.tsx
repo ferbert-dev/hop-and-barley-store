@@ -138,7 +138,7 @@ describe('catalog discovery screen', () => {
     });
   });
 
-  it('shows visible progress while a search is waiting to update', () => {
+  it('keeps results during debounce, then shows skeletons until search results arrive', () => {
     vi.useFakeTimers();
     const { rerender } = render(
       <CatalogScreen query={query} result={pagedResult()} />,
@@ -148,16 +148,37 @@ describe('catalog discovery screen', () => {
       target: { value: 'Ca' },
     });
 
-    expect(screen.getByText('Searching…')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Cascade Hops' })).toBeVisible();
+    expect(
+      screen.queryByRole('status', { name: 'Searching products' }),
+    ).not.toBeInTheDocument();
 
-    act(() => vi.advanceTimersByTime(300));
+    act(() => vi.advanceTimersByTime(299));
+    expect(replace).not.toHaveBeenCalled();
+    expect(screen.getByRole('link', { name: 'Cascade Hops' })).toBeVisible();
+
+    act(() => vi.advanceTimersByTime(1));
+    const loadingStatuses = screen.getAllByRole('status', {
+      name: 'Searching products',
+    });
+    expect(loadingStatuses).toHaveLength(1);
+    expect(loadingStatuses[0]).toBeVisible();
+    expect(loadingStatuses[0]?.closest('[aria-busy="true"]')).toBeNull();
+    expect(screen.getAllByTestId('catalog-product-skeleton')).toHaveLength(8);
+    expect(
+      screen.queryByRole('link', { name: 'Cascade Hops' }),
+    ).not.toBeInTheDocument();
+
     rerender(
       <CatalogScreen
         query={{ ...query, search: 'Ca' }}
         result={pagedResult()}
       />,
     );
-    expect(screen.queryByText('Searching…')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('status', { name: 'Searching products' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cascade Hops' })).toBeVisible();
   });
 
   it('automatically restores all products when the search is cleared', () => {
@@ -184,6 +205,18 @@ describe('catalog discovery screen', () => {
     });
 
     expect(replace).toHaveBeenCalledWith('/', { scroll: false });
+    expect(
+      screen.getByRole('status', { name: 'Searching products' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('link', { name: 'Cascade Hops' }),
+    ).not.toBeInTheDocument();
+
+    rerender(<CatalogScreen query={query} result={pagedResult()} />);
+    expect(
+      screen.queryByRole('status', { name: 'Searching products' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cascade Hops' })).toBeVisible();
   });
 
   it('supersedes an in-flight search when cleared before URL props commit', () => {

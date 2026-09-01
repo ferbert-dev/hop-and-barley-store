@@ -6,6 +6,10 @@ import { CatalogHero } from './catalog-hero';
 import { CatalogPagination } from './catalog-pagination';
 import { LegacyCatalogCard, PagedCatalogCard } from './catalog-product';
 import { buildCatalogHref, type CatalogQuery } from './catalog-query';
+import {
+  CatalogSearchResults,
+  CatalogSearchTransitionProvider,
+} from './catalog-search-transition';
 import styles from './catalog.module.css';
 
 export function CatalogScreen({
@@ -70,40 +74,45 @@ export function CatalogScreen({
       <section className={styles.catalog} aria-labelledby="catalog-title">
         <CatalogHeading />
         <div className={styles.discoveryLayout}>
-          <CatalogControls
-            categories={meta.facets.categories}
-            categorySelection={
-              result.catalog.kind === 'paged-predecessor'
-                ? 'single'
-                : 'multiple'
-            }
-            query={query}
-          />
-          <div className={styles.results}>
-            <div className={styles.resultHeading}>
-              <p aria-live="polite">
-                {meta.totalItems}{' '}
-                {meta.totalItems === 1 ? 'product' : 'products'} found
-              </p>
-            </div>
-            {items.length > 0 ? (
-              <>
-                <div className={styles.productGrid}>
-                  {items.map((product) => (
-                    <PagedCatalogCard key={product.id} product={product} />
-                  ))}
-                </div>
-                <CatalogPagination query={query} totalPages={meta.totalPages} />
-              </>
-            ) : (
-              <CatalogEmptyState
-                hasFilters={hasFilters}
-                query={query}
-                totalItems={meta.totalItems}
-                totalPages={meta.totalPages}
-              />
-            )}
-          </div>
+          <CatalogSearchTransitionProvider activeSearch={query.search ?? ''}>
+            <CatalogControls
+              categories={meta.facets.categories}
+              categorySelection={
+                result.catalog.kind === 'paged-predecessor'
+                  ? 'single'
+                  : 'multiple'
+              }
+              query={query}
+            />
+            <CatalogSearchResults>
+              <div className={styles.resultHeading}>
+                <p aria-live="polite">
+                  {meta.totalItems}{' '}
+                  {meta.totalItems === 1 ? 'product' : 'products'} found
+                </p>
+              </div>
+              {items.length > 0 ? (
+                <>
+                  <div className={styles.productGrid}>
+                    {items.map((product) => (
+                      <PagedCatalogCard key={product.id} product={product} />
+                    ))}
+                  </div>
+                  <CatalogPagination
+                    query={query}
+                    totalPages={meta.totalPages}
+                  />
+                </>
+              ) : (
+                <CatalogEmptyState
+                  hasFilters={hasFilters}
+                  query={query}
+                  totalItems={meta.totalItems}
+                  totalPages={meta.totalPages}
+                />
+              )}
+            </CatalogSearchResults>
+          </CatalogSearchTransitionProvider>
         </div>
       </section>
     </>

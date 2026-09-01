@@ -22,6 +22,7 @@ import {
   buildCatalogTitle,
   type CatalogQuery,
 } from './catalog-query';
+import { useCatalogSearchTransition } from './catalog-search-transition';
 import styles from './catalog.module.css';
 
 type CatalogHrefBuilder = (
@@ -62,6 +63,7 @@ export function CatalogControls({
   }
   const search = searchState.value;
   const [isPending, startTransition] = useTransition();
+  const { beginSearch } = useCatalogSearchTransition();
   const catalogTitle = buildCatalogTitle(query);
   const normalizedSearch = normalizeSearch(search);
   const isSearchUpdating =
@@ -91,6 +93,7 @@ export function CatalogControls({
     const timeout = window.setTimeout(() => {
       searchTimeoutRef.current = null;
       immediateSearchRef.current = normalized;
+      beginSearch(normalized);
       startTransition(() => {
         router.replace(
           buildHref(
@@ -108,7 +111,7 @@ export function CatalogControls({
       window.clearTimeout(timeout);
       if (searchTimeoutRef.current === timeout) searchTimeoutRef.current = null;
     };
-  }, [activeSearch, buildHref, query, router, search]);
+  }, [activeSearch, beginSearch, buildHref, query, router, search]);
 
   function openDrawer() {
     setDraftCategories(query.category ?? []);
@@ -131,6 +134,7 @@ export function CatalogControls({
     }
 
     immediateSearchRef.current = '';
+    beginSearch('');
     startTransition(() => {
       router.replace(buildHref(query, { search: undefined }, true), {
         scroll: false,
@@ -152,6 +156,9 @@ export function CatalogControls({
     cancelPendingSearch();
     const searchOverride = getSearchOverride();
     immediateSearchRef.current = searchOverride ?? '';
+    if ((searchOverride ?? '') !== activeSearch) {
+      beginSearch(searchOverride ?? '');
+    }
     startTransition(() => {
       router.replace(
         buildHref(
@@ -175,6 +182,9 @@ export function CatalogControls({
     cancelPendingSearch();
     const searchOverride = getSearchOverride();
     immediateSearchRef.current = searchOverride ?? '';
+    if ((searchOverride ?? '') !== activeSearch) {
+      beginSearch(searchOverride ?? '');
+    }
     startTransition(() => {
       router.replace(buildHref(query, { search: searchOverride, sort }, true), {
         scroll: false,
@@ -222,39 +232,24 @@ export function CatalogControls({
           Search products
         </label>
         <input
-          aria-describedby="catalog-search-status"
           autoComplete="off"
           className={styles.searchInput}
           id="catalog-search"
           maxLength={80}
           onChange={(event) => updateSearch(event.currentTarget.value)}
-          placeholder="Search products, varieties, or flavors"
+          placeholder="Search products by name"
           type="search"
           value={search}
         />
         {isSearchUpdating ? (
-          <span
-            aria-live="polite"
-            className={styles.searchProgress}
-            id="catalog-search-status"
-          >
+          <span aria-hidden="true" className={styles.searchProgress}>
             <CircleNotch
-              aria-hidden="true"
               className={styles.searchSpinner}
               size={18}
               weight="bold"
             />
-            Searching…
           </span>
-        ) : (
-          <span
-            aria-live="polite"
-            className="visually-hidden"
-            id="catalog-search-status"
-          >
-            Products updated
-          </span>
-        )}
+        ) : null}
       </form>
 
       <button
