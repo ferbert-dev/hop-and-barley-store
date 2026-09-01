@@ -52,6 +52,12 @@ const meta = {
   totalPages: 1,
 };
 
+const predecessorMeta = {
+  ...meta,
+  facets: { categories: [{ name: 'Hops', slug: 'hops' }] },
+  filters: { ...meta.filters, category: 'hops' },
+};
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe('resolveApiOrigin', () => {
@@ -134,6 +140,54 @@ describe('loadCatalog', () => {
       },
       connected: true,
     });
+  });
+
+  it('retries a repeated category as one category only for the immediate predecessor', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 400 }))
+      .mockResolvedValueOnce(
+        Response.json({ items: [pagedItem], meta: predecessorMeta }),
+      );
+    vi.stubGlobal('fetch', fetch);
+
+    await expect(
+      loadCatalog(
+        {
+          category: ['hops', 'malts'],
+          limit: 12,
+          page: 1,
+          sort: 'name-asc',
+        },
+        'http://api:3001',
+      ),
+    ).resolves.toMatchObject({
+      catalog: { kind: 'paged-predecessor' },
+      connected: true,
+    });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect((fetch.mock.calls[0]?.[0] as Request).url).toContain(
+      'category=hops&category=malts',
+    );
+    expect((fetch.mock.calls[1]?.[0] as Request).url).toContain(
+      'category=hops',
+    );
+    expect((fetch.mock.calls[1]?.[0] as Request).url).not.toContain(
+      'category=malts',
+    );
+  });
+
+  it('does not disguise a current API failure as predecessor compatibility', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 500 }))
+      .mockResolvedValueOnce(Response.json({ items: [pagedItem], meta }));
+    vi.stubGlobal('fetch', fetch);
+
+    await expect(
+      loadCatalog({ ...DEFAULT_CATALOG_QUERY, category: ['hops', 'malts'] }),
+    ).resolves.toEqual({ catalog: null, connected: false });
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it.each([

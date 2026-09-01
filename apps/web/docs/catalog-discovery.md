@@ -39,9 +39,9 @@ they never become broad catalog queries accidentally.
 
 The client discovery controls commit valid search text after a 300ms debounce,
 without a submit button. The sort select commits immediately against the
-current search and categories. Product-type checkboxes and the drawer sort
-remain staged until `Apply filters`, which commits them, resets pagination, and
-closes the drawer. Pagination links preserve the current filters and use a
+current search and categories. Product-type checkboxes remain staged until
+`Apply filters`, which commits them, resets pagination, and closes the drawer.
+Pagination links preserve the current filters and use a
 deterministic first/last/current-window model. Browser Back and Forward restore
 the exact URL and server-rendered view.
 
@@ -64,7 +64,10 @@ The rollback normalizer is deliberately discriminated. A legacy six-field
 array renders with an explicit filtering/paging-unavailable notice. The
 immediate predecessor paged envelope also remains supported: its scalar/null
 category is normalized to the equivalent zero-or-one item list, and missing
-facet counts remain absent rather than being invented. A malformed payload
+facet counts remain absent rather than being invented. If a repeated-category
+request reaches that predecessor, the web retries with one category only after
+the original request fails, verifies the predecessor shape, and redirects to
+the corresponding canonical single-category URL. A malformed payload
 fails closed as an unavailable catalog.
 
 ## Responsive and accessibility contract

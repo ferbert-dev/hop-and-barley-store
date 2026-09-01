@@ -62,21 +62,26 @@ prisma/
 
 Controllers should remain transport boundaries. Database access belongs in services/repositories, and backend persistence models must not become frontend contracts by accident.
 
-### C2 catalog discovery contract
+### Catalog discovery contract
 
 `GET /api/v1/products` returns one `{items, meta}` envelope. Optional validated
-query parameters are `search`, `category`, `minPriceMinor`, `maxPriceMinor`,
-`sort`, `page` and `limit`. Search is Unicode NFC, token-AND across the product
-name, teaser and description, with literal wildcard characters rejected.
+query parameters are `search`, repeated `category`, `minPriceMinor`,
+`maxPriceMinor`, `sort`, `page` and `limit`. Repeated categories use OR logic
+because every product has one type. Search is Unicode NFC and uses PostgreSQL
+full-text AND semantics across a stored weighted `tsvector` built from product
+name, teaser and description; literal wildcard characters are rejected.
 Prices are canonical unsigned integer minor units. Page defaults to 1, limit to
 12, and the navigable result window is capped at page 200.
 
-The service builds one Prisma `where`, explicitly selects public fields, and
-reads count, page items and product-backed base category facets in one
-`RepeatableRead` transaction. Facets intentionally ignore the current filters.
-Only active USD products are public; stock quantity becomes the literal
-`in-stock`/`out-of-stock` availability and is never exposed. The DTO decorators,
-Swagger document and generated client describe the same nested envelope.
+Without search, the service uses Prisma filters. With search, parameterized raw
+SQL applies `websearch_to_tsquery('simple', ...)` to the indexed
+`searchDocument` column for both rows and count. Count, page items, and dynamic
+product-backed category facets are read in one `RepeatableRead` transaction.
+Facet counts honor search and price filters while deliberately ignoring the
+selected category, so the drawer always describes the available catalog. Only
+active USD products are public; stock quantity becomes the literal
+`in-stock`/`out-of-stock` availability and is never exposed. DTO decorators,
+Swagger, and the generated client describe the same envelope.
 
 ### P1 product-detail contract
 

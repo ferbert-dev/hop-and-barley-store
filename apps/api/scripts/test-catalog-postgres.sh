@@ -131,6 +131,22 @@ seed_twice_and_verify "$fresh_url" fresh_catalog 12
 docker exec "$container_name" createdb -U "$database_user" \
   --template fresh_catalog rollback_f5_search
 f5_search_rollback_path="$repo_root/apps/api/prisma/migrations/20260901110000_add_catalog_full_text_search/rollback.sql"
+docker exec "$container_name" psql --set ON_ERROR_STOP=1 \
+  --username "$database_user" --dbname rollback_f5_search \
+  --command 'CREATE VIEW "RollbackSearchDependency" AS SELECT "searchDocument" FROM "Product";' >/dev/null
+if docker exec --interactive "$container_name" psql --no-psqlrc \
+  --set ON_ERROR_STOP=1 --username "$database_user" --dbname rollback_f5_search \
+  < "$f5_search_rollback_path" >/dev/null 2>&1; then
+  echo 'Expected F5 rollback to fail while searchDocument has a dependent view' >&2
+  exit 1
+fi
+f5_search_failed_rollback_state=$(docker exec "$container_name" psql --tuples-only --no-align \
+  --username "$database_user" --dbname rollback_f5_search \
+  --command 'SELECT (SELECT count(*) FROM information_schema.columns WHERE table_schema = '"'"'public'"'"' AND table_name = '"'"'Product'"'"' AND column_name = '"'"'searchDocument'"'"') || '"'"':'"'"' || (SELECT count(*) FROM pg_indexes WHERE schemaname = '"'"'public'"'"' AND tablename = '"'"'Product'"'"' AND indexname = '"'"'Product_searchDocument_idx'"'"') || '"'"':'"'"' || (SELECT count(*) FROM "Product");')
+test "$f5_search_failed_rollback_state" = '1:1:12'
+docker exec "$container_name" psql --set ON_ERROR_STOP=1 \
+  --username "$database_user" --dbname rollback_f5_search \
+  --command 'DROP VIEW "RollbackSearchDependency";' >/dev/null
 docker exec --interactive "$container_name" psql --no-psqlrc \
   --set ON_ERROR_STOP=1 --username "$database_user" --dbname rollback_f5_search \
   < "$f5_search_rollback_path"

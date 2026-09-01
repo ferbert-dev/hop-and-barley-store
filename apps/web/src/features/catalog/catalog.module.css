@@ -153,8 +153,7 @@
   padding: var(--hb-space-2);
 }
 
-.productTypes,
-.drawerSort {
+.productTypes {
   border: 0;
   border-block-end: 1px solid var(--hb-color-border);
   display: grid;
@@ -164,8 +163,7 @@
   padding: 0 0 var(--hb-space-8);
 }
 
-.productTypes legend,
-.drawerSort legend {
+.productTypes legend {
   font-weight: 800;
   padding: 0;
 }
@@ -176,8 +174,7 @@
   margin: calc(-1 * var(--hb-space-8)) 0 0 auto;
 }
 
-.productTypeList,
-.drawerSort {
+.productTypeList {
   display: grid;
 }
 
@@ -185,8 +182,7 @@
   gap: var(--hb-space-2);
 }
 
-.productType,
-.drawerSort label {
+.productType {
   align-items: center;
   cursor: pointer;
   display: grid;
@@ -195,8 +191,7 @@
   min-block-size: 2.75rem;
 }
 
-.productType input,
-.drawerSort input {
+.productType input {
   accent-color: var(--hb-color-brand);
   block-size: 1.25rem;
   inline-size: 1.25rem;
@@ -206,15 +201,6 @@
 .facetCount {
   color: var(--hb-color-text-muted);
   font-variant-numeric: tabular-nums;
-}
-
-.drawerSort {
-  gap: var(--hb-space-2);
-  padding-block-start: var(--hb-space-8);
-}
-
-.drawerSort label {
-  grid-template-columns: auto minmax(0, 1fr);
 }
 
 .drawerActions {

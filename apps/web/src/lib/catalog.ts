@@ -50,15 +50,31 @@ export async function loadCatalog(
     const client = createApiClient(resolveApiOrigin(rawApiUrl), {
       requestInitExt: { next: { revalidate: 60 } } satisfies RequestInit,
     });
-    const { data, error, response } = await client.GET('/api/v1/products', {
-      params: { query },
-      signal: AbortSignal.timeout(CATALOG_REQUEST_TIMEOUT_MS),
-    });
-    if (!response.ok || error !== undefined || data === undefined) {
-      throw new Error(`Catalog request failed with ${response.status}`);
-    }
+    const requestCatalog = async (requestQuery: CatalogQuery) => {
+      const { data, error, response } = await client.GET('/api/v1/products', {
+        params: { query: requestQuery },
+        signal: AbortSignal.timeout(CATALOG_REQUEST_TIMEOUT_MS),
+      });
+      if (!response.ok || error !== undefined || data === undefined) {
+        throw new Error(`Catalog request failed with ${response.status}`);
+      }
 
-    return { catalog: normalizeCatalogResponse(data), connected: true };
+      return normalizeCatalogResponse(data);
+    };
+
+    try {
+      return { catalog: await requestCatalog(query), connected: true };
+    } catch (primaryError) {
+      if (!query.category || query.category.length <= 1) throw primaryError;
+
+      const fallback = await requestCatalog({
+        ...query,
+        category: query.category.slice(0, 1),
+      });
+      if (fallback.kind !== 'paged-predecessor') throw primaryError;
+
+      return { catalog: fallback, connected: true };
+    }
   } catch {
     return { catalog: null, connected: false };
   }

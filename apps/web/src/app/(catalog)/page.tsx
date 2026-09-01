@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/button';
 import { ErrorState } from '../../components/ui/status';
 import { CatalogHero } from '../../features/catalog/catalog-hero';
 import {
+  buildCatalogHref,
   buildCatalogTitle,
   parseCatalogSearchParams,
   type CatalogSearchParams,
@@ -25,6 +26,19 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   if (!parsed.isCanonical) redirect(parsed.canonicalHref);
 
   const result = await loadCatalog(parsed.query);
+  if (
+    result.connected &&
+    result.catalog.kind === 'paged-predecessor' &&
+    (parsed.query.category?.length ?? 0) > 1
+  ) {
+    redirect(
+      buildCatalogHref(
+        parsed.query,
+        { category: parsed.query.category?.slice(0, 1) },
+        true,
+      ),
+    );
+  }
   return <CatalogScreen query={parsed.query} result={result} />;
 }
 

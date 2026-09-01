@@ -79,6 +79,30 @@ describe('catalog route', () => {
     expect(loadCatalog).not.toHaveBeenCalled();
   });
 
+  it('canonicalizes a multi-category URL when the API is the immediate predecessor', async () => {
+    vi.mocked(loadCatalog).mockResolvedValue({
+      connected: true,
+      catalog: {
+        ...pagedResult.catalog,
+        kind: 'paged-predecessor',
+        meta: {
+          ...pagedResult.catalog.meta,
+          facets: { categories: [{ name: 'Hops', slug: 'hops' }] },
+          filters: {
+            ...pagedResult.catalog.meta.filters,
+            category: ['hops'],
+          },
+        },
+      },
+    });
+
+    await expect(
+      CatalogPage({
+        searchParams: Promise.resolve({ category: ['hops', 'malts'] }),
+      }),
+    ).rejects.toThrow('NEXT_REDIRECT:/?category=hops');
+  });
+
   it('fails closed for invalid URLs without contacting the API', async () => {
     render(
       await CatalogPage({

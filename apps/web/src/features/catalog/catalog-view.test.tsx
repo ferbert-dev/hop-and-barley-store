@@ -198,6 +198,48 @@ describe('catalog discovery screen', () => {
     );
   });
 
+  it('cancels a pending search and includes it in immediate sorting', () => {
+    vi.useFakeTimers();
+    render(<CatalogScreen query={query} result={pagedResult()} />);
+
+    fireEvent.change(screen.getByRole('searchbox'), {
+      target: { value: 'Citra' },
+    });
+    fireEvent.change(screen.getByLabelText('Sort by'), {
+      target: { value: 'price-desc' },
+    });
+
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(replace).toHaveBeenCalledWith('/?search=Citra&sort=price-desc', {
+      scroll: false,
+    });
+    act(() => vi.advanceTimersByTime(300));
+    expect(replace).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels a pending search and includes it when filters are applied', () => {
+    vi.useFakeTimers();
+    render(<CatalogScreen query={query} result={pagedResult()} />);
+
+    fireEvent.change(screen.getByRole('searchbox'), {
+      target: { value: 'Citra' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const dialog = screen.getByRole('dialog', { name: 'Filters' });
+    expect(within(dialog).queryByText('Sort')).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: /Hops/ }));
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Apply filters' }),
+    );
+
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(replace).toHaveBeenCalledWith('/?search=Citra&category=hops', {
+      scroll: false,
+    });
+    act(() => vi.advanceTimersByTime(300));
+    expect(replace).toHaveBeenCalledTimes(1);
+  });
+
   it('limits predecessor rollback facets to one product type', () => {
     const current = extractPaged(pagedResult());
     render(

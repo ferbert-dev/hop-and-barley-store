@@ -30,7 +30,6 @@ type CatalogHrefBuilder = (
 ) => string;
 
 const SEARCH_DEBOUNCE_MS = 300;
-const DEFAULT_SORT: CatalogQuery['sort'] = 'name-asc';
 
 export function CatalogControls({
   buildHref = buildCatalogHref,
@@ -46,11 +45,12 @@ export function CatalogControls({
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
+  const searchTimeoutRef = useRef<number | null>(null);
+  const immediateSearchRef = useRef<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draftCategories, setDraftCategories] = useState<string[]>(
     query.category ?? [],
   );
-  const [draftSort, setDraftSort] = useState<CatalogQuery['sort']>(query.sort);
   const activeSearch = query.search ?? '';
   const [searchState, setSearchState] = useState({
     query: activeSearch,
@@ -77,10 +77,15 @@ export function CatalogControls({
 
   useEffect(() => {
     const normalized = normalizeSearch(search);
-    if (normalized === activeSearch) return;
+    if (normalized === activeSearch) {
+      immediateSearchRef.current = null;
+      return;
+    }
+    if (normalized === immediateSearchRef.current) return;
     if (!isSearchReady(normalized)) return;
 
     const timeout = window.setTimeout(() => {
+      searchTimeoutRef.current = null;
       startTransition(() => {
         router.replace(
           buildHref(
@@ -92,13 +97,16 @@ export function CatalogControls({
         );
       });
     }, SEARCH_DEBOUNCE_MS);
+    searchTimeoutRef.current = timeout;
 
-    return () => window.clearTimeout(timeout);
+    return () => {
+      window.clearTimeout(timeout);
+      if (searchTimeoutRef.current === timeout) searchTimeoutRef.current = null;
+    };
   }, [activeSearch, buildHref, query, router, search]);
 
   function openDrawer() {
     setDraftCategories(query.category ?? []);
-    setDraftSort(query.sort);
     setDrawerOpen(true);
   }
 
@@ -113,6 +121,9 @@ export function CatalogControls({
         ? draftCategories.slice(0, 1)
         : draftCategories;
     closeDrawer();
+    cancelPendingSearch();
+    const searchOverride = getSearchOverride();
+    immediateSearchRef.current = searchOverride ?? '';
     startTransition(() => {
       router.replace(
         buildHref(
@@ -122,7 +133,7 @@ export function CatalogControls({
               selectedCategories.length === 0
                 ? undefined
                 : selectedCategories.toSorted(),
-            sort: draftSort,
+            search: searchOverride,
           },
           true,
         ),
@@ -133,9 +144,26 @@ export function CatalogControls({
 
   function applySort(event: ChangeEvent<HTMLSelectElement>) {
     const sort = event.currentTarget.value as CatalogQuery['sort'];
+    cancelPendingSearch();
+    const searchOverride = getSearchOverride();
+    immediateSearchRef.current = searchOverride ?? '';
     startTransition(() => {
-      router.replace(buildHref(query, { sort }, true), { scroll: false });
+      router.replace(buildHref(query, { search: searchOverride, sort }, true), {
+        scroll: false,
+      });
     });
+  }
+
+  function cancelPendingSearch() {
+    if (searchTimeoutRef.current === null) return;
+    window.clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = null;
+  }
+
+  function getSearchOverride(): string | undefined {
+    const normalized = normalizeSearch(search);
+    if (!isSearchReady(normalized)) return query.search;
+    return normalized.length === 0 ? undefined : normalized;
   }
 
   function toggleCategory(slug: string) {
@@ -270,21 +298,6 @@ export function CatalogControls({
           </div>
         </fieldset>
 
-        <fieldset className={styles.drawerSort}>
-          <legend>Sort</legend>
-          {SORT_OPTIONS.map((option) => (
-            <label key={option.value}>
-              <input
-                checked={draftSort === option.value}
-                name="drawer-sort"
-                onChange={() => setDraftSort(option.value)}
-                type="radio"
-              />
-              <span>{option.label}</span>
-            </label>
-          ))}
-        </fieldset>
-
         <div className={styles.drawerActions}>
           <Button onClick={applyFilters} pending={isPending}>
             Apply filters
@@ -293,7 +306,6 @@ export function CatalogControls({
             className={styles.resetFilters}
             onClick={() => {
               setDraftCategories([]);
-              setDraftSort(DEFAULT_SORT);
             }}
             type="button"
           >
@@ -304,16 +316,6 @@ export function CatalogControls({
     </section>
   );
 }
-
-const SORT_OPTIONS: Array<{
-  label: string;
-  value: CatalogQuery['sort'];
-}> = [
-  { label: 'Name A–Z', value: 'name-asc' },
-  { label: 'Name Z–A', value: 'name-desc' },
-  { label: 'Price: Low to High', value: 'price-asc' },
-  { label: 'Price: High to Low', value: 'price-desc' },
-];
 
 function normalizeSearch(value: string): string {
   return value
