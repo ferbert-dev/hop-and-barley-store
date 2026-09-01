@@ -77,7 +77,6 @@ export function CatalogScreen({
                 ? 'single'
                 : 'multiple'
             }
-            key={query.search ?? ''}
             query={query}
           />
           <div className={styles.results}>

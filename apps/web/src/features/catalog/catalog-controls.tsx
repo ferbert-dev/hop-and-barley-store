@@ -51,9 +51,16 @@ export function CatalogControls({
     query.category ?? [],
   );
   const [draftSort, setDraftSort] = useState<CatalogQuery['sort']>(query.sort);
-  const [search, setSearch] = useState(query.search ?? '');
-  const [isPending, startTransition] = useTransition();
   const activeSearch = query.search ?? '';
+  const [searchState, setSearchState] = useState({
+    query: activeSearch,
+    value: activeSearch,
+  });
+  if (searchState.query !== activeSearch) {
+    setSearchState({ query: activeSearch, value: activeSearch });
+  }
+  const search = searchState.value;
+  const [isPending, startTransition] = useTransition();
   const catalogTitle = buildCatalogTitle(query);
 
   useEffect(() => {
@@ -163,7 +170,13 @@ export function CatalogControls({
           className={styles.searchInput}
           id="catalog-search"
           maxLength={80}
-          onChange={(event) => setSearch(event.currentTarget.value)}
+          onChange={(event) => {
+            const value = event.currentTarget.value;
+            setSearchState((current) => ({
+              ...current,
+              value,
+            }));
+          }}
           placeholder="Search products, varieties, or flavors"
           type="search"
           value={search}
