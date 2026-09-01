@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('shows the configured Hop & Barley stack status', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
 
   await expect(
     page.getByRole('heading', { name: 'Hop & Barley Store' }),
