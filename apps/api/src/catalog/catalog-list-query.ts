@@ -80,19 +80,28 @@ export function buildCatalogProductWhere(
 export function buildCatalogFacetQuery(
   visibility: CatalogListVisibility,
   evaluatedAt = new Date(),
+  query?: CatalogQueryDto | AdminCatalogQueryDto,
 ) {
+  const facetProductWhere = query
+    ? buildCatalogProductWhere(
+        { ...query, category: undefined },
+        visibility,
+        evaluatedAt,
+      )
+    : {
+        currency: 'USD' as const,
+        ...(visibility === 'public'
+          ? buildPublicProductLifecycleWhere(evaluatedAt)
+          : {}),
+      };
+
   return {
     orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }, { slug: 'asc' }],
     select: {
       _count: {
         select: {
           products: {
-            where: {
-              currency: 'USD',
-              ...(visibility === 'public'
-                ? buildPublicProductLifecycleWhere(evaluatedAt)
-                : {}),
-            },
+            where: facetProductWhere,
           },
         },
       },
@@ -113,6 +122,33 @@ export function buildCatalogFacetQuery(
       },
     },
   } satisfies Prisma.CategoryFindManyArgs;
+}
+
+export function buildCatalogSearchFacetQuery(
+  query: CatalogQueryDto,
+  evaluatedAt: Date,
+): Prisma.Sql {
+  return sql`
+    SELECT
+      COUNT(p."id")::integer AS "count",
+      c."name",
+      c."slug"
+    FROM "Category" c
+    LEFT JOIN "Product" p
+      ON p."categoryId" = c."id"
+      AND ${buildCatalogSearchProductWhere(query, evaluatedAt)}
+    WHERE EXISTS (
+      SELECT 1
+      FROM "Product" visible
+      WHERE visible."categoryId" = c."id"
+        AND visible."currency" = 'USD'
+        AND visible."isActive" = true
+        AND (visible."activeFrom" IS NULL OR visible."activeFrom" <= ${evaluatedAt})
+        AND (visible."activeUntil" IS NULL OR visible."activeUntil" > ${evaluatedAt})
+    )
+    GROUP BY c."id", c."displayOrder", c."name", c."slug"
+    ORDER BY c."displayOrder" ASC, c."name" ASC, c."slug" ASC
+  `;
 }
 
 export function buildCatalogSearchCountQuery(
@@ -146,13 +182,23 @@ function buildCatalogSearchWhere(
   query: CatalogQueryDto,
   evaluatedAt: Date,
 ): Prisma.Sql {
+  const categories = query.category?.length
+    ? sql`AND c."slug" IN (${sqlJoin(query.category)})`
+    : sqlEmpty;
+  return sql`
+    ${buildCatalogSearchProductWhere(query, evaluatedAt)}
+    ${categories}
+  `;
+}
+
+function buildCatalogSearchProductWhere(
+  query: CatalogQueryDto,
+  evaluatedAt: Date,
+): Prisma.Sql {
   if (!query.search) {
     throw new TypeError('A normalized search value is required');
   }
 
-  const categories = query.category?.length
-    ? sql`AND c."slug" IN (${sqlJoin(query.category)})`
-    : sqlEmpty;
   const minimumPrice =
     query.minPriceMinor === undefined
       ? sqlEmpty
@@ -168,7 +214,6 @@ function buildCatalogSearchWhere(
     AND (p."activeFrom" IS NULL OR p."activeFrom" <= ${evaluatedAt})
     AND (p."activeUntil" IS NULL OR p."activeUntil" > ${evaluatedAt})
     AND p."searchDocument" @@ websearch_to_tsquery('simple', ${query.search})
-    ${categories}
     ${minimumPrice}
     ${maximumPrice}
   `;

@@ -12,6 +12,7 @@ import {
   buildCatalogProductWhere,
   buildPublicProductLifecycleWhere,
   buildCatalogSearchCountQuery,
+  buildCatalogSearchFacetQuery,
   buildCatalogSearchPageQuery,
   CATALOG_PRODUCT_SORT_ORDER,
 } from './catalog-list-query';
@@ -76,7 +77,7 @@ export class CatalogService {
   async listProducts(query: CatalogQueryDto): Promise<CatalogResponseDto> {
     const evaluatedAt = new Date();
     const where = buildCatalogProductWhere(query, 'public', evaluatedAt);
-    const facetQuery = buildCatalogFacetQuery('public', evaluatedAt);
+    const facetQuery = buildCatalogFacetQuery('public', evaluatedAt, query);
     const { categories, products, totalItems } = await this.prisma.$transaction(
       async (transaction) => {
         if (query.search) {
@@ -87,7 +88,9 @@ export class CatalogService {
             transaction.$queryRaw<{ id: string }[]>(
               buildCatalogSearchPageQuery(query, evaluatedAt),
             ),
-            transaction.category.findMany(facetQuery),
+            transaction.$queryRaw<
+              { count: number; name: string; slug: string }[]
+            >(buildCatalogSearchFacetQuery(query, evaluatedAt)),
           ]);
           const orderedIds = idRows.map(({ id }) => id);
           const unorderedProducts =
@@ -124,7 +127,15 @@ export class CatalogService {
           transaction.category.findMany(facetQuery),
         ]);
 
-        return { categories: facets, products: items, totalItems: count };
+        return {
+          categories: facets.map(({ _count, name, slug }) => ({
+            count: _count.products,
+            name,
+            slug,
+          })),
+          products: items,
+          totalItems: count,
+        };
       },
       { isolationLevel: 'RepeatableRead' },
     );
@@ -143,11 +154,7 @@ export class CatalogService {
       meta: {
         currency: 'USD',
         facets: {
-          categories: categories.map(({ _count, name, slug }) => ({
-            count: _count.products,
-            name,
-            slug,
-          })),
+          categories,
         },
         filters: {
           category: query.category ?? [],

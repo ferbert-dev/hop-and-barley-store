@@ -303,6 +303,14 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
     expect(first.items.map(({ id }) => id)).not.toEqual(
       expect.arrayContaining(second.items.map(({ id }) => id)),
     );
+    expect(first.meta.facets.categories).toEqual(
+      expectedCategoryFacets(
+        (product) =>
+          product.categorySlug === 'hops' &&
+          product.priceMinor >= 500 &&
+          product.priceMinor <= 800,
+      ),
+    );
 
     const fullwidthLiteral = await getCatalog('?search=ab％cd＿ef');
     expect(fullwidthLiteral.items).toEqual([]);
@@ -322,6 +330,14 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
       category: ['yeast', 'hops'],
       search: 'american',
     });
+  });
+
+  it('scopes facet counts to price while retaining available zero-count types', async () => {
+    const body = await getCatalog('?minPriceMinor=700');
+
+    expect(body.meta.facets.categories).toEqual(
+      expectedCategoryFacets((product) => product.priceMinor >= 700),
+    );
   });
 
   it('keeps unique slug tie-breaks deterministic across page boundaries', async () => {
@@ -410,6 +426,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
       })();
       await writer;
     };
+    let firstRawQueryCompleted = false;
     const transactionSpy = jest
       .spyOn(transactionHost, '$transaction')
       .mockImplementation(async (callback, options) =>
@@ -454,7 +471,11 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
                       ...queryArgs: unknown[]
                     ) => Promise<unknown>
                   )(...args);
-                  releaseCount();
+                  if (!firstRawQueryCompleted) {
+                    firstRawQueryCompleted = true;
+                    releaseCount();
+                    await writeAfterCount();
+                  }
                   return result;
                 };
               }
@@ -631,14 +652,18 @@ function literal(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-function expectedCategoryFacets() {
+function expectedCategoryFacets(
+  matches: (product: (typeof catalogProducts)[number]) => boolean = () => true,
+) {
   return catalogCategories
     .map((category) => ({
       count: catalogProducts.filter(
-        (product) => product.categorySlug === category.slug,
+        (product) => product.categorySlug === category.slug && matches(product),
       ).length,
       name: category.name,
       slug: category.slug,
     }))
-    .filter(({ count }) => count > 0);
+    .filter(({ slug }) =>
+      catalogProducts.some((product) => product.categorySlug === slug),
+    );
 }

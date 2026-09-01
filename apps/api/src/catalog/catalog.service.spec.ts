@@ -295,7 +295,8 @@ describe('CatalogService', () => {
   it('uses indexed full-text search with OR categories and deterministic page ordering', async () => {
     queryRaw
       .mockResolvedValueOnce([{ totalItems: 5 }])
-      .mockResolvedValueOnce([{ id: 'product-id' }]);
+      .mockResolvedValueOnce([{ id: 'product-id' }])
+      .mockResolvedValueOnce([{ count: 1, name: 'Hops', slug: 'hops' }]);
     const query = {
       category: ['hops', 'malts'],
       limit: 2,
@@ -307,13 +308,16 @@ describe('CatalogService', () => {
     } satisfies CatalogQueryDto;
 
     const result = await service.listProducts(query);
-    expect(queryRaw).toHaveBeenCalledTimes(2);
+    expect(queryRaw).toHaveBeenCalledTimes(3);
     expect(count).not.toHaveBeenCalled();
     expect(findProducts).toHaveBeenCalledWith({
       select: productSelect,
       where: { id: { in: ['product-id'] } },
     });
-    expect(findCategories).toHaveBeenCalledWith(facetQuery);
+    expect(findCategories).not.toHaveBeenCalled();
+    expect(result.meta.facets.categories).toEqual([
+      { count: 1, name: 'Hops', slug: 'hops' },
+    ]);
     expect(result.meta).toMatchObject({
       filters: {
         category: ['hops', 'malts'],
@@ -377,6 +381,23 @@ describe('CatalogService', () => {
 
     expect(count).toHaveBeenCalledWith({
       where: { currency: 'USD', ...publicLifecycleWhere, priceMinor },
+    });
+    expect(findCategories).toHaveBeenCalledWith({
+      ...facetQuery,
+      select: {
+        ...facetQuery.select,
+        _count: {
+          select: {
+            products: {
+              where: {
+                currency: 'USD',
+                ...publicLifecycleWhere,
+                priceMinor,
+              },
+            },
+          },
+        },
+      },
     });
   });
 
