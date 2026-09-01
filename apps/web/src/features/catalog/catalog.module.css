@@ -46,6 +46,8 @@
 .searchForm:focus-within {
   border-color: var(--hb-color-brand);
   box-shadow: 0 0 0 3px var(--hb-color-brand-soft);
+  outline: 3px solid var(--hb-color-brand);
+  outline-offset: 2px;
 }
 
 .searchInput {
