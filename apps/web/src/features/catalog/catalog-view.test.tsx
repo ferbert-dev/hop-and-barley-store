@@ -138,6 +138,70 @@ describe('catalog discovery screen', () => {
     });
   });
 
+  it('shows visible progress while a search is waiting to update', () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      <CatalogScreen query={query} result={pagedResult()} />,
+    );
+
+    fireEvent.change(screen.getByRole('searchbox'), {
+      target: { value: 'Ca' },
+    });
+
+    expect(screen.getByText('Searching…')).toBeVisible();
+
+    act(() => vi.advanceTimersByTime(300));
+    rerender(
+      <CatalogScreen
+        query={{ ...query, search: 'Ca' }}
+        result={pagedResult()}
+      />,
+    );
+    expect(screen.queryByText('Searching…')).not.toBeInTheDocument();
+  });
+
+  it('automatically restores all products when the search is cleared', () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      <CatalogScreen query={query} result={pagedResult()} />,
+    );
+
+    fireEvent.change(screen.getByRole('searchbox'), {
+      target: { value: 'Ca' },
+    });
+    act(() => vi.advanceTimersByTime(300));
+    expect(replace).toHaveBeenLastCalledWith('/?search=Ca', { scroll: false });
+
+    rerender(
+      <CatalogScreen
+        query={{ ...query, search: 'Ca' }}
+        result={pagedResult()}
+      />,
+    );
+    replace.mockClear();
+    fireEvent.change(screen.getByRole('searchbox'), {
+      target: { value: '' },
+    });
+
+    expect(replace).toHaveBeenCalledWith('/', { scroll: false });
+  });
+
+  it('supersedes an in-flight search when cleared before URL props commit', () => {
+    vi.useFakeTimers();
+    render(<CatalogScreen query={query} result={pagedResult()} />);
+
+    fireEvent.change(screen.getByRole('searchbox'), {
+      target: { value: 'Ca' },
+    });
+    act(() => vi.advanceTimersByTime(300));
+    expect(replace).toHaveBeenLastCalledWith('/?search=Ca', { scroll: false });
+
+    fireEvent.change(screen.getByRole('searchbox'), {
+      target: { value: '' },
+    });
+    expect(replace).toHaveBeenLastCalledWith('/', { scroll: false });
+  });
+
   it('syncs search and title when URL-owned query props change', () => {
     vi.useFakeTimers();
     const { rerender } = render(

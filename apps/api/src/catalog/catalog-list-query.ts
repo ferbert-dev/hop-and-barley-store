@@ -213,10 +213,22 @@ function buildCatalogSearchProductWhere(
     AND p."isActive" = true
     AND (p."activeFrom" IS NULL OR p."activeFrom" <= ${evaluatedAt})
     AND (p."activeUntil" IS NULL OR p."activeUntil" > ${evaluatedAt})
-    AND p."searchDocument" @@ websearch_to_tsquery('simple', ${query.search})
+    AND p."searchDocument" @@ ${buildCatalogPrefixTsQuery(query.search)}
     ${minimumPrice}
     ${maximumPrice}
   `;
+}
+
+function buildCatalogPrefixTsQuery(search: string): Prisma.Sql {
+  return sql`(
+    SELECT to_tsquery(
+      'simple',
+      string_agg(quote_literal(term) || ':*A', ' & ')
+    )
+    FROM unnest(
+      tsvector_to_array(to_tsvector('simple', ${search}))
+    ) AS term
+  )`;
 }
 
 export function buildPublicProductLifecycleWhere(

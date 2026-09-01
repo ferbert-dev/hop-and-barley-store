@@ -66,6 +66,27 @@
   color: var(--hb-color-text-muted);
 }
 
+.searchProgress {
+  align-items: center;
+  color: var(--hb-color-brand);
+  display: inline-flex;
+  flex: none;
+  font-size: var(--hb-font-size-sm);
+  font-weight: 700;
+  gap: var(--hb-space-2);
+  white-space: nowrap;
+}
+
+.searchSpinner {
+  animation: catalog-search-spin 700ms linear infinite;
+}
+
+@keyframes catalog-search-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .filterTrigger,
 .drawerClose,
 .resetFilters {

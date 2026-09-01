@@ -68,14 +68,19 @@ Controllers should remain transport boundaries. Database access belongs in servi
 query parameters are `search`, repeated `category`, `minPriceMinor`,
 `maxPriceMinor`, `sort`, `page` and `limit`. Repeated categories use OR logic
 because every product has one type. Search is Unicode NFC and uses PostgreSQL
-full-text AND semantics across a stored weighted `tsvector` built from product
-name, teaser and description; literal wildcard characters are rejected.
+full-text AND semantics against the name (`A`) lexemes in a stored weighted
+`tsvector`. Every normalized lexeme uses safe prefix matching, so `Ca` matches
+names such as `Cascade Hops` and `Caramel Malt 60L` case-insensitively; literal
+wildcard characters are rejected. The stored vector retains lower-weight teaser
+and description lexemes for future relevance work, but public matching is name
+scoped.
 Prices are canonical unsigned integer minor units. Page defaults to 1, limit to
 12, and the navigable result window is capped at page 200.
 
 Without search, the service uses Prisma filters. With search, parameterized raw
-SQL applies `websearch_to_tsquery('simple', ...)` to the indexed
-`searchDocument` column for both rows and count. Count, page items, and dynamic
+SQL derives a prefix `to_tsquery('simple', ...)` from sanitized lexemes and
+applies it to the indexed `searchDocument` column for both rows and count.
+Count, page items, and dynamic
 product-backed category facets are read in one `RepeatableRead` transaction.
 Facet counts honor search and price filters while deliberately ignoring the
 selected category, so the drawer always describes the available catalog. Only
