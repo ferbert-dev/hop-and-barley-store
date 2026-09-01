@@ -6,6 +6,8 @@ export {
 } from './catalog-compatibility.js';
 export type {
   CatalogCompatibilityResult,
+  CompatibleCatalogCategoryFacet,
+  CompatibleCatalogMeta,
   LegacyCatalogProduct,
   PagedCatalogProduct,
   PagedCatalogResponse,

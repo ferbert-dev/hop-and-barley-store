@@ -1,6 +1,6 @@
 'use client';
 
-import type { PagedCatalogResponse } from '@hop-and-barley/api-client';
+import type { CompatibleCatalogCategoryFacet } from '@hop-and-barley/api-client';
 import {
   MagnifyingGlass,
   SlidersHorizontal,
@@ -34,7 +34,7 @@ export function CatalogControls({
   query,
 }: {
   buildHref?: CatalogHrefBuilder;
-  categories: PagedCatalogResponse['meta']['facets']['categories'];
+  categories: CompatibleCatalogCategoryFacet[];
   query: CatalogQuery;
 }) {
   const router = useRouter();
@@ -225,7 +225,9 @@ export function CatalogControls({
                   value={category.slug}
                 />
                 <span>{category.name}</span>
-                <span className={styles.facetCount}>{category.count}</span>
+                {category.count === undefined ? null : (
+                  <span className={styles.facetCount}>{category.count}</span>
+                )}
               </label>
             ))}
           </div>

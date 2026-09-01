@@ -52,6 +52,12 @@ const meta = {
   totalPages: 1,
 };
 
+const predecessorMeta = {
+  ...meta,
+  facets: { categories: [{ name: 'Hops', slug: 'hops' }] },
+  filters: { ...meta.filters, category: 'hops' },
+};
+
 function jsonResponse(body) {
   return new Response(JSON.stringify(body), {
     headers: { 'content-type': 'application/json' },
@@ -218,6 +224,25 @@ test('normalizer returns a validated paged branch and tolerates additive fields'
   assert.deepEqual(result.meta, meta);
 });
 
+test('normalizer supports the exact predecessor paged envelope during rollback', () => {
+  const result = normalizeCatalogResponse({
+    items: [pagedItem],
+    meta: predecessorMeta,
+  });
+
+  assert.equal(result.kind, 'paged-predecessor');
+  assert.deepEqual(result.capabilities, {
+    facets: 'available',
+    pagination: 'available',
+  });
+  assert.deepEqual(result.items, [pagedItem]);
+  assert.deepEqual(result.meta, {
+    ...predecessorMeta,
+    facets: { categories: [{ name: 'Hops', slug: 'hops' }] },
+    filters: { ...predecessorMeta.filters, category: ['hops'] },
+  });
+});
+
 test('normalizer accepts only opaque UUID-v4 dynamic product image paths', () => {
   const imagePath = '/product-assets/123e4567-e89b-42d3-a456-426614174000.webp';
   const result = normalizeCatalogResponse({
@@ -269,6 +294,20 @@ test('normalizer rejects malformed common, paged and nested structures', () => {
     {
       items: [pagedItem],
       meta: { ...meta, facets: { categories: [{ name: 'Hops' }] } },
+    },
+    {
+      items: [pagedItem],
+      meta: {
+        ...meta,
+        facets: { categories: [{ name: 'Hops', slug: 'hops' }] },
+      },
+    },
+    {
+      items: [pagedItem],
+      meta: {
+        ...meta,
+        filters: { ...meta.filters, category: 'hops' },
+      },
     },
     { items: [pagedItem], meta: { ...meta, totalPages: 2 } },
     { items: [pagedItem], meta: { ...meta, hasNextPage: true } },
