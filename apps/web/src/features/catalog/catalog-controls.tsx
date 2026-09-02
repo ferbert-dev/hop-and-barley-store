@@ -2,19 +2,15 @@
 
 import type { CompatibleCatalogCategoryFacet } from '@hop-and-barley/api-client';
 import {
+  CaretDown,
+  Check,
   CircleNotch,
   MagnifyingGlass,
   SlidersHorizontal,
   X,
 } from '@phosphor-icons/react/dist/ssr';
 import { useRouter } from 'next/navigation';
-import {
-  useEffect,
-  useRef,
-  useState,
-  useTransition,
-  type ChangeEvent,
-} from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 
 import { Button } from '../../components/ui/button';
 import {
@@ -32,6 +28,15 @@ type CatalogHrefBuilder = (
 ) => string;
 
 const SEARCH_DEBOUNCE_MS = 300;
+const SORT_OPTIONS = [
+  { label: 'Name A–Z', value: 'name-asc' },
+  { label: 'Name Z–A', value: 'name-desc' },
+  { label: 'Price low to high', value: 'price-asc' },
+  { label: 'Price high to low', value: 'price-desc' },
+] as const satisfies ReadonlyArray<{
+  label: string;
+  value: CatalogQuery['sort'];
+}>;
 
 export function CatalogControls({
   buildHref = buildCatalogHref,
@@ -47,6 +52,8 @@ export function CatalogControls({
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
+  const sortControlRef = useRef<HTMLDetailsElement>(null);
+  const sortSummaryRef = useRef<HTMLElement>(null);
   const searchTimeoutRef = useRef<number | null>(null);
   const immediateSearchRef = useRef<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -80,6 +87,35 @@ export function CatalogControls({
   useEffect(() => {
     document.title = catalogTitle;
   }, [catalogTitle]);
+
+  useEffect(() => {
+    function closeSortOnOutsidePointer(event: PointerEvent) {
+      const control = sortControlRef.current;
+      if (
+        !control?.open ||
+        !(event.target instanceof Node) ||
+        control.contains(event.target)
+      ) {
+        return;
+      }
+      control.open = false;
+    }
+
+    function closeSortOnEscape(event: KeyboardEvent) {
+      const control = sortControlRef.current;
+      if (event.key !== 'Escape' || !control?.open) return;
+      event.preventDefault();
+      control.open = false;
+      sortSummaryRef.current?.focus();
+    }
+
+    document.addEventListener('pointerdown', closeSortOnOutsidePointer);
+    document.addEventListener('keydown', closeSortOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeSortOnOutsidePointer);
+      document.removeEventListener('keydown', closeSortOnEscape);
+    };
+  }, []);
 
   useEffect(() => {
     const normalized = normalizeSearch(search);
@@ -177,8 +213,11 @@ export function CatalogControls({
     });
   }
 
-  function applySort(event: ChangeEvent<HTMLSelectElement>) {
-    const sort = event.currentTarget.value as CatalogQuery['sort'];
+  function applySort(sort: CatalogQuery['sort']) {
+    if (sortControlRef.current) sortControlRef.current.open = false;
+    sortSummaryRef.current?.focus();
+    if (sort === query.sort) return;
+
     cancelPendingSearch();
     const searchOverride = getSearchOverride();
     immediateSearchRef.current = searchOverride ?? '';
@@ -217,6 +256,9 @@ export function CatalogControls({
   }
 
   const selectedCount = query.category?.length ?? 0;
+  const selectedSort =
+    SORT_OPTIONS.find((option) => option.value === query.sort) ??
+    SORT_OPTIONS[0];
 
   return (
     <section aria-label="Catalog discovery controls" className={styles.filters}>
@@ -269,20 +311,46 @@ export function CatalogControls({
         ) : null}
       </button>
 
-      <label className={styles.sortControl}>
-        <span className="visually-hidden">Sort by</span>
-        <select
-          aria-label="Sort by"
-          className={styles.sortSelect}
-          onChange={applySort}
-          value={query.sort}
+      <details className={styles.sortControl} ref={sortControlRef}>
+        <summary
+          aria-label={`Sort by: ${selectedSort.label}`}
+          className={styles.sortSummary}
+          ref={sortSummaryRef}
+          role="button"
         >
-          <option value="name-asc">Sort: Name A–Z</option>
-          <option value="name-desc">Sort: Name Z–A</option>
-          <option value="price-asc">Sort: Price low to high</option>
-          <option value="price-desc">Sort: Price high to low</option>
-        </select>
-      </label>
+          <span>Sort: {selectedSort.label}</span>
+          <CaretDown
+            aria-hidden="true"
+            className={styles.sortChevron}
+            size={18}
+            weight="bold"
+          />
+        </summary>
+        <nav aria-label="Sort products" className={styles.sortMenu}>
+          <ul>
+            {SORT_OPTIONS.map((option) => (
+              <li key={option.value}>
+                <a
+                  aria-current={
+                    option.value === query.sort ? 'true' : undefined
+                  }
+                  className={styles.sortOption}
+                  href={buildHref(query, { sort: option.value }, true)}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    applySort(option.value);
+                  }}
+                >
+                  <span>{option.label}</span>
+                  {option.value === query.sort ? (
+                    <Check aria-hidden="true" size={18} weight="bold" />
+                  ) : null}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </details>
 
       <dialog
         aria-labelledby="catalog-filter-title"

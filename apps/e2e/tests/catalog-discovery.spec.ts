@@ -93,6 +93,7 @@ test('renders dynamic filter choices and preserves only approved discovery contr
   await expect(page.getByRole('button', { name: 'Search' })).toHaveCount(0);
 
   await page.getByRole('button', { name: /Filters/ }).click();
+  const drawer = page.getByRole('dialog', { name: 'Filters' });
   const productType = page.getByRole('group', { name: 'Product Type' });
   await expect(
     productType.getByRole('checkbox', { name: /Hops/ }),
@@ -105,15 +106,17 @@ test('renders dynamic filter choices and preserves only approved discovery contr
   ).toBeVisible();
   await expect(page.getByText('Selected filters')).toHaveCount(0);
 
-  const sort = page.getByRole('combobox', { name: 'Sort by' });
-  await expect(sort.getByRole('option')).toHaveText([
-    'Sort: Name A–Z',
-    'Sort: Name Z–A',
-    'Sort: Price low to high',
-    'Sort: Price high to low',
+  await drawer.getByRole('button', { name: 'Close filters' }).click();
+  await page.getByRole('button', { name: 'Sort by: Name A–Z' }).click();
+  const sort = page.getByRole('navigation', { name: 'Sort products' });
+  await expect(sort.getByRole('link')).toHaveText([
+    'Name A–Z',
+    'Name Z–A',
+    'Price low to high',
+    'Price high to low',
   ]);
-  await expect(sort.getByRole('option', { name: 'New' })).toHaveCount(0);
-  await expect(sort.getByRole('option', { name: 'Rating' })).toHaveCount(0);
+  await expect(sort.getByRole('link', { name: 'New' })).toHaveCount(0);
+  await expect(sort.getByRole('link', { name: 'Rating' })).toHaveCount(0);
   await expect(page.getByLabel('Minimum price')).toHaveCount(0);
   await expect(page.getByLabel('Maximum price')).toHaveCount(0);
   await expect(page.getByLabel('Products per page')).toHaveCount(0);
@@ -180,7 +183,35 @@ test('supports keyboard-only catalog filtering with Tab, Shift+Tab, and Enter', 
 
   await expect(filterButton).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('combobox', { name: 'Sort by' })).toBeFocused();
+  const sort = page.getByRole('button', { name: 'Sort by: Name A–Z' });
+  await expect(sort).toBeFocused();
+  await assertProjectFocusVisible(sort, 'ready');
+  await page.keyboard.press('Enter');
+  const sortMenu = page.getByRole('navigation', { name: 'Sort products' });
+  await expect(sortMenu).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(sortMenu.getByRole('link', { name: 'Name A–Z' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await expect(
+    sortMenu.getByRole('link', { name: 'Price high to low' }),
+  ).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  await expect(page).toHaveURL(
+    /\?search=Citra&category=hops&category=malts&sort=price-desc$/,
+  );
+  await expect(sortMenu).not.toBeVisible();
+  const selectedSort = page.getByRole('button', {
+    name: 'Sort by: Price high to low',
+  });
+  await expect(selectedSort).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(sortMenu).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(sortMenu).not.toBeVisible();
+  await expect(selectedSort).toBeFocused();
 });
 
 test('keeps stable pagination and restores URL state with browser history', async ({

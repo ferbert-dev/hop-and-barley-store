@@ -113,7 +113,9 @@ describe('catalog discovery screen', () => {
       screen.getByRole('search', { name: 'Search products' }),
     ).toBeVisible();
     expect(screen.getByRole('button', { name: 'Filters' })).toBeVisible();
-    expect(screen.getByLabelText('Sort by')).toHaveValue('name-asc');
+    expect(
+      screen.getByRole('button', { name: 'Sort by: Name A–Z' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Cascade Hops' })).toHaveAttribute(
       'href',
       '/product/cascade-hops',
@@ -285,14 +287,38 @@ describe('catalog discovery screen', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Sort by'), {
-      target: { value: 'price-desc' },
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by: Name A–Z' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Price high to low' }));
 
     expect(replace).toHaveBeenCalledWith(
       '/?search=citra+hops&category=hops&sort=price-desc',
       { scroll: false },
     );
+    expect(
+      screen
+        .getByRole('button', { name: 'Sort by: Name A–Z' })
+        .closest('details'),
+    ).not.toHaveAttribute('open');
+  });
+
+  it('exposes canonical sort links and restores focus when dismissed', () => {
+    render(<CatalogScreen query={query} result={pagedResult()} />);
+
+    const trigger = screen.getByRole('button', {
+      name: 'Sort by: Name A–Z',
+    });
+    fireEvent.click(trigger);
+
+    expect(screen.getByRole('link', { name: 'Name Z–A' })).toHaveAttribute(
+      'href',
+      '/?sort=name-desc',
+    );
+    expect(trigger.closest('details')).toHaveAttribute('open');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(trigger.closest('details')).not.toHaveAttribute('open');
+    expect(trigger).toHaveFocus();
   });
 
   it('cancels a pending search and includes it in immediate sorting', () => {
@@ -302,9 +328,8 @@ describe('catalog discovery screen', () => {
     fireEvent.change(screen.getByRole('searchbox'), {
       target: { value: 'Citra' },
     });
-    fireEvent.change(screen.getByLabelText('Sort by'), {
-      target: { value: 'price-desc' },
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by: Name A–Z' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Price high to low' }));
 
     expect(replace).toHaveBeenCalledTimes(1);
     expect(replace).toHaveBeenCalledWith('/?search=Citra&sort=price-desc', {
