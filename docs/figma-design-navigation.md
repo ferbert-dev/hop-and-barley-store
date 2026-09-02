@@ -203,6 +203,16 @@ Page 1 (0:1)
 - This loading state is user-approved behavior absent from the source frame; it
   does not change the existing product-name prefix search contract.
 
+**User-confirmed catalog sort spacing extension — 2026-09-02**
+
+- The catalog sort dropdown uses the existing storefront control language but
+  gives both its trigger and every expanded option an intentional internal
+  rhythm. Expanded rows retain at least a 44 px target with 12 px vertical and
+  16 px horizontal padding.
+- This spacing treatment is a user-approved refinement absent from the source
+  frame. It does not change the confirmed immediate sort behavior or canonical
+  catalog query contract.
+
 ### Product details — `product`
 
 [Open node `9:2284`](https://www.figma.com/design/H7jIUNYzAGc7o8R0iABQjy/Project-M4-1--Next.js--share-?node-id=9-2284)
