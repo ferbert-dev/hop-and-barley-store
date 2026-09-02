@@ -7,6 +7,10 @@ Hop & Barley is a full-stack ecommerce portfolio project built as a professional
 > work locally. The complete shop described in the product brief is still being
 > built; planned features are labelled explicitly below.
 
+## Storefront Preview
+
+[![Hop & Barley storefront showing the hop-field hero, product search, filters, sorting, and catalog cards](docs/images/storefront-homepage.webp)](docs/images/storefront-homepage.webp)
+
 ## What Works Today
 
 - one pnpm workspace orchestrated by Turborepo;
