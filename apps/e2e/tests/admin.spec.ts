@@ -95,7 +95,8 @@ test.describe('connected administrator product management', () => {
     const productSurface = page
       .getByRole('table')
       .or(page.getByRole('list', { name: /products?/i }));
-    await expect(productSurface.first(), 'product table/list').toBeVisible();
+    const visibleProductSurface = productSurface.first();
+    await expect(visibleProductSurface, 'product table/list').toBeVisible();
 
     await expect(
       page.getByRole('link', { name: /Add Product/i }),
@@ -119,19 +120,23 @@ test.describe('connected administrator product management', () => {
       ).toBeVisible();
     }
 
-    await expect(page.getByText(/\$\s?\d[\d,.]*\.\d{2}/).first()).toBeVisible();
     await expect(
-      page.getByText(/\b(?:Hops|Malt|Yeast|Adjuncts)\b/i).first(),
+      visibleProductSurface.getByText(/\$\s?\d[\d,.]*\.\d{2}/).first(),
     ).toBeVisible();
     await expect(
-      page
+      visibleProductSurface
+        .getByText(/\b(?:Hops|Malt|Yeast|Adjuncts)\b/i)
+        .first(),
+    ).toBeVisible();
+    await expect(
+      visibleProductSurface
         .getByText(
           /\b(?:\d[\d,.]*\s?(?:mg|g|kg|packs?|kits?|units?)|in stock|out of stock)\b/i,
         )
         .first(),
     ).toBeVisible();
     await expect(
-      page
+      visibleProductSurface
         .getByText(/\b(?:Active|Ending soon|Scheduled|Expired|Deactivated)\b/i)
         .first(),
     ).toBeVisible();

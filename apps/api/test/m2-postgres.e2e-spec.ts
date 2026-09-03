@@ -130,6 +130,7 @@ describePostgres('M2 administrator product list with PostgreSQL 17.6', () => {
         'currency',
         'description',
         'id',
+        'imagePath',
         'isActive',
         'lifecycleStatus',
         'name',
@@ -141,8 +142,9 @@ describePostgres('M2 administrator product list with PostgreSQL 17.6', () => {
         'updatedAt',
       ]);
       expect(JSON.stringify(item)).not.toMatch(
-        /imagePath|specifications|credential|storage|filesystem/i,
+        /specifications|credential|storage|filesystem/i,
       );
+      expect(item.imagePath).toMatch(/^\/assets\/products\//u);
     }
   });
 
