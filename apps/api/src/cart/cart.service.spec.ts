@@ -156,6 +156,8 @@ describe('CartService desired-amount cart', () => {
 
 function product(overrides: Record<string, unknown> = {}) {
   return {
+    activeFrom: null,
+    activeUntil: null,
     amountUnit: 'EACH',
     currency: 'USD',
     id: productId,

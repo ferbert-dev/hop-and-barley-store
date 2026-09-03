@@ -4,9 +4,12 @@ import {
   type ProductAmountRules,
 } from '../catalog/product-amount';
 import type { CheckoutReadinessLineDto } from './dto/cart-response.dto';
+import { isPublicProductEligible } from '../catalog/product-public-eligibility';
 
 export type CheckoutProduct = ProductAmountRules &
   Readonly<{
+    activeFrom: Date | null;
+    activeUntil: Date | null;
     currency: string;
     isActive: boolean;
     priceBasisAmount: number;
@@ -17,8 +20,13 @@ export type CheckoutProduct = ProductAmountRules &
 export function checkoutLineOutcome(
   product: CheckoutProduct | null | undefined,
   requestedAmount: number,
+  evaluatedAt: Date,
 ): CheckoutReadinessLineDto['outcome'] {
-  if (!product || !product.isActive || product.currency !== 'USD') {
+  if (
+    !product ||
+    !isPublicProductEligible(product, evaluatedAt) ||
+    product.currency !== 'USD'
+  ) {
     return 'product_unavailable';
   }
   if (!isValidOrderAmount(requestedAmount, product)) return 'invalid_amount';

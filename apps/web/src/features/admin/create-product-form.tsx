@@ -42,6 +42,7 @@ export function CreateProductForm({
       : 'WEIGHT',
   );
   const [image, setImage] = useState<File | null>(null);
+  const [isActive, setIsActive] = useState(product?.isActive ?? true);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
   const [state, setState] = useState<FormState>({ kind: 'idle' });
@@ -419,12 +420,15 @@ export function CreateProductForm({
           />
           <label className={styles.activeToggle}>
             <input
-              defaultChecked={product?.isActive ?? true}
+              aria-label={isActive ? 'Active' : 'Disabled'}
+              checked={isActive}
               name="isActive"
+              onChange={(event) => setIsActive(event.currentTarget.checked)}
+              role="switch"
               type="checkbox"
               value="true"
             />
-            Active
+            <span>{isActive ? 'Active' : 'Disabled'}</span>
           </label>
         </div>
 

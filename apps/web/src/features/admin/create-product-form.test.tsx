@@ -166,6 +166,11 @@ describe('CreateProductForm', () => {
     );
 
     expect(screen.getByLabelText('Title')).toHaveValue('Citra Hops');
+    const lifecycle = screen.getByRole('switch', { name: 'Active' });
+    await user.click(lifecycle);
+    expect(screen.getByRole('switch', { name: 'Disabled' })).not.toBeChecked();
+    await user.click(screen.getByRole('switch', { name: 'Disabled' }));
+    expect(screen.getByRole('switch', { name: 'Active' })).toBeChecked();
     const cancel = screen.getByRole('link', { name: 'Cancel' });
     const save = screen.getByRole('button', { name: 'Save changes' });
     expect(

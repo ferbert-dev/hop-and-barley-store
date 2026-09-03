@@ -22,6 +22,7 @@ const productIds = [
   '62000000-0000-4000-8000-000000000011',
   '62000000-0000-4000-8000-000000000012',
   '62000000-0000-4000-8000-000000000013',
+  '62000000-0000-4000-8000-000000000014',
 ];
 
 describePostgres('M2 administrator product list with PostgreSQL 17.6', () => {
@@ -79,6 +80,12 @@ describePostgres('M2 administrator product list with PostgreSQL 17.6', () => {
           name: 'M2 Expired',
           slug: 'm2-expired',
         }),
+        productFixture({
+          activeUntil: new Date(Date.now() + 3 * 86_400_000),
+          id: productIds[4],
+          name: 'M2 Ending Soon',
+          slug: 'm2-ending-soon',
+        }),
       ],
     });
     const credential = await app
@@ -97,9 +104,9 @@ describePostgres('M2 administrator product list with PostgreSQL 17.6', () => {
     adminCookie = `hb_session=${session.rawToken}`;
   });
 
-  it('lists all four lifecycle states while minimizing every admin item', async () => {
+  it('lists all five lifecycle states while minimizing every admin item', async () => {
     const response = await request(app.getHttpServer() as App)
-      .get('/api/v1/admin/products?category=m2-lifecycle&limit=4')
+      .get('/api/v1/admin/products?category=m2-lifecycle&limit=5')
       .set('Cookie', adminCookie)
       .expect(200);
     const body = JSON.parse(response.text) as AdminProductListResponseDto;
@@ -109,11 +116,12 @@ describePostgres('M2 administrator product list with PostgreSQL 17.6', () => {
     ).toEqual([
       ['m2-active', 'ACTIVE'],
       ['m2-disabled', 'DISABLED'],
+      ['m2-ending-soon', 'ENDING_SOON'],
       ['m2-expired', 'EXPIRED'],
       ['m2-scheduled', 'SCHEDULED'],
     ]);
     expect(body.meta).toMatchObject({
-      totalItems: 4,
+      totalItems: 5,
       totalPages: 1,
     });
     expect(body.meta.facets.categories).not.toContainEqual({
@@ -148,13 +156,39 @@ describePostgres('M2 administrator product list with PostgreSQL 17.6', () => {
     }
   });
 
+  it.each([
+    ['ACTIVE', 'm2-active'],
+    ['DISABLED', 'm2-disabled'],
+    ['ENDING_SOON', 'm2-ending-soon'],
+    ['EXPIRED', 'm2-expired'],
+    ['SCHEDULED', 'm2-scheduled'],
+  ] as const)(
+    'applies the %s lifecycle filter through HTTP',
+    async (lifecycle, slug) => {
+      const response = await request(app.getHttpServer() as App)
+        .get(
+          `/api/v1/admin/products?category=m2-lifecycle&lifecycle=${lifecycle}`,
+        )
+        .set('Cookie', adminCookie)
+        .expect(200);
+      const body = JSON.parse(response.text) as AdminProductListResponseDto;
+
+      expect(body.items.map((item) => item.slug)).toEqual([slug]);
+      expect(body.meta.filters.lifecycle).toBe(lifecycle);
+      expect(body.meta.totalItems).toBe(1);
+    },
+  );
+
   it('keeps the public catalog limited to currently active products', async () => {
     const response = await request(app.getHttpServer() as App)
       .get('/api/v1/products?category=m2-lifecycle&limit=4')
       .expect(200);
     const body = JSON.parse(response.text) as CatalogResponseDto;
 
-    expect(body.items.map(({ slug }) => slug)).toEqual(['m2-active']);
+    expect(body.items.map(({ slug }) => slug)).toEqual([
+      'm2-active',
+      'm2-ending-soon',
+    ]);
     expect(body.items).not.toContainEqual(
       expect.objectContaining({ slug: 'm2-disabled' }),
     );

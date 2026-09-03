@@ -355,7 +355,7 @@ describe('AdminProductCreationService', () => {
     expect(storeImage).not.toHaveBeenCalled();
   });
 
-  it('replaces an uploaded image and removes the superseded uploaded asset', async () => {
+  it('replaces an uploaded image while retaining the immutable superseded asset for cached pages', async () => {
     const previousKey = '24c35fd6-0053-4acf-ae31-1d4b145484f7.webp';
     findUnique
       .mockResolvedValueOnce({
@@ -370,7 +370,7 @@ describe('AdminProductCreationService', () => {
     expect(updateMany.mock.calls[0]?.[0].data).toMatchObject({
       imagePath: STORED_ASSET.imagePath,
     });
-    expect(deleteAsset).toHaveBeenCalledWith(previousKey);
+    expect(deleteAsset).not.toHaveBeenCalledWith(previousKey);
   });
 
   it('removes a newly stored image when the optimistic update loses its race', async () => {

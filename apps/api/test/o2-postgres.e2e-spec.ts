@@ -38,7 +38,13 @@ describePostgres('O2S atomic orders with disposable PostgreSQL', () => {
     await prisma.cart.deleteMany();
     await prisma.user.deleteMany();
     await prisma.product.update({
-      data: { isActive: true, priceMinor: 499, stockAmount: 100 },
+      data: {
+        activeFrom: null,
+        activeUntil: null,
+        isActive: true,
+        priceMinor: 499,
+        stockAmount: 100,
+      },
       where: { slug: productSlug },
     });
   });
@@ -190,6 +196,45 @@ describePostgres('O2S atomic orders with disposable PostgreSQL', () => {
         where: { cartId: cart.cartId },
       }),
     ).toMatchObject({ amount: 3 });
+  });
+
+  it('rejects final allocation when a product expires exactly at checkout time', async () => {
+    const userId = await createUser('expired@example.com');
+    const cart = await desiredCart(1);
+    await prisma.product.update({
+      data: { activeUntil: now },
+      where: { slug: productSlug },
+    });
+
+    const error = await orders
+      .create(
+        {
+          cartId: cart.cartId,
+          idempotencyKey: 'expired-order-0001',
+          userId,
+        },
+        checkoutBody(1),
+        now,
+      )
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(UnprocessableEntityException);
+    expect((error as UnprocessableEntityException).getResponse()).toEqual({
+      checkedAt: now.toISOString(),
+      lines: [
+        {
+          outcome: 'product_unavailable',
+          productSlug,
+          requestedAmount: 1,
+        },
+      ],
+      status: 'allocation-unavailable',
+    });
+    expect(await prisma.order.count()).toBe(0);
+    expect(await productStock()).toBe(100);
+    expect(
+      await prisma.cartItem.count({ where: { cartId: cart.cartId } }),
+    ).toBe(1);
   });
 
   it('lets exactly one concurrent buyer allocate the final unit', async () => {

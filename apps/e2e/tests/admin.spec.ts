@@ -92,6 +92,19 @@ test.describe('connected administrator product management', () => {
     await expect(page.getByLabel('Category')).toBeVisible();
     await expect(page.getByRole('radio')).toHaveCount(0);
 
+    const lifecycleResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/admin/products?') &&
+        response.url().includes('lifecycle=ACTIVE') &&
+        response.request().method() === 'GET',
+    );
+    await page.getByLabel('Status').selectOption('ACTIVE');
+    expect((await lifecycleResponse).status()).toBe(200);
+    await expect(page).toHaveURL(/lifecycle=ACTIVE/);
+    await expect(
+      page.getByRole('table').getByText('Active', { exact: true }).first(),
+    ).toBeVisible();
+
     const productSurface = page
       .getByRole('table')
       .or(page.getByRole('list', { name: /products?/i }));
@@ -246,14 +259,46 @@ test.describe('connected administrator product management', () => {
     ).toBeVisible();
     const updatedName = `${productName} Updated`;
     await page.getByLabel('Title').fill(updatedName);
-    await page.getByLabel('Active', { exact: true }).uncheck();
+    const lifecycleSwitch = page.getByRole('switch', { name: 'Active' });
+    await lifecycleSwitch.uncheck();
+    await expect(
+      page.getByRole('switch', { name: 'Disabled' }),
+    ).not.toBeChecked();
+    await page
+      .getByLabel('Replace image')
+      .setInputFiles(
+        path.join(
+          process.cwd(),
+          '../web/public/assets/products/caramel-malt.webp',
+        ),
+      );
     const updateResponse = page.waitForResponse(
       (response) =>
         /\/api\/v1\/admin\/products\/[0-9a-f-]+$/i.test(response.url()) &&
         response.request().method() === 'PATCH',
     );
     await page.getByRole('button', { name: 'Save changes' }).click();
-    expect((await updateResponse).status()).toBe(200);
+    const updatedResponse = await updateResponse;
+    expect(updatedResponse.status()).toBe(200);
+    const updated = (await updatedResponse.json()) as { imagePath: string };
+    expect(updated.imagePath).not.toBe(created.imagePath);
+    await expect
+      .poll(async () =>
+        (
+          await page.request.get(
+            new URL(updated.imagePath, page.url()).toString(),
+          )
+        ).status(),
+      )
+      .toBe(200);
+    expect(
+      (
+        await page.request.get(
+          new URL(created.imagePath, page.url()).toString(),
+        )
+      ).status(),
+      'the superseded immutable image must remain available to primed storefront caches',
+    ).toBe(200);
     await expect(
       page.getByRole('heading', { name: 'Product updated' }),
     ).toBeVisible();

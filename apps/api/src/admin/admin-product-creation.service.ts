@@ -32,7 +32,6 @@ const PRODUCT_CREATE_UNAVAILABLE = Object.freeze({ status: 'unavailable' });
 const PRODUCT_SLUG_CONFLICT = Object.freeze({ status: 'slug-conflict' });
 const PRODUCT_NOT_FOUND = Object.freeze({ status: 'not-found' });
 const PRODUCT_UPDATE_CONFLICT = Object.freeze({ status: 'update-conflict' });
-const PRODUCT_ASSET_PATH = /^\/product-assets\/(.+[.]webp)$/u;
 
 const createdProductSelect = {
   activeFrom: true,
@@ -249,18 +248,6 @@ export class AdminProductCreationService {
       }
       updateCommitted = true;
       const updated = await this.getProduct(id);
-      if (storedAsset && updateCommitted) {
-        const previousKey = PRODUCT_ASSET_PATH.exec(existing.imagePath)?.[1];
-        if (previousKey) {
-          await this.assets
-            .deleteAsset(previousKey)
-            .catch(() =>
-              this.logger.error(
-                'admin.product.update.old_asset_cleanup_failed',
-              ),
-            );
-        }
-      }
       return updated;
     } catch (error) {
       if (storedAsset && !updateCommitted) {
