@@ -139,10 +139,24 @@ test.describe('database-backed product details', () => {
       await expect(
         page.getByRole('link', { name: 'Shopping cart, 1 item' }),
       ).toHaveAttribute('href', '/cart');
+      const addButton = page.getByRole('button', {
+        name: 'Add Mosaic Hops to Cart',
+      });
+      const firstConfirmation = page.getByRole('dialog', {
+        name: 'Mosaic Hops added to your cart',
+      });
+      await expect(firstConfirmation).toHaveAccessibleDescription(
+        'Your cart now contains 100g of Mosaic Hops.',
+      );
       await expect(
-        page.getByRole('button', { name: 'Add Mosaic Hops to Cart' }),
-      ).toBeVisible();
-      await expect(page.getByText(/in cart/i)).toHaveCount(0);
+        page.getByRole('link', { name: 'In cart: 100g' }),
+      ).toHaveAttribute('href', '/cart');
+      await firstConfirmation
+        .getByRole('button', { name: 'Continue shopping' })
+        .click();
+      await expect(firstConfirmation).toBeHidden();
+      await expect(page).toHaveURL(/\/product\/mosaic-hops$/);
+      await expect(addButton).toBeFocused();
 
       await page
         .getByRole('button', { name: 'Increase weight amount' })
@@ -162,9 +176,26 @@ test.describe('database-backed product details', () => {
       await expect(
         page.getByRole('link', { name: 'Shopping cart, 1 item' }),
       ).toBeVisible();
-      await expect(page.getByText(/in cart/i)).toHaveCount(0);
-
-      await page.getByRole('link', { name: 'Shopping cart, 1 item' }).click();
+      await page.setViewportSize({ height: 800, width: 320 });
+      const secondConfirmation = page.getByRole('dialog', {
+        name: 'Mosaic Hops added to your cart',
+      });
+      await expect(secondConfirmation).toHaveAccessibleDescription(
+        'Your cart now contains 300g of Mosaic Hops.',
+      );
+      await expect(
+        page.getByRole('link', { name: 'In cart: 300g' }),
+      ).toBeVisible();
+      expect(
+        await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth -
+            document.documentElement.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(0);
+      await secondConfirmation
+        .getByRole('link', { name: 'Go to cart' })
+        .click();
       await expect(page).toHaveURL(/\/cart$/);
       await expect(
         page

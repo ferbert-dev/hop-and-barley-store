@@ -15,6 +15,7 @@ export interface DialogProps {
   id: string;
   onOpenChange: (open: boolean) => void;
   open: boolean;
+  returnFocus?: () => HTMLElement | null;
   title: ReactNode;
 }
 
@@ -26,6 +27,7 @@ export function Dialog({
   id,
   onOpenChange,
   open,
+  returnFocus,
   title,
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -53,9 +55,10 @@ export function Dialog({
     if (open) {
       if (!dialog.open) {
         previousFocusRef.current =
-          document.activeElement instanceof HTMLElement
+          returnFocus?.() ??
+          (document.activeElement instanceof HTMLElement
             ? document.activeElement
-            : null;
+            : null);
         dialog.showModal();
       }
 
@@ -67,7 +70,7 @@ export function Dialog({
     }
 
     restoreFocus();
-  }, [open, restoreFocus]);
+  }, [open, restoreFocus, returnFocus]);
 
   useEffect(
     () => () => {

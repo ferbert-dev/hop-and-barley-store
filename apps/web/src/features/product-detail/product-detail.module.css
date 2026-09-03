@@ -108,6 +108,29 @@
   justify-items: start;
 }
 
+.cartActionRow {
+  display: grid;
+  gap: var(--hb-space-3);
+  justify-items: start;
+}
+
+.cartActionRow .inCartLink {
+  background: var(--hb-color-warning);
+  border-color: color-mix(in srgb, var(--hb-color-ink) 28%, transparent);
+  color: var(--hb-color-ink);
+}
+
+.cartActionRow .inCartLink:hover {
+  background: color-mix(in srgb, var(--hb-color-warning) 84%, white);
+}
+
+.confirmationActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hb-space-3);
+  justify-content: flex-end;
+}
+
 .cartMessage {
   margin: 0;
 }
@@ -189,5 +212,11 @@
 
   .specs {
     padding: var(--hb-space-8);
+  }
+
+  .cartActionRow {
+    align-items: end;
+    display: flex;
+    flex-wrap: wrap;
   }
 }
