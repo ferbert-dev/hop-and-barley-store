@@ -7,6 +7,7 @@ import {
 } from '../../web/src/quality/acceptance-matrix';
 
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
+const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
 
 async function waitForShellAssets(page: Page) {
   const images = await page
@@ -253,6 +254,8 @@ test('fills the complete catalog hero section with the hop image', async ({
 test('keeps the header visible while the catalog hero scrolls away', async ({
   page,
 }) => {
+  test.skip(unavailable, 'requires the connected catalog');
+
   for (const width of [360, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/', { waitUntil: 'domcontentloaded' });
