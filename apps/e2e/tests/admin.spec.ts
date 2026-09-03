@@ -272,29 +272,13 @@ test.describe('connected administrator product management', () => {
           '../web/public/assets/products/caramel-malt.webp',
         ),
       );
-    const updateResult = page
-      .waitForResponse(
-        (response) =>
-          /\/api\/v1\/admin\/products\/[0-9a-f-]+$/i.test(response.url()) &&
-          response.request().method() === 'PATCH',
-      )
-      .then(async (response) => ({
-        body: (await response.json()) as { imagePath: string },
-        status: response.status(),
-      }));
+    const updateResponse = page.waitForResponse(
+      (response) =>
+        /\/api\/v1\/admin\/products\/[0-9a-f-]+$/i.test(response.url()) &&
+        response.request().method() === 'PATCH',
+    );
     await page.getByRole('button', { name: 'Save changes' }).click();
-    const { body: updated, status: updatedStatus } = await updateResult;
-    expect(updatedStatus).toBe(200);
-    expect(updated.imagePath).not.toBe(created.imagePath);
-    await expect
-      .poll(async () =>
-        (
-          await page.request.get(
-            new URL(updated.imagePath, page.url()).toString(),
-          )
-        ).status(),
-      )
-      .toBe(200);
+    expect((await updateResponse).status()).toBe(200);
     expect(
       (
         await page.request.get(
@@ -313,6 +297,20 @@ test.describe('connected administrator product management', () => {
     await page.getByLabel('Search products').press('Enter');
     const updatedRow = page.getByRole('row').filter({ hasText: updatedName });
     await expect(updatedRow).toBeVisible();
+    const updatedImagePath = await updatedRow
+      .locator('img')
+      .getAttribute('src');
+    expect(updatedImagePath).toMatch(
+      /^\/product-assets\/[0-9a-f-]{36}[.]webp$/u,
+    );
+    expect(updatedImagePath).not.toBe(created.imagePath);
+    expect(
+      (
+        await page.request.get(
+          new URL(updatedImagePath!, page.url()).toString(),
+        )
+      ).status(),
+    ).toBe(200);
     await expect(updatedRow.getByText('Deactivated')).toBeVisible();
   });
 
