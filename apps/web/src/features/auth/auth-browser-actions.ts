@@ -62,14 +62,20 @@ export async function loginFromBrowser(
       return { status: 'invalid' };
     }
     if (!response.ok || error) return { status: 'unavailable' };
-    if (data?.cartMerge === 'unavailable') {
-      window.sessionStorage.setItem('hb-cart-merge-warning', '1');
-    }
+    updateCartMergeWarning(data?.cartMerge);
     window.location.assign(safeReturnPath(returnTo));
     return { status: 'idle' };
   } catch {
     return { status: 'unavailable' };
   }
+}
+
+export function updateCartMergeWarning(cartMerge: unknown): void {
+  if (cartMerge === 'unavailable') {
+    window.sessionStorage.setItem('hb-cart-merge-warning', '1');
+    return;
+  }
+  window.sessionStorage.removeItem('hb-cart-merge-warning');
 }
 
 function browserClient() {

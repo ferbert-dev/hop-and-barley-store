@@ -1,5 +1,6 @@
 'use client';
 
+import { createApiClient } from '@hop-and-barley/api-client';
 import { useEffect, useState } from 'react';
 import { resolveBrowserApiUrl } from '../../lib/browser-api-url';
 import { Button } from '../../components/ui/button';
@@ -8,6 +9,7 @@ import styles from './auth.module.css';
 const PUBLIC_API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 const PUBLIC_API_HOST_ALIASES = process.env.NEXT_PUBLIC_API_HOST_ALIASES ?? '';
+const CART_MERGE_RETRY_TIMEOUT_MS = 1_500;
 
 export function CartMergeNotice() {
   const [visible, setVisible] = useState(false);
@@ -28,30 +30,35 @@ export function CartMergeNotice() {
   async function retry() {
     setPending(true);
     try {
-      const base = resolveBrowserApiUrl(
-        PUBLIC_API_URL,
-        window.location.origin,
-        PUBLIC_API_HOST_ALIASES,
+      const origin = window.location.origin;
+      const client = createApiClient(
+        resolveBrowserApiUrl(PUBLIC_API_URL, origin, PUBLIC_API_HOST_ALIASES),
+        { cache: 'no-store', credentials: 'include' },
       );
-      const csrfResponse = await fetch(`${base}/api/v1/auth/csrf`, {
-        cache: 'no-store',
-        credentials: 'include',
+      const csrf = await client.GET('/api/v1/auth/csrf', {
+        signal: AbortSignal.timeout(CART_MERGE_RETRY_TIMEOUT_MS),
       });
-      const csrf = (await csrfResponse.json()) as { csrfToken?: unknown };
-      if (!csrfResponse.ok || typeof csrf.csrfToken !== 'string') return;
-      const response = await fetch(`${base}/api/v1/auth/cart-merge`, {
-        cache: 'no-store',
-        credentials: 'include',
-        headers: {
-          Origin: window.location.origin,
-          'X-CSRF-Token': csrf.csrfToken,
-        },
-        method: 'POST',
-      });
-      const result = (await response.json()) as { cartMerge?: unknown };
       if (
-        response.ok &&
-        (result.cartMerge === 'succeeded' || result.cartMerge === 'not_present')
+        !csrf.response.ok ||
+        csrf.error !== undefined ||
+        typeof csrf.data?.csrfToken !== 'string'
+      ) {
+        return;
+      }
+      const merge = await client.POST('/api/v1/auth/cart-merge', {
+        params: {
+          header: {
+            Origin: origin,
+            'X-CSRF-Token': csrf.data.csrfToken,
+          },
+        },
+        signal: AbortSignal.timeout(CART_MERGE_RETRY_TIMEOUT_MS),
+      });
+      if (
+        merge.response.ok &&
+        merge.error === undefined &&
+        (merge.data?.cartMerge === 'succeeded' ||
+          merge.data?.cartMerge === 'not_present')
       ) {
         window.sessionStorage.removeItem('hb-cart-merge-warning');
         window.location.reload();

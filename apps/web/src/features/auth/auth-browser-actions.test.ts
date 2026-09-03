@@ -1,9 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { loginFromBrowser, registerFromBrowser } from './auth-browser-actions';
+import {
+  loginFromBrowser,
+  registerFromBrowser,
+  updateCartMergeWarning,
+} from './auth-browser-actions';
 import { INITIAL_AUTH_FORM_STATE } from './auth-state';
 
-beforeEach(() => vi.unstubAllGlobals());
+beforeEach(() => {
+  vi.unstubAllGlobals();
+  window.sessionStorage.clear();
+});
 
 describe('direct browser auth transport', () => {
   it('does not forward spoofable client-address headers', async () => {
@@ -72,6 +79,14 @@ describe('direct browser auth transport', () => {
         rememberMe: false,
       });
     }
+  });
+
+  it('clears a stale merge warning after a later successful login merge', () => {
+    updateCartMergeWarning('unavailable');
+    expect(window.sessionStorage.getItem('hb-cart-merge-warning')).toBe('1');
+
+    updateCartMergeWarning('succeeded');
+    expect(window.sessionStorage.getItem('hb-cart-merge-warning')).toBeNull();
   });
 });
 

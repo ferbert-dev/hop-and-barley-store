@@ -225,6 +225,16 @@ export class CartService {
           : null;
 
       if (!account && activeGuest) {
+        const guestItems = await transaction.cartItem.findMany({
+          select: { amount: true, productId: true },
+          where: { cartId: activeGuest.id },
+        });
+        await requireCanonicalMergedItems(
+          transaction,
+          new Map(
+            guestItems.map(({ amount, productId }) => [productId, amount]),
+          ),
+        );
         await transaction.cart.update({
           data: {
             expiresAt: new Date(requestedNow.getTime() + CART_LIFETIME_MS),
@@ -269,22 +279,7 @@ export class CartService {
           Math.max(merged.get(item.productId) ?? 0, item.amount),
         );
       }
-      if (merged.size > MAX_DISTINCT_ITEMS) unavailable();
-      const products = await transaction.product.findMany({
-        select: {
-          amountUnit: true,
-          maximumOrderAmount: true,
-          minimumOrderAmount: true,
-          orderStepAmount: true,
-          saleKind: true,
-          id: true,
-        },
-        where: { id: { in: [...merged.keys()] } },
-      });
-      if (products.length !== merged.size) unavailable();
-      for (const product of products) {
-        requireValidCartAmount(merged.get(product.id) ?? 0, product);
-      }
+      await requireCanonicalMergedItems(transaction, merged);
       for (const [productId, amount] of merged) {
         await transaction.cartItem.upsert({
           create: { amount, cartId: accountId, productId },
@@ -567,6 +562,28 @@ async function lockCarts(
     ORDER BY "id"
     FOR UPDATE
   `;
+}
+
+async function requireCanonicalMergedItems(
+  transaction: Prisma.TransactionClient,
+  merged: ReadonlyMap<string, number>,
+): Promise<void> {
+  if (merged.size > MAX_DISTINCT_ITEMS) unavailable();
+  const products = await transaction.product.findMany({
+    select: {
+      amountUnit: true,
+      maximumOrderAmount: true,
+      minimumOrderAmount: true,
+      orderStepAmount: true,
+      saleKind: true,
+      id: true,
+    },
+    where: { id: { in: [...merged.keys()] } },
+  });
+  if (products.length !== merged.size) unavailable();
+  for (const product of products) {
+    requireValidCartAmount(merged.get(product.id) ?? 0, product);
+  }
 }
 
 function requireActiveCart(
