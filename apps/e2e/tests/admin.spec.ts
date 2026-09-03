@@ -246,7 +246,7 @@ test.describe('connected administrator product management', () => {
     ).toBeVisible();
     const updatedName = `${productName} Updated`;
     await page.getByLabel('Title').fill(updatedName);
-    await page.getByLabel('Active').uncheck();
+    await page.getByLabel('Active', { exact: true }).uncheck();
     const updateResponse = page.waitForResponse(
       (response) =>
         /\/api\/v1\/admin\/products\/[0-9a-f-]+$/i.test(response.url()) &&
