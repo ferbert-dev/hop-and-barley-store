@@ -4,10 +4,12 @@ import {
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import type { Prisma } from '../generated/prisma/client';
-import { CATALOG_INGREDIENT_PRODUCT_TYPES } from '../catalog/catalog-product-types';
+import { CATALOG_ADMIN_PRODUCT_TYPES } from '../catalog/catalog-product-types';
+import type { ProductSpecificationDto } from '../catalog/dto/product-detail.dto';
 import { PrismaService } from '../database/prisma.service';
 import {
   ProductAssetStorageService,
@@ -18,6 +20,7 @@ import {
   type AdminCreateProductBodyDto,
   type AdminCreatedProductDto,
   type AdminProductCreateOptionsDto,
+  type AdminUpdateProductBodyDto,
 } from './dto/admin-product-create.dto';
 
 const INT32_MAX = 2_147_483_647;
@@ -27,6 +30,9 @@ const WEIGHT_MAXIMUM_MG = 100_000_000;
 
 const PRODUCT_CREATE_UNAVAILABLE = Object.freeze({ status: 'unavailable' });
 const PRODUCT_SLUG_CONFLICT = Object.freeze({ status: 'slug-conflict' });
+const PRODUCT_NOT_FOUND = Object.freeze({ status: 'not-found' });
+const PRODUCT_UPDATE_CONFLICT = Object.freeze({ status: 'update-conflict' });
+const PRODUCT_ASSET_PATH = /^\/product-assets\/(.+[.]webp)$/u;
 
 const createdProductSelect = {
   activeFrom: true,
@@ -39,6 +45,7 @@ const createdProductSelect = {
   id: true,
   imagePath: true,
   isActive: true,
+  kitYieldVolumeMl: true,
   maximumOrderAmount: true,
   minimumOrderAmount: true,
   name: true,
@@ -49,6 +56,7 @@ const createdProductSelect = {
   priceQualifier: true,
   saleKind: true,
   slug: true,
+  specifications: true,
   stockAmount: true,
   teaser: true,
   updatedAt: true,
@@ -66,9 +74,11 @@ export class AdminProductCreationService {
 
   getCreateOptions(): AdminProductCreateOptionsDto {
     return {
-      categories: CATALOG_INGREDIENT_PRODUCT_TYPES.map(
-        ({ id, name, slug }) => ({ id, name, slug }),
-      ),
+      categories: CATALOG_ADMIN_PRODUCT_TYPES.map(({ id, name, slug }) => ({
+        id,
+        name,
+        slug,
+      })),
       saleKinds: [...ADMIN_PRODUCT_SALE_KINDS],
     };
   }
@@ -77,7 +87,7 @@ export class AdminProductCreationService {
     dto: AdminCreateProductBodyDto,
     image: UploadedProductImage,
   ): Promise<AdminCreatedProductDto> {
-    const category = CATALOG_INGREDIENT_PRODUCT_TYPES.find(
+    const category = CATALOG_ADMIN_PRODUCT_TYPES.find(
       (candidate) => candidate.id === dto.categoryId,
     );
     if (!category) {
@@ -92,30 +102,14 @@ export class AdminProductCreationService {
       'stockAmount',
     );
     const packageNetWeightMg = resolvePackageNetWeight(dto);
+    const kitYieldVolumeMl = resolveKitYield(dto);
     const activeFrom = dto.activeFrom ? new Date(dto.activeFrom) : new Date();
     const activeUntil = dto.activeUntil ? new Date(dto.activeUntil) : null;
     if (activeUntil && activeUntil <= activeFrom) {
       throw new BadRequestException({ status: 'invalid-activity-window' });
     }
 
-    const sale =
-      dto.saleKind === 'WEIGHT'
-        ? {
-            amountUnit: 'MILLIGRAM' as const,
-            maximumOrderAmount: WEIGHT_MAXIMUM_MG,
-            minimumOrderAmount: WEIGHT_INCREMENT_MG,
-            orderStepAmount: WEIGHT_INCREMENT_MG,
-            priceBasisAmount: WEIGHT_INCREMENT_MG,
-            priceQualifier: 'per 100g' as const,
-          }
-        : {
-            amountUnit: 'EACH' as const,
-            maximumOrderAmount: null,
-            minimumOrderAmount: 1,
-            orderStepAmount: 1,
-            priceBasisAmount: 1,
-            priceQualifier: 'per package' as const,
-          };
+    const sale = resolveSaleConfiguration(dto.saleKind);
     const specifications = [{ label: 'Product Type', value: category.name }];
     const slug = createProductSlug(dto.name);
     const storedAsset = await this.assets.storeImage(image);
@@ -131,7 +125,7 @@ export class AdminProductCreationService {
           description: dto.description,
           imagePath: storedAsset.imagePath,
           isActive: dto.isActive === 'true',
-          kitYieldVolumeMl: null,
+          kitYieldVolumeMl,
           name: dto.name,
           packageNetWeightMg,
           priceMinor,
@@ -139,7 +133,7 @@ export class AdminProductCreationService {
           slug,
           specifications,
           stockAmount,
-          teaser: createTeaser(dto.description),
+          teaser: dto.teaser ?? createTeaser(dto.description),
         },
         select: createdProductSelect,
       });
@@ -166,6 +160,145 @@ export class AdminProductCreationService {
       throw new ServiceUnavailableException(PRODUCT_CREATE_UNAVAILABLE);
     }
   }
+
+  async getProduct(id: string): Promise<AdminCreatedProductDto> {
+    const product = await this.prisma.product.findUnique({
+      select: createdProductSelect,
+      where: { id },
+    });
+    if (!product) throw new NotFoundException(PRODUCT_NOT_FOUND);
+    return {
+      ...product,
+      amountUnit:
+        product.saleKind === 'WEIGHT'
+          ? ('MILLIGRAM' as const)
+          : ('EACH' as const),
+      currency: 'USD',
+      priceQualifier:
+        product.saleKind === 'WEIGHT'
+          ? ('per 100g' as const)
+          : product.saleKind === 'KIT'
+            ? ('per kit' as const)
+            : ('per package' as const),
+      specifications: parseProductSpecifications(product.specifications),
+    };
+  }
+
+  async updateProduct(
+    id: string,
+    dto: AdminUpdateProductBodyDto,
+    image?: UploadedProductImage,
+  ): Promise<AdminCreatedProductDto> {
+    const existing = await this.prisma.product.findUnique({
+      select: { imagePath: true, updatedAt: true },
+      where: { id },
+    });
+    if (!existing) throw new NotFoundException(PRODUCT_NOT_FOUND);
+    if (existing.updatedAt.toISOString() !== dto.expectedUpdatedAt) {
+      throw new ConflictException(PRODUCT_UPDATE_CONFLICT);
+    }
+
+    const category = CATALOG_ADMIN_PRODUCT_TYPES.find(
+      (candidate) => candidate.id === dto.categoryId,
+    );
+    if (!category) {
+      throw new BadRequestException({ status: 'invalid-product-category' });
+    }
+    const priceMinor = parseUsdMinor(dto.price);
+    const stockAmount = parseCanonicalInteger(
+      dto.stockAmount,
+      0,
+      STOCK_MAX,
+      'stockAmount',
+    );
+    const packageNetWeightMg = resolvePackageNetWeight(dto);
+    const kitYieldVolumeMl = resolveKitYield(dto);
+    const activeFrom = dto.activeFrom ? new Date(dto.activeFrom) : new Date();
+    const activeUntil = dto.activeUntil ? new Date(dto.activeUntil) : null;
+    if (activeUntil && activeUntil <= activeFrom) {
+      throw new BadRequestException({ status: 'invalid-activity-window' });
+    }
+    const sale = resolveSaleConfiguration(dto.saleKind);
+    const specifications = [{ label: 'Product Type', value: category.name }];
+    const storedAsset = image ? await this.assets.storeImage(image) : null;
+    let updateCommitted = false;
+
+    try {
+      const changed = await this.prisma.product.updateMany({
+        data: {
+          activeFrom,
+          activeUntil,
+          ...sale,
+          categoryId: category.id,
+          description: dto.description,
+          ...(storedAsset ? { imagePath: storedAsset.imagePath } : {}),
+          isActive: dto.isActive === 'true',
+          kitYieldVolumeMl,
+          name: dto.name,
+          packageNetWeightMg,
+          priceMinor,
+          saleKind: dto.saleKind,
+          specifications,
+          stockAmount,
+          teaser: dto.teaser ?? createTeaser(dto.description),
+        },
+        where: { id, updatedAt: existing.updatedAt },
+      });
+      if (changed.count !== 1) {
+        throw new ConflictException(PRODUCT_UPDATE_CONFLICT);
+      }
+      updateCommitted = true;
+      const updated = await this.getProduct(id);
+      if (storedAsset && updateCommitted) {
+        const previousKey = PRODUCT_ASSET_PATH.exec(existing.imagePath)?.[1];
+        if (previousKey) {
+          await this.assets
+            .deleteAsset(previousKey)
+            .catch(() =>
+              this.logger.error(
+                'admin.product.update.old_asset_cleanup_failed',
+              ),
+            );
+        }
+      }
+      return updated;
+    } catch (error) {
+      if (storedAsset && !updateCommitted) {
+        await this.assets
+          .deleteAsset(storedAsset.key)
+          .catch(() =>
+            this.logger.error('admin.product.update.new_asset_cleanup_failed'),
+          );
+      }
+      if (error instanceof ConflictException) throw error;
+      this.logger.error('admin.product.update.failed');
+      throw new ServiceUnavailableException(PRODUCT_CREATE_UNAVAILABLE);
+    }
+  }
+}
+
+function resolveSaleConfiguration(
+  saleKind: AdminCreateProductBodyDto['saleKind'],
+) {
+  if (saleKind === 'WEIGHT') {
+    return {
+      amountUnit: 'MILLIGRAM' as const,
+      maximumOrderAmount: WEIGHT_MAXIMUM_MG,
+      minimumOrderAmount: WEIGHT_INCREMENT_MG,
+      orderStepAmount: WEIGHT_INCREMENT_MG,
+      priceBasisAmount: WEIGHT_INCREMENT_MG,
+      priceQualifier: 'per 100g' as const,
+    };
+  }
+  return {
+    amountUnit: 'EACH' as const,
+    maximumOrderAmount: null,
+    minimumOrderAmount: 1,
+    orderStepAmount: 1,
+    priceBasisAmount: 1,
+    priceQualifier:
+      saleKind === 'KIT' ? ('per kit' as const) : ('per package' as const),
+  };
 }
 
 export function createProductSlug(name: string): string {
@@ -201,7 +334,7 @@ function parseUsdMinor(value: string): number {
 function resolvePackageNetWeight(
   dto: AdminCreateProductBodyDto,
 ): number | null {
-  if (dto.saleKind === 'WEIGHT') {
+  if (dto.saleKind !== 'PACKAGE') {
     if (dto.packageNetWeightMg !== undefined) {
       throw new BadRequestException({ status: 'invalid-package-net-weight' });
     }
@@ -213,6 +346,24 @@ function resolvePackageNetWeight(
     1,
     INT32_MAX,
     'packageNetWeightMg',
+  );
+}
+
+function resolveKitYield(dto: AdminCreateProductBodyDto): number | null {
+  if (dto.saleKind !== 'KIT') {
+    if (dto.kitYieldVolumeMl !== undefined) {
+      throw new BadRequestException({ status: 'invalid-kit-yield' });
+    }
+    return null;
+  }
+  if (dto.kitYieldVolumeMl === undefined) {
+    throw new BadRequestException({ status: 'invalid-kit-yield' });
+  }
+  return parseCanonicalInteger(
+    dto.kitYieldVolumeMl,
+    1,
+    INT32_MAX,
+    'kitYieldVolumeMl',
   );
 }
 
@@ -230,6 +381,37 @@ function parseCanonicalInteger(
     throw new BadRequestException({ field, status: 'invalid-integer' });
   }
   return parsed;
+}
+
+function parseProductSpecifications(
+  value: Prisma.JsonValue,
+): ProductSpecificationDto[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new TypeError('Stored product specifications are invalid');
+  }
+  return value.map((item) => {
+    if (item === null || Array.isArray(item) || typeof item !== 'object') {
+      throw new TypeError('Stored product specifications are invalid');
+    }
+    const { label, value: specificationValue } = item as Record<
+      string,
+      unknown
+    >;
+    const validValue =
+      typeof specificationValue === 'string' ||
+      (Array.isArray(specificationValue) &&
+        specificationValue.length > 0 &&
+        specificationValue.every((entry) => typeof entry === 'string'));
+    if (typeof label !== 'string' || !label || !validValue) {
+      throw new TypeError('Stored product specifications are invalid');
+    }
+    return {
+      label,
+      value: Array.isArray(specificationValue)
+        ? [...specificationValue]
+        : specificationValue,
+    };
+  });
 }
 
 function isProductSlugConflict(error: unknown): boolean {

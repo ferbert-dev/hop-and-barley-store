@@ -5,6 +5,12 @@
   padding: 0;
 }
 
+.pageTitle {
+  font-size: clamp(2.75rem, 5vw, 4.5rem);
+  line-height: 0.95;
+  margin-block: 0 var(--hb-space-6);
+}
+
 .form > fieldset {
   display: grid;
   gap: var(--hb-space-6);
@@ -141,6 +147,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--hb-space-3);
+  justify-content: flex-end;
 }
 
 .success {

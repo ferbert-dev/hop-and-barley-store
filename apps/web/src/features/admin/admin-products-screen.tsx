@@ -1,4 +1,6 @@
 import type { components } from '@hop-and-barley/api-client';
+import Image from 'next/image';
+import { CalendarBlank, PencilSimple } from '@phosphor-icons/react/dist/ssr';
 
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -6,9 +8,7 @@ import { Price } from '../../components/ui/price';
 import { EmptyState, ErrorState } from '../../components/ui/status';
 import { getVisiblePages } from '../catalog/catalog-pagination';
 import {
-  formatActivationWindow,
   formatAdminStock,
-  formatUtc,
   getLifecyclePresentation,
 } from './admin-product-format';
 import { AdminProductFilters } from './admin-product-filters';
@@ -18,6 +18,7 @@ import {
 } from './admin-products-query';
 import type { AdminProductsLoadResult } from './admin-products-server';
 import { AdminShell } from './admin-shell';
+import { isUploadedProductImagePath } from '../../lib/product-image';
 import styles from './admin-products.module.css';
 
 type AdminProduct = components['schemas']['AdminProductListItemDto'];
@@ -51,22 +52,36 @@ function AdminProductResults({
   const hasFilters = Boolean(
     query.search ||
     query.category ||
+    query.lifecycle ||
     query.minPriceMinor !== undefined ||
     query.maxPriceMinor !== undefined,
   );
 
   return (
     <>
-      <AdminProductFilters
-        categories={meta.facets.categories}
-        query={query}
-        showClear={hasFilters}
-      />
-      <div className={styles.toolbar}>
-        <p aria-live="polite">
-          {meta.totalItems} {meta.totalItems === 1 ? 'product' : 'products'}
+      <header className={styles.pageHeader}>
+        <div>
+          <h1>Products</h1>
+          <p aria-live="polite">
+            {meta.totalItems} {meta.totalItems === 1 ? 'product' : 'products'}
+          </p>
+        </div>
+        <p className={styles.today}>
+          <CalendarBlank aria-hidden="true" size={20} />
+          {new Intl.DateTimeFormat('en-GB', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          }).format(new Date())}
         </p>
-        <Button href="/admin/add">+ Add Product</Button>
+      </header>
+      <div className={styles.controls}>
+        <AdminProductFilters
+          categories={meta.facets.categories}
+          query={query}
+          showClear={hasFilters}
+        />
+        <Button href="/admin/add">+ Add product</Button>
       </div>
 
       {items.length === 0 ? (
@@ -89,19 +104,11 @@ function AdminProductResults({
               <caption className="visually-hidden">Product stock</caption>
               <thead>
                 <tr>
-                  <th scope="col">ID</th>
-                  <th scope="col">Name</th>
-                  <th scope="col">Description</th>
+                  <th scope="col">Product</th>
                   <th scope="col">Price</th>
-                  <th scope="col">Category</th>
                   <th scope="col">Stock</th>
-                  <th scope="col">Lifecycle</th>
-                  <th scope="col">Activation window</th>
-                  <th scope="col">Created at</th>
-                  <th scope="col">Updated at</th>
-                  <th scope="col">
-                    <span className="visually-hidden">Actions</span>
-                  </th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -129,20 +136,24 @@ function AdminProductTableRow({ product }: { product: AdminProduct }) {
   const lifecycle = getLifecyclePresentation(product.lifecycleStatus);
   return (
     <tr>
-      <td>
-        <code>{product.id}</code>
-      </td>
-      <td>
-        <p className={styles.productName}>{product.name}</p>
-      </td>
-      <td>
-        <p className={styles.description}>{product.description}</p>
+      <td className={styles.productCell}>
+        <Image
+          alt=""
+          className={styles.thumbnail}
+          height={72}
+          src={product.imagePath}
+          unoptimized={isUploadedProductImagePath(product.imagePath)}
+          width={72}
+        />
+        <span>
+          <p className={styles.productName}>{product.name}</p>
+          <span className={styles.subdetail}>{product.category.name}</span>
+        </span>
       </td>
       <td>
         <Price currency={product.currency} minorUnits={product.priceMinor} />
         <span className={styles.subdetail}>{product.priceQualifier}</span>
       </td>
-      <td>{product.category.name}</td>
       <td>
         {formatAdminStock(
           product.stockAmount,
@@ -151,25 +162,21 @@ function AdminProductTableRow({ product }: { product: AdminProduct }) {
         )}
       </td>
       <td>
-        <Badge tone={lifecycle.tone}>{lifecycle.label}</Badge>
+        <Badge
+          className={styles.lifecycleBadge}
+          data-lifecycle={product.lifecycleStatus}
+          tone={lifecycle.tone}
+        >
+          {lifecycle.label}
+        </Badge>
       </td>
       <td>
-        <span>
-          {formatActivationWindow(product.activeFrom, product.activeUntil)}
-        </span>
-        <span className={styles.subdetail}>
-          {product.isActive ? 'Manually enabled' : 'Manually disabled'}
-        </span>
-      </td>
-      <td>
-        <time dateTime={product.createdAt}>{formatUtc(product.createdAt)}</time>
-      </td>
-      <td>
-        <time dateTime={product.updatedAt}>{formatUtc(product.updatedAt)}</time>
-      </td>
-      <td>
-        <Button href={editHref(product.id)} variant="secondary">
-          Edit
+        <Button
+          className={styles.editButton}
+          href={editHref(product.id)}
+          variant="secondary"
+        >
+          <PencilSimple aria-hidden="true" size={18} /> Edit
         </Button>
       </td>
     </tr>
@@ -181,23 +188,27 @@ function AdminProductCard({ product }: { product: AdminProduct }) {
   return (
     <li className={styles.card}>
       <div className={styles.cardHeader}>
-        <div>
+        <Image
+          alt=""
+          className={styles.thumbnail}
+          height={64}
+          src={product.imagePath}
+          unoptimized={isUploadedProductImagePath(product.imagePath)}
+          width={64}
+        />
+        <div className={styles.cardTitle}>
           <p className={styles.productName}>{product.name}</p>
-          <p className={styles.description}>{product.description}</p>
+          <p className={styles.description}>{product.category.name}</p>
         </div>
-        <Badge tone={lifecycle.tone}>{lifecycle.label}</Badge>
+        <Badge
+          className={styles.lifecycleBadge}
+          data-lifecycle={product.lifecycleStatus}
+          tone={lifecycle.tone}
+        >
+          {lifecycle.label}
+        </Badge>
       </div>
       <dl>
-        <div>
-          <dt>ID</dt>
-          <dd>
-            <code>{product.id}</code>
-          </dd>
-        </div>
-        <div>
-          <dt>Lifecycle</dt>
-          <dd>{lifecycle.label}</dd>
-        </div>
         <div>
           <dt>Price</dt>
           <dd>
@@ -209,10 +220,6 @@ function AdminProductCard({ product }: { product: AdminProduct }) {
           </dd>
         </div>
         <div>
-          <dt>Category</dt>
-          <dd>{product.category.name}</dd>
-        </div>
-        <div>
           <dt>Stock</dt>
           <dd>
             {formatAdminStock(
@@ -222,32 +229,13 @@ function AdminProductCard({ product }: { product: AdminProduct }) {
             )}
           </dd>
         </div>
-        <div>
-          <dt>Activation window</dt>
-          <dd>
-            {formatActivationWindow(product.activeFrom, product.activeUntil)} (
-            {product.isActive ? 'manually enabled' : 'manually disabled'})
-          </dd>
-        </div>
-        <div>
-          <dt>Created at</dt>
-          <dd>
-            <time dateTime={product.createdAt}>
-              {formatUtc(product.createdAt)}
-            </time>
-          </dd>
-        </div>
-        <div>
-          <dt>Updated at</dt>
-          <dd>
-            <time dateTime={product.updatedAt}>
-              {formatUtc(product.updatedAt)}
-            </time>
-          </dd>
-        </div>
       </dl>
-      <Button href={editHref(product.id)} variant="secondary">
-        Edit
+      <Button
+        className={styles.editButton}
+        href={editHref(product.id)}
+        variant="secondary"
+      >
+        <PencilSimple aria-hidden="true" size={18} /> Edit
       </Button>
     </li>
   );

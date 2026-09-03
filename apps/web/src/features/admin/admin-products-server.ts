@@ -87,6 +87,7 @@ function isAdminProduct(value: unknown): boolean {
     isShortString(value.slug) &&
     isShortString(value.name) &&
     isShortString(value.description) &&
+    isShortString(value.imagePath) &&
     isNonNegativeInteger(value.priceMinor) &&
     value.currency === 'USD' &&
     isShortString(value.priceQualifier) &&
@@ -126,6 +127,7 @@ function isFilters(value: unknown): boolean {
   return (
     isNullableShortString(value.search) &&
     isNullableShortString(value.category) &&
+    isNullableShortString(value.lifecycle) &&
     isNullableNonNegativeInteger(value.minPriceMinor) &&
     isNullableNonNegativeInteger(value.maxPriceMinor)
   );
@@ -184,6 +186,7 @@ function isAmountUnit(value: unknown): boolean {
 function isLifecycleStatus(value: unknown): boolean {
   return (
     value === 'ACTIVE' ||
+    value === 'ENDING_SOON' ||
     value === 'DISABLED' ||
     value === 'SCHEDULED' ||
     value === 'EXPIRED'

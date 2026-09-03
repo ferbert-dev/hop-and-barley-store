@@ -30,3 +30,13 @@ export type CatalogIngredientProductTypeSlug =
 
 export const CATALOG_INGREDIENT_PRODUCT_TYPE_SLUGS =
   CATALOG_INGREDIENT_PRODUCT_TYPES.map(({ slug }) => slug);
+
+export const CATALOG_ADMIN_PRODUCT_TYPES = [
+  ...CATALOG_INGREDIENT_PRODUCT_TYPES,
+  {
+    displayOrder: 5,
+    id: '10000000-0000-4000-8000-000000000005',
+    name: 'Kits',
+    slug: 'kits',
+  },
+] as const;

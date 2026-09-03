@@ -76,11 +76,15 @@ function toMultipartBody(payload: AdminProductCreatePayload): FormData {
   const body = new FormData();
   body.set('name', payload.name);
   body.set('description', payload.description);
+  if (payload.teaser) body.set('teaser', payload.teaser);
   body.set('price', payload.price);
   body.set('categoryId', payload.categoryId);
   body.set('saleKind', payload.saleKind);
   body.set('stockAmount', String(payload.stockAmount));
   body.set('isActive', String(payload.isActive));
+  if (payload.kitYieldVolumeMl !== undefined) {
+    body.set('kitYieldVolumeMl', String(payload.kitYieldVolumeMl));
+  }
   if (payload.activeFrom) body.set('activeFrom', payload.activeFrom);
   if (payload.activeUntil) body.set('activeUntil', payload.activeUntil);
   if (payload.packageNetWeightMg !== undefined) {

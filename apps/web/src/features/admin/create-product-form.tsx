@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 
 import { Button } from '../../components/ui/button';
 import { Field, Select } from '../../components/ui/field';
+import { revalidateProductViews } from './admin-product-actions';
 import type { AdminProductCreateOptions } from './admin-product-create-server';
+import type { AdminEditableProduct } from './admin-product-edit-server';
 import {
   createAdminProductFromBrowser,
   type AdminProductCreated,
@@ -13,8 +15,10 @@ import {
 import {
   initialLocalDateTime,
   validateAdminProductCreate,
+  validateAdminProductUpdate,
   type AdminProductSaleKind,
 } from './admin-product-create-validation';
+import { updateAdminProductFromBrowser } from './admin-product-update-transport';
 import styles from './create-product.module.css';
 
 type FormState =
@@ -26,9 +30,17 @@ type FormState =
 
 export function CreateProductForm({
   options,
-}: Readonly<{ options: AdminProductCreateOptions }>) {
+  product,
+}: Readonly<{
+  options: AdminProductCreateOptions;
+  product?: AdminEditableProduct;
+}>) {
   const router = useRouter();
-  const [saleKind, setSaleKind] = useState<AdminProductSaleKind>('WEIGHT');
+  const [saleKind, setSaleKind] = useState<AdminProductSaleKind>(
+    product?.saleKind === 'PACKAGE' || product?.saleKind === 'KIT'
+      ? product.saleKind
+      : 'WEIGHT',
+  );
   const [image, setImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const previewUrlRef = useRef<string | null>(null);
@@ -44,7 +56,7 @@ export function CreateProductForm({
   if (state.kind === 'success') {
     return (
       <section className={styles.success} role="status" tabIndex={-1}>
-        <h2>Product created</h2>
+        <h2>Product {product ? 'updated' : 'created'}</h2>
         <p>
           The product is ready for review in the catalog when its activation
           settings allow it.
@@ -65,7 +77,7 @@ export function CreateProductForm({
   return (
     <form
       aria-describedby={
-        state.kind === 'unavailable' ? 'create-product-error' : undefined
+        state.kind === 'unavailable' ? 'product-form-error' : undefined
       }
       className={styles.form}
       noValidate
@@ -73,13 +85,14 @@ export function CreateProductForm({
         event.preventDefault();
         if (pending) return;
         const formData = new FormData(event.currentTarget);
-        const validation = validateAdminProductCreate({
+        const input = {
           activeFrom: String(formData.get('activeFrom') ?? ''),
           activeUntil: String(formData.get('activeUntil') ?? ''),
           categoryId: String(formData.get('categoryId') ?? ''),
           description: String(formData.get('description') ?? ''),
           image,
           isActive: formData.get('isActive') === 'true',
+          kitYieldLitres: String(formData.get('kitYieldLitres') ?? ''),
           name: String(formData.get('name') ?? ''),
           packageNetWeightGrams: String(
             formData.get('packageNetWeightGrams') ?? '',
@@ -87,15 +100,34 @@ export function CreateProductForm({
           price: String(formData.get('price') ?? ''),
           saleKind,
           stock: String(formData.get('stock') ?? ''),
-        });
-        if (!validation.ok) {
-          setState({ errors: validation.errors, kind: 'invalid' });
-          return;
-        }
+          teaser: String(formData.get('teaser') ?? ''),
+        };
         setState({ kind: 'submitting' });
         try {
-          const product = await createAdminProductFromBrowser(validation.value);
-          setState({ kind: 'success', product });
+          if (product) {
+            const validation = validateAdminProductUpdate(
+              input,
+              product.updatedAt,
+            );
+            if (!validation.ok) {
+              setState({ errors: validation.errors, kind: 'invalid' });
+              return;
+            }
+            await updateAdminProductFromBrowser(product.id, validation.value);
+            await revalidateProductViews().catch(() => undefined);
+            setState({ kind: 'success', product });
+          } else {
+            const validation = validateAdminProductCreate(input);
+            if (!validation.ok) {
+              setState({ errors: validation.errors, kind: 'invalid' });
+              return;
+            }
+            const created = await createAdminProductFromBrowser(
+              validation.value,
+            );
+            await revalidateProductViews().catch(() => undefined);
+            setState({ kind: 'success', product: created });
+          }
           router.refresh();
         } catch {
           setState({ kind: 'unavailable' });
@@ -103,15 +135,17 @@ export function CreateProductForm({
       }}
     >
       <fieldset disabled={pending}>
-        <legend className="visually-hidden">Create product</legend>
+        <legend className="visually-hidden">
+          {product ? 'Edit product' : 'Create product'}
+        </legend>
         {state.kind === 'unavailable' ? (
           <p
             className={styles.errorSummary}
-            id="create-product-error"
+            id="product-form-error"
             role="alert"
           >
-            The product could not be saved safely. Check the details and try
-            again.
+            The product could not be saved safely. Reload the editor if it was
+            changed elsewhere, then try again.
           </p>
         ) : null}
 
@@ -119,14 +153,14 @@ export function CreateProductForm({
           <div className={styles.imagePanel}>
             <h2>Product image</h2>
             <p>JPEG, PNG, or WebP. Maximum file size: 5 MiB.</p>
-            {previewUrl ? (
+            {previewUrl || product?.imagePath ? (
               // The selected upload is a local blob URL, which Next Image does
               // not optimize. The server receives and validates the original file.
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 alt="Selected product image preview"
                 className={styles.preview}
-                src={previewUrl}
+                src={previewUrl ?? product?.imagePath}
               />
             ) : (
               <div
@@ -140,7 +174,7 @@ export function CreateProductForm({
               accept="image/jpeg,image/png,image/webp"
               error={errors.image}
               id="product-image"
-              label={image ? 'Replace image' : 'Choose image'}
+              label={image || product ? 'Replace image' : 'Choose image'}
               name="image"
               onChange={(event) => {
                 const nextImage = event.currentTarget.files?.item(0) ?? null;
@@ -155,7 +189,7 @@ export function CreateProductForm({
                 setImage(nextImage);
                 if (state.kind === 'invalid') setState({ kind: 'idle' });
               }}
-              required
+              required={!product}
               type="file"
             />
           </div>
@@ -170,6 +204,17 @@ export function CreateProductForm({
               name="name"
               required
               type="text"
+              defaultValue={product?.name}
+            />
+            <Field
+              autoComplete="off"
+              error={errors.teaser}
+              id="product-teaser"
+              label="Short description"
+              maxLength={160}
+              name="teaser"
+              type="text"
+              defaultValue={product?.teaser}
             />
             <label
               className={styles.textareaField}
@@ -190,6 +235,7 @@ export function CreateProductForm({
                 name="description"
                 required
                 rows={7}
+                defaultValue={product?.description}
               />
               {errors.description ? (
                 <span id="product-description-error" role="alert">
@@ -207,6 +253,9 @@ export function CreateProductForm({
               required
               step="0.01"
               type="number"
+              defaultValue={
+                product ? (product.priceMinor / 100).toFixed(2) : undefined
+              }
             />
             <Select
               error={errors.categoryId}
@@ -214,6 +263,7 @@ export function CreateProductForm({
               label="Product Type"
               name="categoryId"
               required
+              defaultValue={product?.category.id}
             >
               {options.categories.map((category) => (
                 <option key={category.id} value={category.id}>
@@ -246,6 +296,16 @@ export function CreateProductForm({
             />
             Package
           </label>
+          <label>
+            <input
+              checked={saleKind === 'KIT'}
+              name="saleKind"
+              onChange={() => setSaleKind('KIT')}
+              type="radio"
+              value="KIT"
+            />
+            Kit
+          </label>
           {errors.saleKind ? <p role="alert">{errors.saleKind}</p> : null}
         </fieldset>
 
@@ -261,8 +321,13 @@ export function CreateProductForm({
             required
             step="0.1"
             type="number"
+            defaultValue={
+              product?.saleKind === 'WEIGHT'
+                ? (product.stockAmount / 1_000_000).toFixed(1)
+                : undefined
+            }
           />
-        ) : (
+        ) : saleKind === 'PACKAGE' ? (
           <div className={styles.packageFields}>
             <Field
               error={errors.stock}
@@ -274,6 +339,11 @@ export function CreateProductForm({
               required
               step="1"
               type="number"
+              defaultValue={
+                product?.saleKind === 'PACKAGE'
+                  ? product.stockAmount
+                  : undefined
+              }
             />
             <Field
               description="Optional. This describes one package."
@@ -285,6 +355,45 @@ export function CreateProductForm({
               name="packageNetWeightGrams"
               step="0.001"
               type="number"
+              defaultValue={
+                product?.packageNetWeightMg
+                  ? product.packageNetWeightMg / 1_000
+                  : undefined
+              }
+            />
+          </div>
+        ) : (
+          <div className={styles.packageFields}>
+            <Field
+              error={errors.stock}
+              id="product-stock-kits"
+              inputMode="numeric"
+              label="Stock (kits)"
+              min="0"
+              name="stock"
+              required
+              step="1"
+              type="number"
+              defaultValue={
+                product?.saleKind === 'KIT' ? product.stockAmount : undefined
+              }
+            />
+            <Field
+              description="The finished batch volume produced by one kit."
+              error={errors.kitYieldLitres}
+              id="product-kit-yield"
+              inputMode="decimal"
+              label="Kit yield (litres)"
+              min="0.001"
+              name="kitYieldLitres"
+              required
+              step="0.001"
+              type="number"
+              defaultValue={
+                product?.kitYieldVolumeMl
+                  ? product.kitYieldVolumeMl / 1_000
+                  : undefined
+              }
             />
           </div>
         )}
@@ -296,7 +405,9 @@ export function CreateProductForm({
             label="Active from"
             name="activeFrom"
             type="datetime-local"
-            defaultValue={initialLocalDateTime()}
+            defaultValue={
+              toLocalDateTime(product?.activeFrom) ?? initialLocalDateTime()
+            }
           />
           <Field
             error={errors.activeUntil}
@@ -304,10 +415,11 @@ export function CreateProductForm({
             label="Active until"
             name="activeUntil"
             type="datetime-local"
+            defaultValue={toLocalDateTime(product?.activeUntil)}
           />
           <label className={styles.activeToggle}>
             <input
-              defaultChecked
+              defaultChecked={product?.isActive ?? true}
               name="isActive"
               type="checkbox"
               value="true"
@@ -317,18 +429,25 @@ export function CreateProductForm({
         </div>
 
         <div className={styles.actions}>
+          <Button href="/admin/products" variant="secondary">
+            Cancel
+          </Button>
           <Button
             pending={pending}
             pendingLabel="Saving product…"
             type="submit"
           >
-            Save
-          </Button>
-          <Button href="/admin/products" variant="secondary">
-            Cancel
+            {product ? 'Save changes' : 'Save'}
           </Button>
         </div>
       </fieldset>
     </form>
   );
+}
+
+function toLocalDateTime(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }

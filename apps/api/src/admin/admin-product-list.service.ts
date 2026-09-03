@@ -21,6 +21,7 @@ const adminProductSelect = {
   currency: true,
   description: true,
   id: true,
+  imagePath: true,
   isActive: true,
   name: true,
   priceMinor: true,
@@ -45,6 +46,17 @@ export class AdminProductListService {
   ): Promise<AdminProductListResponseDto> {
     const evaluatedAt = new Date();
     const where = buildCatalogProductWhere(query, 'admin');
+    const lifecycleWhere = buildLifecycleWhere(query.lifecycle, evaluatedAt);
+    if (lifecycleWhere) {
+      where.AND = [
+        ...(Array.isArray(where.AND)
+          ? where.AND
+          : where.AND
+            ? [where.AND]
+            : []),
+        lifecycleWhere,
+      ];
+    }
     const facetQuery = buildCatalogFacetQuery('admin');
     const { categories, products, totalItems } = await this.prisma.$transaction(
       async (transaction) => {
@@ -80,6 +92,7 @@ export class AdminProductListService {
         },
         filters: {
           category: query.category ?? null,
+          lifecycle: query.lifecycle ?? null,
           maxPriceMinor: query.maxPriceMinor ?? null,
           minPriceMinor: query.minPriceMinor ?? null,
           search: query.search ?? null,
@@ -105,5 +118,41 @@ export function resolveAdminProductLifecycle(
     return 'SCHEDULED';
   if (product.activeUntil && product.activeUntil <= evaluatedAt)
     return 'EXPIRED';
+  if (
+    product.activeUntil &&
+    product.activeUntil <= new Date(evaluatedAt.getTime() + 7 * 86_400_000)
+  ) {
+    return 'ENDING_SOON';
+  }
   return 'ACTIVE';
+}
+
+function buildLifecycleWhere(
+  lifecycle: AdminCatalogQueryDto['lifecycle'],
+  now: Date,
+): Prisma.ProductWhereInput | undefined {
+  if (!lifecycle) return undefined;
+  const soon = new Date(now.getTime() + 7 * 86_400_000);
+  switch (lifecycle) {
+    case 'DISABLED':
+      return { isActive: false };
+    case 'SCHEDULED':
+      return { activeFrom: { gt: now }, isActive: true };
+    case 'EXPIRED':
+      return { activeUntil: { lte: now }, isActive: true };
+    case 'ENDING_SOON':
+      return {
+        AND: [{ OR: [{ activeFrom: null }, { activeFrom: { lte: now } }] }],
+        activeUntil: { gt: now, lte: soon },
+        isActive: true,
+      };
+    case 'ACTIVE':
+      return {
+        AND: [
+          { OR: [{ activeFrom: null }, { activeFrom: { lte: now } }] },
+          { OR: [{ activeUntil: null }, { activeUntil: { gt: soon } }] },
+        ],
+        isActive: true,
+      };
+  }
 }

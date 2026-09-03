@@ -28,16 +28,11 @@ describe('admin routes', () => {
   it('keeps the Figma-confirmed shell while showing the read-only product error state', async () => {
     render(await AdminProductsPage({ searchParams: Promise.resolve({}) }));
 
-    expect(
-      screen.getByRole('heading', { name: 'Admin - Product Stock' }),
-    ).toBeVisible();
-    expect(
-      screen.getByText('Product Management', { selector: 'span' }),
-    ).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByText('Dashboard')).toHaveAttribute(
-      'aria-disabled',
-      'true',
+    expect(screen.getByRole('link', { name: 'Products' })).toHaveAttribute(
+      'aria-current',
+      'page',
     );
+    expect(screen.queryByText('Dashboard')).not.toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(
       'We could not load product management safely.',
     );

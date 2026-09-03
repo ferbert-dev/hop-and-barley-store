@@ -32,6 +32,7 @@ const DEFAULT_QUERY = Object.freeze({
 const ALLOWED_KEYS = new Set([
   'category',
   'limit',
+  'lifecycle',
   'maxPriceMinor',
   'minPriceMinor',
   'page',
@@ -43,6 +44,13 @@ const SORTS = new Set<AdminProductsQuery['sort']>([
   'name-desc',
   'price-asc',
   'price-desc',
+]);
+const LIFECYCLES = new Set<NonNullable<AdminProductsQuery['lifecycle']>>([
+  'ACTIVE',
+  'ENDING_SOON',
+  'DISABLED',
+  'SCHEDULED',
+  'EXPIRED',
 ]);
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const INTEGER = /^(?:0|[1-9][0-9]*)$/;
@@ -62,6 +70,7 @@ export function parseAdminProductsSearchParams(
   const scalar = raw as Readonly<Record<string, string | undefined>>;
   const search = parseSearch(scalar.search);
   const category = parseCategory(scalar.category);
+  const lifecycle = parseLifecycle(scalar.lifecycle);
   const minPriceMinor = parseInteger(scalar.minPriceMinor, 0, MAX_INT32);
   const maxPriceMinor = parseInteger(scalar.maxPriceMinor, 0, MAX_INT32);
   const sort = parseSort(scalar.sort);
@@ -71,6 +80,7 @@ export function parseAdminProductsSearchParams(
   if (
     search.kind === 'invalid' ||
     category.kind === 'invalid' ||
+    lifecycle.kind === 'invalid' ||
     minPriceMinor.kind === 'invalid' ||
     maxPriceMinor.kind === 'invalid' ||
     sort.kind === 'invalid' ||
@@ -92,6 +102,13 @@ export function parseAdminProductsSearchParams(
     ...(category.value === undefined
       ? {}
       : { category: category.value as string }),
+    ...(lifecycle.value === undefined
+      ? {}
+      : {
+          lifecycle: lifecycle.value as NonNullable<
+            AdminProductsQuery['lifecycle']
+          >,
+        }),
     ...(minPriceMinor.value === undefined
       ? {}
       : { minPriceMinor: minPriceMinor.value as number }),
@@ -126,6 +143,7 @@ export function buildAdminProductsHref(
   const parameters = new URLSearchParams();
   if (query.search) parameters.set('search', query.search);
   if (query.category) parameters.set('category', query.category);
+  if (query.lifecycle) parameters.set('lifecycle', query.lifecycle);
   if (query.minPriceMinor !== undefined)
     parameters.set('minPriceMinor', String(query.minPriceMinor));
   if (query.maxPriceMinor !== undefined)
@@ -159,6 +177,13 @@ function parseSearch(value: string | undefined): Parsed {
 function parseCategory(value: string | undefined): Parsed {
   if (value === undefined || value === '') return valid();
   return value.length <= 64 && SLUG.test(value) ? valid(value) : invalidValue();
+}
+
+function parseLifecycle(value: string | undefined): Parsed {
+  if (value === undefined || value === '') return valid();
+  return LIFECYCLES.has(value as NonNullable<AdminProductsQuery['lifecycle']>)
+    ? valid(value)
+    : invalidValue();
 }
 
 function parseInteger(

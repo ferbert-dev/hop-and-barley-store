@@ -31,7 +31,8 @@ describe('administrator product formatting', () => {
 
   it.each([
     ['ACTIVE', 'Active', 'success'],
-    ['DISABLED', 'Disabled', 'neutral'],
+    ['ENDING_SOON', 'Ending soon', 'warning'],
+    ['DISABLED', 'Deactivated', 'danger'],
     ['SCHEDULED', 'Scheduled', 'warning'],
     ['EXPIRED', 'Expired', 'danger'],
   ] as const)(

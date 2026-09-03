@@ -3,6 +3,9 @@ import {
   Body,
   Controller,
   Get,
+  Param,
+  Patch,
+  ParseUUIDPipe,
   Post,
   Query,
   UploadedFile,
@@ -18,6 +21,7 @@ import {
   ApiHeader,
   ApiOkResponse,
   ApiOperation,
+  ApiNotFoundResponse,
   ApiPayloadTooLargeResponse,
   ApiQuery,
   ApiServiceUnavailableResponse,
@@ -37,6 +41,8 @@ import {
   AdminCreateProductMultipartDto,
   AdminCreatedProductDto,
   AdminProductCreateOptionsDto,
+  AdminUpdateProductBodyDto,
+  AdminUpdateProductMultipartDto,
 } from './dto/admin-product-create.dto';
 import {
   PRODUCT_IMAGE_MAX_BYTES,
@@ -66,10 +72,10 @@ const productImageUploadOptions = {
   limits: {
     fieldNameSize: 100,
     fieldSize: 20_000,
-    fields: 10,
+    fields: 13,
     fileSize: PRODUCT_IMAGE_MAX_BYTES,
     files: 1,
-    parts: 11,
+    parts: 14,
   },
 };
 
@@ -101,6 +107,14 @@ export class AdminController {
     name: 'search',
     required: false,
     type: String,
+  })
+  @ApiQuery({
+    name: 'lifecycle',
+    required: false,
+    schema: {
+      enum: ['ACTIVE', 'ENDING_SOON', 'DISABLED', 'SCHEDULED', 'EXPIRED'],
+      type: 'string',
+    },
   })
   @ApiQuery({
     maxLength: 64,
@@ -199,5 +213,40 @@ export class AdminController {
       throw new BadRequestException({ status: 'product-image-required' });
     }
     return this.productCreation.createProduct(body, image);
+  }
+
+  @Get('products/:id')
+  @ApiOperation({ summary: 'Get one administrator-managed product' })
+  @ApiOkResponse({ type: AdminCreatedProductDto })
+  @ApiNotFoundResponse({ description: 'Product not found' })
+  getProduct(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ): Promise<AdminCreatedProductDto> {
+    return this.productCreation.getProduct(id);
+  }
+
+  @Patch('products/:id')
+  @UseInterceptors(FileInterceptor('image', productImageUploadOptions))
+  @ApiOperation({ summary: 'Update an administrator-managed product' })
+  @ApiHeader({ name: 'Origin', required: true, schema: { type: 'string' } })
+  @ApiHeader({
+    name: 'X-CSRF-Token',
+    required: true,
+    schema: { type: 'string' },
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: AdminUpdateProductMultipartDto })
+  @ApiOkResponse({ type: AdminCreatedProductDto })
+  @ApiBadRequestResponse({ description: 'Invalid product fields or image' })
+  @ApiConflictResponse({
+    description: 'Product was changed by another request',
+  })
+  @ApiNotFoundResponse({ description: 'Product not found' })
+  updateProduct(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() body: AdminUpdateProductBodyDto,
+    @UploadedFile() image: UploadedProductImage | undefined,
+  ): Promise<AdminCreatedProductDto> {
+    return this.productCreation.updateProduct(id, body, image);
   }
 }

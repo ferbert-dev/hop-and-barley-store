@@ -18,8 +18,13 @@ const options = {
       name: 'Adjuncts',
       slug: 'adjuncts',
     },
+    {
+      id: '10000000-0000-4000-8000-000000000005',
+      name: 'Kits',
+      slug: 'kits',
+    },
   ],
-  saleKinds: ['WEIGHT', 'PACKAGE'],
+  saleKinds: ['WEIGHT', 'PACKAGE', 'KIT'],
 } as const;
 const privateHeaders = { 'cache-control': 'private, no-store' };
 
