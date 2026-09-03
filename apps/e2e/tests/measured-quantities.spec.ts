@@ -127,7 +127,7 @@ test.describe('measured product quantities', () => {
     await expect(
       page.getByRole('link', { name: /Shopping cart, 1 item/ }),
     ).toBeVisible();
-    await page.getByRole('link', { name: /Shopping cart, 1 item/ }).click();
+    await goToCartFromConfirmation(page);
     await expect(page).toHaveURL(/\/cart$/);
     await expect(
       page.getByRole('heading', { name: 'Citra Hops' }),
@@ -171,7 +171,7 @@ test.describe('measured product quantities', () => {
       amount: 2,
       productSlug: 'safale-us05-yeast',
     });
-    await page.getByRole('link', { name: /Shopping cart, 1 item/ }).click();
+    await goToCartFromConfirmation(page);
     await expect(
       page
         .getByLabel('SafAle US-05 Dry Ale Yeast quantity')
@@ -213,7 +213,7 @@ test.describe('measured product quantities', () => {
       amount: 4,
       productSlug: 'west-coast-ipa-kit',
     });
-    await page.getByRole('link', { name: /Shopping cart, 1 item/ }).click();
+    await goToCartFromConfirmation(page);
     await expect(page.getByText(/20\s*gal/i).first()).toBeVisible();
     await expect(
       page.getByText(/(?:75(?:\.\d+)?|76)\s*l/i).first(),
@@ -288,6 +288,14 @@ async function addSelectedAmount(page: Page) {
     true,
   );
   return request.postDataJSON() as Record<string, unknown>;
+}
+
+async function goToCartFromConfirmation(page: Page) {
+  await page
+    .getByRole('dialog')
+    .getByRole('link', { name: 'Go to cart' })
+    .click();
+  await expect(page).toHaveURL(/\/cart$/);
 }
 
 async function clearGuestCart(page: Page) {
