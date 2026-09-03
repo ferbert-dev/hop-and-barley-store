@@ -187,7 +187,7 @@ test.describe('connected administrator product management', () => {
     const productName = `E2E Harvest Hops ${Date.now()}`;
     await page.getByLabel('Title').fill(productName);
     await page
-      .getByLabel('Description')
+      .getByLabel('Description', { exact: true })
       .fill('A connected browser proof for administrator product creation.');
     await page.getByLabel('Price (USD)').fill('5.99');
     await page.getByLabel('Stock (kg)').fill('1.2');
