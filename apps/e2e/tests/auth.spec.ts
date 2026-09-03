@@ -223,6 +223,50 @@ test.describe('connected local authentication journey', () => {
     await expect(page).toHaveURL(/\/login\?next=%2Faccount$/);
   });
 
+  test('merges a persistent guest cart and honours the safe cart return target', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    const email = `o1a-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
+    const credential = `A1!a${Date.now()}${Math.random().toString(36).slice(2)}`;
+
+    await page.goto('/register');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password', { exact: true }).fill(credential);
+    await page.getByLabel('Confirm Password').fill(credential);
+    await page.getByRole('button', { name: 'Register' }).click();
+    await expect(
+      page.getByRole('link', { name: 'Continue to sign in' }),
+    ).toBeVisible();
+
+    await page.goto('/product/citra-hops');
+    await page.getByRole('button', { name: 'Add Citra Hops to Cart' }).click();
+    await expect(
+      page.getByRole('dialog', { name: 'Citra Hops added to your cart' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Continue shopping' }).click();
+    expect(
+      (await page.context().cookies()).some(({ name }) =>
+        ['hb_cart', '__Host-hb_cart'].includes(name),
+      ),
+    ).toBe(true);
+
+    await page.goto('/login?next=%2Fcart');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password', { exact: true }).fill(credential);
+    await page.getByRole('button', { name: 'Sign In' }).click();
+
+    await expect(page).toHaveURL(/\/cart$/);
+    await expect(
+      page.getByRole('heading', { name: 'Citra Hops' }),
+    ).toBeVisible();
+    expect(
+      (await page.context().cookies()).some(({ name }) =>
+        ['hb_cart', '__Host-hb_cart'].includes(name),
+      ),
+    ).toBe(false);
+  });
+
   test('reflows access screens and honours reduced motion without serious Axe findings', async ({
     page,
   }) => {

@@ -49,7 +49,7 @@ export async function loginFromBrowser(
   if (!input.ok) return { errors: input.errors, status: 'invalid' };
   try {
     const origin = window.location.origin;
-    const { error, response } = await browserClient().POST(
+    const { data, error, response } = await browserClient().POST(
       '/api/v1/auth/login',
       {
         body: input.value,
@@ -62,6 +62,9 @@ export async function loginFromBrowser(
       return { status: 'invalid' };
     }
     if (!response.ok || error) return { status: 'unavailable' };
+    if (data?.cartMerge === 'unavailable') {
+      window.sessionStorage.setItem('hb-cart-merge-warning', '1');
+    }
     window.location.assign(safeReturnPath(returnTo));
     return { status: 'idle' };
   } catch {

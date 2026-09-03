@@ -34,11 +34,13 @@ import { AllowCartBootstrap } from './cart-bootstrap.decorator';
 import { CartBodylessMutation } from './cart-bodyless-mutation.decorator';
 import { CartCapabilityGuard } from './cart-capability.guard';
 import type { CartCookieMode } from './cart-cookie';
-import { createCartCookie, readCartCookie } from './cart-cookie';
+import { createCartCookie } from './cart-cookie';
 import { CartCsrfService } from './cart-csrf.service';
 import { CartMutationGuard } from './cart-mutation.guard';
 import type { CartRequest } from './cart-request';
 import { CartService } from './cart.service';
+import { CartAccessService } from './cart-access.service';
+import { CsrfService } from '../auth/session/csrf.service';
 import {
   AddCartItemDto,
   CartProductSlugDto,
@@ -58,7 +60,9 @@ const UNAUTHORIZED = Object.freeze({ status: 'unauthorized' as const });
 export class CartController {
   constructor(
     private readonly carts: CartService,
+    private readonly access: CartAccessService,
     private readonly csrf: CartCsrfService,
+    private readonly sessionCsrf: CsrfService,
     private readonly config: ConfigService,
   ) {}
 
@@ -73,13 +77,13 @@ export class CartController {
     description: 'Presented cart capability is not valid',
   })
   async get(@Req() request: CartRequest): Promise<CartDto> {
-    const cookie = readCartCookie(request.get('cookie'), this.cookieMode());
-    if (cookie.kind === 'absent') return this.carts.empty();
-    if (cookie.kind === 'invalid')
+    const resolved = await this.access.resolve(request.get('cookie'));
+    if (resolved.kind === 'absent' || resolved.kind === 'account_absent') {
+      return this.carts.empty();
+    }
+    if (resolved.kind === 'invalid')
       throw new UnauthorizedException(UNAUTHORIZED);
-    const active = await this.carts.authenticate(cookie.rawToken);
-    if (!active) throw new UnauthorizedException(UNAUTHORIZED);
-    return this.carts.getCart(active);
+    return this.carts.getCart(resolved.access);
   }
 
   @Get('csrf')
@@ -90,7 +94,13 @@ export class CartController {
     description: 'Presented cart capability is not valid',
   })
   csrfToken(@Req() request: CartRequest): CartCsrfResponseDto {
-    return { csrfToken: this.csrf.issue(requireActiveCart(request).rawToken) };
+    const cart = requireActiveCart(request);
+    return {
+      csrfToken:
+        cart.kind === 'account'
+          ? this.sessionCsrf.issue(cart.rawToken)
+          : this.csrf.issue(cart.rawToken),
+    };
   }
 
   @Post('checkout-readiness')

@@ -13,7 +13,11 @@ import {
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
 import { isPublicProductEligible } from '../catalog/product-public-eligibility';
-import type { ActiveCartCapability } from './cart-request';
+import type {
+  ActiveAccountCart,
+  ActiveCartAccess,
+  ActiveCartCapability,
+} from './cart-request';
 import { generateCartToken, hashCartToken } from './cart-token';
 import { runCartSerializable } from './cart-transaction';
 import { checkoutLineOutcome } from './checkout-readiness';
@@ -115,21 +119,194 @@ export class CartService {
     rawToken: string,
     now = new Date(),
   ): Promise<ActiveCartCapability | null> {
-    const cart = await this.prisma.cart.findUnique({
+    const cart = await this.prisma.cart.findFirst({
       select: { expiresAt: true, id: true },
-      where: { tokenDigest: toPrismaBytes(rawToken) },
+      where: { tokenDigest: toPrismaBytes(rawToken), userId: null },
     });
     if (!cart || cart.expiresAt.getTime() <= now.getTime()) return null;
-    return { cartId: cart.id, expiresAt: cart.expiresAt, rawToken };
+    return {
+      cartId: cart.id,
+      expiresAt: cart.expiresAt,
+      kind: 'guest',
+      rawToken,
+    };
+  }
+
+  async authenticateAccount(
+    userId: string,
+    rawSessionToken: string,
+  ): Promise<ActiveAccountCart | null> {
+    const cart = await this.prisma.cart.findUnique({
+      select: { id: true },
+      where: { userId },
+    });
+    return cart
+      ? { cartId: cart.id, kind: 'account', rawToken: rawSessionToken, userId }
+      : null;
+  }
+
+  async createAccountCart(
+    userId: string,
+    rawSessionToken: string,
+    requestedNow = new Date(),
+  ): Promise<ActiveAccountCart> {
+    const cartId = await runCartSerializable(
+      this.prisma,
+      async (transaction) => {
+        await lockActiveUser(transaction, userId);
+        const existing = await transaction.cart.findUnique({
+          select: { id: true },
+          where: { userId },
+        });
+        if (existing) return existing.id;
+        return (
+          await transaction.cart.create({
+            data: {
+              expiresAt: new Date(requestedNow.getTime() + CART_LIFETIME_MS),
+              tokenDigest: toPrismaBytes(generateCartToken()),
+              userId,
+            },
+            select: { id: true },
+          })
+        ).id;
+      },
+    );
+    return {
+      cartId,
+      kind: 'account',
+      rawToken: rawSessionToken,
+      userId,
+    };
+  }
+
+  async mergeGuestIntoAccount(
+    userId: string,
+    rawGuestToken: string | null,
+    requestedNow = new Date(),
+  ): Promise<'not_present' | 'succeeded'> {
+    const guestDigest = rawGuestToken ? toPrismaBytes(rawGuestToken) : null;
+    return runCartSerializable(this.prisma, async (transaction) => {
+      await lockActiveUser(transaction, userId);
+      const candidates = await transaction.cart.findMany({
+        select: { id: true },
+        where: {
+          OR: [
+            { userId },
+            ...(guestDigest
+              ? [{ tokenDigest: guestDigest, userId: null }]
+              : []),
+          ],
+        },
+      });
+      await lockCarts(
+        transaction,
+        candidates.map(({ id }) => id),
+      );
+
+      const account = await transaction.cart.findUnique({
+        select: { id: true },
+        where: { userId },
+      });
+      const guest = guestDigest
+        ? await transaction.cart.findFirst({
+            select: {
+              expiresAt: true,
+              id: true,
+              order: { select: { id: true } },
+            },
+            where: { tokenDigest: guestDigest, userId: null },
+          })
+        : null;
+      const activeGuest =
+        guest &&
+        guest.order === null &&
+        guest.expiresAt.getTime() > requestedNow.getTime()
+          ? guest
+          : null;
+
+      if (!account && activeGuest) {
+        await transaction.cart.update({
+          data: {
+            expiresAt: new Date(requestedNow.getTime() + CART_LIFETIME_MS),
+            tokenDigest: toPrismaBytes(generateCartToken()),
+            userId,
+          },
+          where: { id: activeGuest.id },
+        });
+        return 'succeeded';
+      }
+
+      const accountId =
+        account?.id ??
+        (
+          await transaction.cart.create({
+            data: {
+              expiresAt: new Date(requestedNow.getTime() + CART_LIFETIME_MS),
+              tokenDigest: toPrismaBytes(generateCartToken()),
+              userId,
+            },
+            select: { id: true },
+          })
+        ).id;
+      if (!activeGuest || activeGuest.id === accountId) return 'not_present';
+
+      const [accountItems, guestItems] = await Promise.all([
+        transaction.cartItem.findMany({
+          select: { amount: true, productId: true },
+          where: { cartId: accountId },
+        }),
+        transaction.cartItem.findMany({
+          select: { amount: true, productId: true },
+          where: { cartId: activeGuest.id },
+        }),
+      ]);
+      const merged = new Map(
+        accountItems.map(({ amount, productId }) => [productId, amount]),
+      );
+      for (const item of guestItems) {
+        merged.set(
+          item.productId,
+          Math.max(merged.get(item.productId) ?? 0, item.amount),
+        );
+      }
+      if (merged.size > MAX_DISTINCT_ITEMS) unavailable();
+      const products = await transaction.product.findMany({
+        select: {
+          amountUnit: true,
+          maximumOrderAmount: true,
+          minimumOrderAmount: true,
+          orderStepAmount: true,
+          saleKind: true,
+          id: true,
+        },
+        where: { id: { in: [...merged.keys()] } },
+      });
+      if (products.length !== merged.size) unavailable();
+      for (const product of products) {
+        requireValidCartAmount(merged.get(product.id) ?? 0, product);
+      }
+      for (const [productId, amount] of merged) {
+        await transaction.cartItem.upsert({
+          create: { amount, cartId: accountId, productId },
+          update: { amount },
+          where: { cartId_productId: { cartId: accountId, productId } },
+        });
+      }
+      await transaction.cart.delete({ where: { id: activeGuest.id } });
+      return 'succeeded';
+    });
   }
 
   async getCart(
-    capability: ActiveCartCapability,
+    capability: ActiveCartAccess,
     now = new Date(),
   ): Promise<CartDto> {
     const cart = await this.prisma.cart.findFirst({
       select: cartSelect,
-      where: { expiresAt: { gt: now }, id: capability.cartId },
+      where: {
+        id: capability.cartId,
+        ...(capability.kind !== 'account' ? { expiresAt: { gt: now } } : {}),
+      },
     });
     if (!cart) throw new UnauthorizedException(UNAUTHORIZED);
     return toCartDto(cart, now);
@@ -176,14 +353,14 @@ export class CartService {
   }
 
   async add(
-    capability: ActiveCartCapability,
+    capability: ActiveCartAccess,
     dto: AddCartItemDto,
     requestedNow?: Date,
   ): Promise<CartDto> {
     const now = requestedNow ?? new Date();
     const cart = await runCartSerializable(this.prisma, async (transaction) => {
       const cartExpiresAt = await lockCart(transaction, capability.cartId);
-      requireActiveCartExpiry(cartExpiresAt, now);
+      requireActiveCart(capability, cartExpiresAt, now);
       const product = await requireCartProduct(
         transaction,
         dto.productSlug,
@@ -225,7 +402,7 @@ export class CartService {
   }
 
   async update(
-    capability: ActiveCartCapability,
+    capability: ActiveCartAccess,
     productSlug: string,
     dto: UpdateCartItemDto,
     requestedNow?: Date,
@@ -233,7 +410,7 @@ export class CartService {
     const now = requestedNow ?? new Date();
     const cart = await runCartSerializable(this.prisma, async (transaction) => {
       const cartExpiresAt = await lockCart(transaction, capability.cartId);
-      requireActiveCartExpiry(cartExpiresAt, now);
+      requireActiveCart(capability, cartExpiresAt, now);
       const item = await transaction.cartItem.findFirst({
         select: {
           id: true,
@@ -254,14 +431,14 @@ export class CartService {
   }
 
   async remove(
-    capability: ActiveCartCapability,
+    capability: ActiveCartAccess,
     productSlug: string,
     requestedNow?: Date,
   ): Promise<CartDto> {
     const now = requestedNow ?? new Date();
     const cart = await runCartSerializable(this.prisma, async (transaction) => {
       const cartExpiresAt = await lockCart(transaction, capability.cartId);
-      requireActiveCartExpiry(cartExpiresAt, now);
+      requireActiveCart(capability, cartExpiresAt, now);
       const item = await transaction.cartItem.findFirst({
         select: { id: true },
         where: { cartId: capability.cartId, product: { slug: productSlug } },
@@ -274,12 +451,12 @@ export class CartService {
   }
 
   async clear(
-    capability: ActiveCartCapability,
+    capability: ActiveCartAccess,
     requestedNow?: Date,
   ): Promise<CartDto> {
     return runCartSerializable(this.prisma, async (transaction) => {
       const cartExpiresAt = await lockCart(transaction, capability.cartId);
-      requireActiveCartExpiry(cartExpiresAt, requestedNow ?? new Date());
+      requireActiveCart(capability, cartExpiresAt, requestedNow ?? new Date());
       await transaction.cartItem.deleteMany({
         where: { cartId: capability.cartId },
       });
@@ -288,13 +465,16 @@ export class CartService {
   }
 
   async checkoutReadiness(
-    capability: ActiveCartCapability,
+    capability: ActiveCartAccess,
     requestedNow?: Date,
   ): Promise<CheckoutReadinessDto> {
     const now = requestedNow ?? new Date();
     const cart = await this.prisma.cart.findFirst({
       select: cartSelect,
-      where: { expiresAt: { gt: now }, id: capability.cartId },
+      where: {
+        id: capability.cartId,
+        ...(capability.kind !== 'account' ? { expiresAt: { gt: now } } : {}),
+      },
     });
     if (!cart) throw new UnauthorizedException(UNAUTHORIZED);
     const lines = cart.items.map(({ amount, product }) => ({
@@ -363,8 +543,38 @@ async function lockCart(
   return rows[0].expiresAt;
 }
 
-function requireActiveCartExpiry(expiresAt: Date, now: Date): void {
-  if (expiresAt.getTime() <= now.getTime()) {
+async function lockActiveUser(
+  transaction: Prisma.TransactionClient,
+  userId: string,
+): Promise<void> {
+  const rows = await transaction.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM "User"
+    WHERE "id" = ${userId}::uuid AND "status" = 'ACTIVE'
+    FOR UPDATE
+  `;
+  if (rows.length !== 1) throw new UnauthorizedException(UNAUTHORIZED);
+}
+
+async function lockCarts(
+  transaction: Prisma.TransactionClient,
+  cartIds: string[],
+): Promise<void> {
+  if (cartIds.length === 0) return;
+  const ordered = [...cartIds].sort();
+  await transaction.$queryRaw`
+    SELECT "id" FROM "Cart"
+    WHERE "id" = ANY(${ordered}::uuid[])
+    ORDER BY "id"
+    FOR UPDATE
+  `;
+}
+
+function requireActiveCart(
+  capability: ActiveCartAccess,
+  expiresAt: Date,
+  now: Date,
+): void {
+  if (capability.kind !== 'account' && expiresAt.getTime() <= now.getTime()) {
     throw new UnauthorizedException(UNAUTHORIZED);
   }
 }

@@ -133,7 +133,11 @@ export class OrdersService {
           return sameOutcome(replayAfterUserLock, requestHash);
         }
 
-        const cartExpiresAt = await lockCart(transaction, context.cartId);
+        const cartAccess = await lockCart(
+          transaction,
+          context.cartId,
+          context.userId,
+        );
         const byCart = await transaction.order.findUnique({
           select: orderSelect,
           where: { cartId: context.cartId },
@@ -146,7 +150,10 @@ export class OrdersService {
           where: { cartId: context.cartId },
         });
         const now = requestedNow ?? new Date();
-        if (cartExpiresAt.getTime() <= now.getTime()) {
+        if (
+          cartAccess.userId === null &&
+          cartAccess.expiresAt.getTime() <= now.getTime()
+        ) {
           allocationUnavailable(now, []);
         }
         if (candidates.length === 0) allocationUnavailable(now, []);
@@ -276,7 +283,7 @@ export class OrdersService {
           where: { cartId: context.cartId },
         });
         await transaction.cart.update({
-          data: { updatedAt: now },
+          data: { updatedAt: now, userId: null },
           where: { id: context.cartId },
         });
         return order;
@@ -381,17 +388,21 @@ async function lockActiveUser(
 async function lockCart(
   transaction: Prisma.TransactionClient,
   cartId: string,
-): Promise<Date> {
+  userId: string,
+): Promise<{ expiresAt: Date; userId: string | null }> {
   const rows = await transaction.$queryRaw<
-    Array<{ expiresAt: Date; id: string }>
+    Array<{ expiresAt: Date; id: string; userId: string | null }>
   >`
-    SELECT "id", "expiresAt"
+    SELECT "id", "expiresAt", "userId"
     FROM "Cart"
     WHERE "id" = ${cartId}::uuid
     FOR UPDATE
   `;
   if (rows.length !== 1) allocationUnavailable(new Date(), []);
-  return rows[0].expiresAt;
+  if (rows[0].userId !== null && rows[0].userId !== userId) {
+    throw new UnauthorizedException(UNAUTHORIZED);
+  }
+  return { expiresAt: rows[0].expiresAt, userId: rows[0].userId };
 }
 
 function canonicalCheckout(checkout: CreateOrderDto): CanonicalCheckout {

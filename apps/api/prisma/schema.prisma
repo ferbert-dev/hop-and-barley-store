@@ -70,6 +70,7 @@ model User {
   customerProfile    CustomerProfile?
   primaryAddress     PrimaryAddress?
   orders             Order[]
+  cart               Cart?
 }
 
 model CustomerProfile {
@@ -143,36 +144,36 @@ model Category {
 }
 
 model Product {
-  id                 String            @id(map: "Product_pkey") @default(uuid()) @db.Uuid
+  id                 String                   @id(map: "Product_pkey") @default(uuid()) @db.Uuid
   name               String
-  slug               String            @unique(map: "Product_slug_key")
+  slug               String                   @unique(map: "Product_slug_key")
   teaser             String
   description        String
   priceMinor         Int
-  priceQualifier     String            @db.VarChar(64)
-  currency           String            @default("USD") @db.VarChar(3)
+  priceQualifier     String                   @db.VarChar(64)
+  currency           String                   @default("USD") @db.VarChar(3)
   saleKind           SaleKind
   amountUnit         AmountUnit
   priceBasisAmount   Int
   minimumOrderAmount Int
   orderStepAmount    Int
   maximumOrderAmount Int?
-  stockAmount        Int               @default(0)
+  stockAmount        Int                      @default(0)
   packageNetWeightMg Int?
   kitYieldVolumeMl   Int?
-  isActive           Boolean           @default(true)
-  activeFrom         DateTime?         @db.Timestamptz(3)
-  activeUntil        DateTime?         @db.Timestamptz(3)
-  imagePath          String            @db.VarChar(255)
+  isActive           Boolean                  @default(true)
+  activeFrom         DateTime?                @db.Timestamptz(3)
+  activeUntil        DateTime?                @db.Timestamptz(3)
+  imagePath          String                   @db.VarChar(255)
   searchDocument     Unsupported("tsvector")?
-  specifications     Json              @db.JsonB
-  categoryId         String            @db.Uuid
-  category           Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Product_categoryId_fkey")
+  specifications     Json                     @db.JsonB
+  categoryId         String                   @db.Uuid
+  category           Category                 @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Product_categoryId_fkey")
   cartItems          CartItem[]
   cartReservations   CartReservation[]
   orderItems         OrderItem[]
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
 
   @@index([categoryId, isActive], map: "Product_categoryId_isActive_idx")
   @@index([isActive, priceMinor], map: "Product_isActive_priceMinor_idx")
@@ -182,6 +183,8 @@ model Product {
 model Cart {
   id           String            @id(map: "Cart_pkey") @default(uuid()) @db.Uuid
   tokenDigest  Bytes             @unique(map: "Cart_tokenDigest_key")
+  userId       String?           @unique(map: "Cart_userId_key") @db.Uuid
+  user         User?             @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "Cart_userId_fkey")
   expiresAt    DateTime
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt

@@ -5,12 +5,16 @@ import { CartCsrfService } from './cart-csrf.service';
 import { CartMutationGuard } from './cart-mutation.guard';
 import { CartPrivateHeadersMiddleware } from './cart-private-headers.middleware';
 import { CartService } from './cart.service';
+import { SessionModule } from '../auth/session/session.module';
+import { CartAccessService } from './cart-access.service';
 
 @Module({
+  imports: [SessionModule],
   controllers: [CartController],
-  exports: [CartCapabilityGuard, CartService],
+  exports: [CartAccessService, CartCapabilityGuard, CartService],
   providers: [
     CartCapabilityGuard,
+    CartAccessService,
     CartCsrfService,
     CartMutationGuard,
     CartPrivateHeadersMiddleware,

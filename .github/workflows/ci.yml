@@ -89,6 +89,8 @@ jobs:
         run: pnpm test:m2:postgres
       - name: Verify guest cart migration, constraints, and concurrency
         run: pnpm test:o0:postgres
+      - name: Verify account cart ownership, merge, isolation, and concurrency
+        run: pnpm test:o1a:postgres
       - name: Verify cart reservation migration, lifecycle, and concurrency
         run: pnpm test:o1b:postgres
       - name: Verify transactional order migration, lifecycle, and concurrency
