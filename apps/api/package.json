@@ -26,6 +26,7 @@
     "test:m1:postgres": "bash scripts/test-m1-postgres.sh",
     "test:m2:postgres": "bash scripts/test-m2-postgres.sh",
     "test:o0:postgres": "bash scripts/test-o0-postgres.sh",
+    "test:o1a:postgres": "bash scripts/test-o1a-postgres.sh",
     "test:o1b:postgres": "bash scripts/test-o1b-postgres.sh",
     "test:o2:postgres": "bash scripts/test-o2-postgres.sh",
     "test:o2q:postgres": "bash scripts/test-o2q-postgres.sh",

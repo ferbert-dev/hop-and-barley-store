@@ -35,6 +35,7 @@
     "test:m1:postgres": "pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api test:m1:postgres",
     "test:m2:postgres": "pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api test:m2:postgres",
     "test:o0:postgres": "pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api test:o0:postgres",
+    "test:o1a:postgres": "pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api test:o1a:postgres",
     "test:o1b:postgres": "pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api test:o1b:postgres",
     "test:o2:postgres": "pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api test:o2:postgres",
     "test:o2q:postgres": "pnpm --filter @hop-and-barley/auth-contract build && pnpm --filter @hop-and-barley/api test:o2q:postgres",

@@ -53,6 +53,7 @@ test('the PR CI workflow is pinned, least-privilege, and covers every merge gate
     'pnpm test:m2:postgres',
     'pnpm test:a4:postgres',
     'pnpm test:o0:postgres',
+    'pnpm test:o1a:postgres',
     'pnpm test:o1b:postgres',
     'pnpm test:a1b:argon2:alpine',
     'docker compose up -d --build --wait',
@@ -87,6 +88,7 @@ test('clean public database and web verification commands own their prerequisite
     'test:m2:postgres',
     'test:a4:postgres',
     'test:o0:postgres',
+    'test:o1a:postgres',
     'test:o1b:postgres',
   ]) {
     assert.match(

@@ -26,6 +26,14 @@ import {
 import type { Response } from 'express';
 import type { AuthRequest } from './auth-request';
 import { AuthSessionDto } from './dto/auth-session.dto';
+import { LoginResponseDto } from './dto/login-response.dto';
+import { CartMergeResponseDto } from './dto/cart-merge-response.dto';
+import { CartService } from '../cart/cart.service';
+import {
+  clearCartCookie,
+  readCartCookie,
+  type CartCookieMode,
+} from '../cart/cart-cookie';
 import { CsrfResponseDto } from './dto/csrf-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { LoginZodPipe } from './dto/login-zod.pipe';
@@ -56,6 +64,7 @@ export class AuthController {
   constructor(
     private readonly registration: RegistrationService,
     private readonly loginService: LoginService,
+    private readonly carts: CartService,
     private readonly sessions: SessionService,
     private readonly csrf: CsrfService,
     private readonly config: ConfigService,
@@ -92,7 +101,7 @@ export class AuthController {
         schema: { type: 'string' },
       },
     },
-    type: AuthSessionDto,
+    type: LoginResponseDto,
   })
   @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
   @ApiForbiddenResponse({ description: 'Origin is not allowed' })
@@ -103,20 +112,36 @@ export class AuthController {
     @Body(LoginZodPipe) dto: LoginDto,
     @Req() request: AuthRequest,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<AuthSessionDto> {
+  ): Promise<LoginResponseDto> {
     const mode = this.cookieMode();
     const presented = readSessionCookie(request.get('cookie'), mode);
     const session = await this.loginService.login(dto, presented);
-    response.setHeader(
-      'Set-Cookie',
+    const cookies = [
       createSessionCookie(
         mode,
         session.rawToken,
         session.expiresAt,
         dto.rememberMe,
       ),
+    ];
+    let cartMerge: LoginResponseDto['cartMerge'] = 'not_present';
+    const cartCookie = readCartCookie(
+      request.get('cookie'),
+      this.cartCookieMode(),
     );
-    return toSessionDto(session);
+    try {
+      cartMerge = await this.carts.mergeGuestIntoAccount(
+        session.userId,
+        cartCookie.kind === 'present' ? cartCookie.rawToken : null,
+      );
+      if (cartCookie.kind !== 'absent') {
+        cookies.push(clearCartCookie(this.cartCookieMode()));
+      }
+    } catch {
+      cartMerge = 'unavailable';
+    }
+    response.setHeader('Set-Cookie', cookies);
+    return { ...toSessionDto(session), cartMerge };
   }
 
   @Get('session')
@@ -125,6 +150,37 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Session is not valid' })
   session(@Req() request: AuthRequest): AuthSessionDto {
     return toSessionDto(requireActiveSession(request));
+  }
+
+  @Post('cart-merge')
+  @HttpCode(200)
+  @ApiCookieAuth('sessionCookie')
+  @ApiHeader({ name: 'Origin', required: true, schema: { type: 'string' } })
+  @ApiHeader({
+    name: 'X-CSRF-Token',
+    required: true,
+    schema: { type: 'string' },
+  })
+  @ApiOkResponse({ type: CartMergeResponseDto })
+  async retryCartMerge(
+    @Req() request: AuthRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<CartMergeResponseDto> {
+    const cartCookie = readCartCookie(
+      request.get('cookie'),
+      this.cartCookieMode(),
+    );
+    if (cartCookie.kind !== 'present') return { cartMerge: 'not_present' };
+    try {
+      const cartMerge = await this.carts.mergeGuestIntoAccount(
+        requireActiveSession(request).userId,
+        cartCookie.rawToken,
+      );
+      response.append('Set-Cookie', clearCartCookie(this.cartCookieMode()));
+      return { cartMerge };
+    } catch {
+      return { cartMerge: 'unavailable' };
+    }
   }
 
   @Get('csrf')
@@ -171,6 +227,10 @@ export class AuthController {
 
   private cookieMode(): AuthCookieMode {
     return this.config.getOrThrow<AuthCookieMode>('AUTH_COOKIE_MODE');
+  }
+
+  private cartCookieMode(): CartCookieMode {
+    return this.config.getOrThrow<CartCookieMode>('CART_COOKIE_MODE');
   }
 }
 

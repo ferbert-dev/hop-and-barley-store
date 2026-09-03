@@ -208,6 +208,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/cart-merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AuthController_retryCartMerge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/csrf": {
         parameters: {
             query?: never;
@@ -633,6 +649,17 @@ export interface components {
             /** @enum {string} */
             status: "ACTIVE";
         };
+        LoginResponseDto: {
+            /** Format: date-time */
+            absoluteExpiresAt: string;
+            /** Format: date-time */
+            idleExpiresAt: string;
+            /** Format: date-time */
+            issuedAt: string;
+            user: components["schemas"]["CurrentUserDto"];
+            /** @enum {string} */
+            cartMerge: "not_present" | "succeeded" | "unavailable";
+        };
         AuthSessionDto: {
             /** Format: date-time */
             absoluteExpiresAt: string;
@@ -641,6 +668,10 @@ export interface components {
             /** Format: date-time */
             issuedAt: string;
             user: components["schemas"]["CurrentUserDto"];
+        };
+        CartMergeResponseDto: {
+            /** @enum {string} */
+            cartMerge: "not_present" | "succeeded" | "unavailable";
         };
         CsrfResponseDto: {
             /**
@@ -1586,7 +1617,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthSessionDto"];
+                    "application/json": components["schemas"]["LoginResponseDto"];
                 };
             };
             /** @description Invalid credentials */
@@ -1649,6 +1680,28 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    AuthController_retryCartMerge: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartMergeResponseDto"];
+                };
             };
         };
     };

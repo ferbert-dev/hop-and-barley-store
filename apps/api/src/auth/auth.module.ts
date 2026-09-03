@@ -11,17 +11,17 @@ import { RegistrationRateLimiter } from './registration-rate-limiter';
 import { RegistrationRequestGuard } from './registration-request.guard';
 import { RegistrationService } from './registration.service';
 import { RegistrationZodPipe } from './dto/registration-zod.pipe';
-import { CsrfService } from './session/csrf.service';
 import { SessionAuthGuard } from './session/session-auth.guard';
-import { SessionService } from './session/session.service';
+import { SessionModule } from './session/session.module';
+import { CartModule } from '../cart/cart.module';
 
 @Module({
+  imports: [CartModule, SessionModule],
   controllers: [AuthController],
   providers: [
     PasswordHashExecutor,
     AuthOriginService,
     AuthPrivateHeadersMiddleware,
-    CsrfService,
     LoginRateLimiter,
     LoginRequestGuard,
     LoginService,
@@ -29,7 +29,6 @@ import { SessionService } from './session/session.service';
     RegistrationRequestGuard,
     RegistrationService,
     RegistrationZodPipe,
-    SessionService,
     { provide: APP_GUARD, useClass: SessionAuthGuard },
   ],
 })
