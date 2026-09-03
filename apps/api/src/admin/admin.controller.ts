@@ -22,6 +22,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiNotFoundResponse,
+  ApiParam,
   ApiPayloadTooLargeResponse,
   ApiQuery,
   ApiServiceUnavailableResponse,
@@ -217,6 +218,7 @@ export class AdminController {
 
   @Get('products/:id')
   @ApiOperation({ summary: 'Get one administrator-managed product' })
+  @ApiParam({ name: 'id', schema: { format: 'uuid', type: 'string' } })
   @ApiOkResponse({ type: AdminCreatedProductDto })
   @ApiNotFoundResponse({ description: 'Product not found' })
   getProduct(
@@ -228,6 +230,7 @@ export class AdminController {
   @Patch('products/:id')
   @UseInterceptors(FileInterceptor('image', productImageUploadOptions))
   @ApiOperation({ summary: 'Update an administrator-managed product' })
+  @ApiParam({ name: 'id', schema: { format: 'uuid', type: 'string' } })
   @ApiHeader({ name: 'Origin', required: true, schema: { type: 'string' } })
   @ApiHeader({
     name: 'X-CSRF-Token',
