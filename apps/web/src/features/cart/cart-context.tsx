@@ -35,7 +35,7 @@ export type CartPendingOperation =
     }>;
 
 export type CartContextValue = Readonly<{
-  add(productSlug: string, amount: number): Promise<void>;
+  add(productSlug: string, amount: number): Promise<boolean>;
   checkCheckoutReadiness(): Promise<CheckoutReadiness>;
   clear(): Promise<void>;
   ensureLoaded(): Promise<void>;
@@ -61,7 +61,7 @@ export function CartProvider({
   const responseId = useRef(0);
   const initialLoad = useRef<Promise<void> | null>(null);
   const pendingRef = useRef<CartPendingOperation | null>(null);
-  const pendingMutation = useRef<Promise<void> | null>(null);
+  const pendingMutation = useRef<Promise<unknown> | null>(null);
   const queuedUpdate = useRef<
     Extract<CartPendingOperation, { kind: 'update' }> | undefined
   >(undefined);
@@ -114,7 +114,7 @@ export function CartProvider({
 
   const mutate = useCallback(
     async (nextPending: CartPendingOperation, action: () => Promise<Cart>) => {
-      if (pendingRef.current) return;
+      if (pendingRef.current) return false;
 
       const requestId = ++responseId.current;
       pendingRef.current = nextPending;
@@ -125,6 +125,7 @@ export function CartProvider({
           if (responseId.current === requestId) {
             setState(readyState(cart));
           }
+          return true;
         } catch {
           try {
             const cart = await transport.load();
@@ -140,6 +141,7 @@ export function CartProvider({
             if (responseId.current === requestId)
               setState({ kind: 'unavailable' });
           }
+          return false;
         } finally {
           // Refreshes use their own response ordering. They must never retain
           // this mutation's lock after the mutation itself has settled.
@@ -149,7 +151,7 @@ export function CartProvider({
         }
       })();
       pendingMutation.current = mutation;
-      await mutation;
+      return await mutation;
     },
     [transport],
   );
@@ -251,15 +253,18 @@ export function CartProvider({
       add: (productSlug, amount) =>
         mutate({ kind: 'add' }, () => transport.add(productSlug, amount)),
       checkCheckoutReadiness,
-      clear: () => mutate({ kind: 'clear' }, () => transport.clear()),
+      clear: async () => {
+        await mutate({ kind: 'clear' }, () => transport.clear());
+      },
       ensureLoaded,
       items: projectItems(state, pending),
       pending,
       refresh,
-      remove: (productSlug) =>
-        mutate({ kind: 'remove', productSlug }, () =>
+      remove: async (productSlug) => {
+        await mutate({ kind: 'remove', productSlug }, () =>
           transport.remove(productSlug),
-        ),
+        );
+      },
       state,
       totalsAreRefreshing:
         state.kind === 'ready' &&

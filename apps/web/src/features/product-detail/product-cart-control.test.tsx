@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CartProvider } from '../cart/cart-context';
 import type {
@@ -37,7 +37,48 @@ const readyReadiness: CheckoutReadiness = {
   status: 'ready',
 };
 
-afterEach(() => cleanup());
+const originalShowModal = Object.getOwnPropertyDescriptor(
+  HTMLDialogElement.prototype,
+  'showModal',
+);
+const originalClose = Object.getOwnPropertyDescriptor(
+  HTMLDialogElement.prototype,
+  'close',
+);
+
+beforeEach(() => {
+  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+    configurable: true,
+    value(this: HTMLDialogElement) {
+      this.setAttribute('open', '');
+      this.querySelector<HTMLElement>('button')?.focus();
+    },
+  });
+  Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+    configurable: true,
+    value(this: HTMLDialogElement) {
+      this.removeAttribute('open');
+    },
+  });
+});
+
+afterEach(() => {
+  cleanup();
+  if (originalShowModal) {
+    Object.defineProperty(
+      HTMLDialogElement.prototype,
+      'showModal',
+      originalShowModal,
+    );
+  } else {
+    Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
+  }
+  if (originalClose) {
+    Object.defineProperty(HTMLDialogElement.prototype, 'close', originalClose);
+  } else {
+    Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
+  }
+});
 
 function cartWithAmount(amount: number): Cart {
   const lineTotalMinor = (amount / 100_000) * 599;
@@ -94,7 +135,7 @@ function renderControl(
 }
 
 describe('ProductCartControl', () => {
-  it('adds the selected physical weight as milligrams without authentication UI', async () => {
+  it('confirms a successful add, exposes the canonical amount, and restores focus when shopping continues', async () => {
     const user = userEvent.setup();
     const transport = createTransport(emptyCart, {
       add: vi.fn(async () => cartWithAmount(200_000)),
@@ -113,13 +154,29 @@ describe('ProductCartControl', () => {
       screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
     );
 
-    await waitFor(() =>
-      expect(
-        screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
-      ).toBeEnabled(),
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Citra Hops added to your cart',
+    });
+    expect(dialog).toHaveAccessibleDescription(
+      'Your cart now contains 200g of Citra Hops.',
     );
     expect(transport.add).toHaveBeenCalledWith(productSlug, 200_000);
-    expect(screen.queryByText(/in cart/i)).toBeNull();
+    expect(screen.getByRole('link', { name: 'In cart: 200g' })).toHaveAttribute(
+      'href',
+      '/cart',
+    );
+    expect(dialog).toContainElement(
+      screen.getByRole('link', { name: 'Go to cart' }),
+    );
+    expect(screen.getByRole('link', { name: 'Go to cart' })).toHaveAttribute(
+      'href',
+      '/cart',
+    );
+    await user.click(screen.getByRole('button', { name: 'Continue shopping' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
+    ).toHaveFocus();
     expect(screen.queryByRole('link', { name: /sign in/i })).toBeNull();
   });
 
@@ -149,9 +206,12 @@ describe('ProductCartControl', () => {
     );
     expect(transport.add).toHaveBeenCalledWith(productSlug, 200_000);
     expect(transport.update).not.toHaveBeenCalled();
-    expect(screen.queryByText(/in cart/i)).toBeNull();
-
-    expect(screen.queryByText(/in cart/i)).toBeNull();
+    expect(
+      await screen.findByRole('dialog', {
+        name: 'Citra Hops added to your cart',
+      }),
+    ).toHaveAccessibleDescription('Your cart now contains 300g of Citra Hops.');
+    expect(screen.getByRole('link', { name: 'In cart: 300g' })).toBeVisible();
   });
 
   it('keeps Add to Cart available regardless of catalog availability', async () => {
@@ -191,13 +251,11 @@ describe('ProductCartControl', () => {
     expect(screen.getByText('Updating cart…')).toBeVisible();
 
     resolveAdd?.(cartWithAmount(300_000));
-    await waitFor(() =>
-      expect(
-        screen.getByRole('button', { name: 'Add Citra Hops to Cart' }),
-      ).toBeEnabled(),
-    );
+    await screen.findByRole('dialog', {
+      name: 'Citra Hops added to your cart',
+    });
     expect(transport.add).toHaveBeenCalledWith(productSlug, 200_000);
-    expect(screen.queryByText(/in cart/i)).toBeNull();
+    expect(screen.getByRole('link', { name: 'In cart: 300g' })).toBeVisible();
   });
 
   it('refreshes after a failed add without turning a cart state into a stock gate', async () => {
@@ -232,5 +290,7 @@ describe('ProductCartControl', () => {
     );
 
     expect(screen.getAllByLabelText('Quantity (kg)').at(-1)).toBeEnabled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('link', { name: 'In cart: 100g' })).toBeVisible();
   });
 });

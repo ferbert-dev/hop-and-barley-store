@@ -249,8 +249,10 @@ Page 1 (0:1)
   the selected count in gallons and approximate litres.
 - Product details always keep the `Add to Cart` action. When the product already
   has a cart line, another add increments that line by the newly selected amount
-  instead of replacing it. The product page does not show a separate `in cart`
-  quantity; line editing remains on the shopping-cart screen.
+  instead of replacing it. After a successful add, the product page opens a
+  confirmation dialog with `Continue shopping` and `Go to cart`. An amber link
+  beside the add action shows the canonical cumulative cart amount; editing that
+  amount remains on the shopping-cart screen.
 - On product detail weight controls, the visible field label is `Quantity (kg)`
   above the input. Do not render a second `kg` label beside the field. This
   placement is limited to product details; it does not redefine the cart layout.
@@ -279,9 +281,10 @@ Page 1 (0:1)
   weight line may reach 100 kg, or a lower explicit product maximum,
   independently of current stock and every other cart line. There is no
   aggregate cart-weight ceiling.
-- The 2026-08-27 product decision supersedes this product-detail component
-  state: the detail page retains `Add to Cart` and does not render `1 in cart`.
-  Quantity editing is still available on the shopping-cart screen.
+- The 2026-09-03 product decision supersedes the earlier absence of a separate
+  product-detail cart state: the detail page retains `Add to Cart` and renders
+  the canonical amount as an amber cart link, without duplicating line editing.
+  This user-approved dialog and link are product decisions, not Figma evidence.
 
 ### Shopping cart — `cart`
 

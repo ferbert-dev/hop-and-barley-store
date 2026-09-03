@@ -1,12 +1,16 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from '../../components/ui/button';
+import { Dialog } from '../../components/ui/dialog';
 import { ErrorState } from '../../components/ui/status';
 import { useCart } from '../cart/cart-context';
 import { QuantityForm } from '../quantity/quantity-form';
-import { type QuantityMetadata } from '../quantity/quantity-model';
+import {
+  formatAmount,
+  type QuantityMetadata,
+} from '../quantity/quantity-model';
 import styles from './product-detail.module.css';
 
 type ProductCartControlProps = Readonly<{
@@ -86,29 +90,80 @@ function AddToCartControl({
   Readonly<{
     loading: boolean;
   }>) {
-  const { add, pending, state } = useCart();
+  const { add, items, pending, state } = useCart();
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const actionRowRef = useRef<HTMLDivElement>(null);
+  const getAddButton = useCallback(
+    () =>
+      actionRowRef.current?.querySelector<HTMLButtonElement>(
+        'button[type="submit"]',
+      ) ?? null,
+    [],
+  );
+  const cartItem = items.find((item) => item.productSlug === productSlug);
+  const inCartAmount = cartItem
+    ? formatAmount(cartItem.amount, cartItem)
+    : null;
 
   return (
     <>
-      <QuantityForm
-        amount={
-          quantityMetadata.saleKind === 'WEIGHT'
-            ? 100_000
-            : quantityMetadata.minimumOrderAmount
-        }
-        currency={state.kind === 'ready' ? state.cart.currency : 'USD'}
-        disabled={loading || pending !== null}
-        metadata={quantityMetadata}
-        onSubmit={(amount) => add(productSlug, amount)}
-        priceMinor={priceMinor}
-        submitLabel={`Add ${productName} to Cart`}
-        weightUnitPlacement="label"
-      />
+      <div className={styles.cartActionRow} ref={actionRowRef}>
+        <QuantityForm
+          amount={
+            quantityMetadata.saleKind === 'WEIGHT'
+              ? 100_000
+              : quantityMetadata.minimumOrderAmount
+          }
+          currency={state.kind === 'ready' ? state.cart.currency : 'USD'}
+          disabled={loading || pending !== null}
+          metadata={quantityMetadata}
+          onSubmit={async (amount) => {
+            if (await add(productSlug, amount)) {
+              setConfirmationOpen(true);
+            }
+          }}
+          priceMinor={priceMinor}
+          submitLabel={`Add ${productName} to Cart`}
+          weightUnitPlacement="label"
+        />
+        {inCartAmount ? (
+          <Button
+            className={styles.inCartLink}
+            href="/cart"
+            variant="secondary"
+          >
+            In cart: {inCartAmount}
+          </Button>
+        ) : null}
+      </div>
       {loading ? (
         <p className={styles.cartMessage} role="status">
           Loading your cart…
         </p>
       ) : null}
+      <Dialog
+        description={
+          inCartAmount
+            ? `Your cart now contains ${inCartAmount} of ${productName}.`
+            : `${productName} was added to your cart.`
+        }
+        id="product-add-confirmation"
+        onOpenChange={setConfirmationOpen}
+        open={confirmationOpen}
+        returnFocus={getAddButton}
+        title={`${productName} added to your cart`}
+      >
+        <div className={styles.confirmationActions}>
+          <Button
+            onClick={() => setConfirmationOpen(false)}
+            type="button"
+            variant="secondary"
+          >
+            Continue shopping
+          </Button>
+          <Button href="/cart">Go to cart</Button>
+        </div>
+      </Dialog>
     </>
   );
 }
