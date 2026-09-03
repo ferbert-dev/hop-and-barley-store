@@ -64,10 +64,8 @@ apply_prior_migrations() {
 
 docker exec "$container_name" createdb -U "$database_user" atomic_o1a
 apply_prior_migrations atomic_o1a
-if {
-  sed -n '1,$p' "$migration_path"
-  printf '\nSELECT 1 / 0;\n'
-} | docker exec --interactive "$container_name" psql --single-transaction \
+if awk '/^COMMIT;$/ { print "SELECT 1 / 0;" } { print }' "$migration_path" | \
+  docker exec --interactive "$container_name" psql \
   --set ON_ERROR_STOP=1 --username "$database_user" --dbname atomic_o1a \
   >/dev/null 2>&1; then
   echo 'Expected injected O1A migration failure' >&2
