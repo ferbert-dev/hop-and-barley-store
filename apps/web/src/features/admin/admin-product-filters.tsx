@@ -1,12 +1,10 @@
+'use client';
+
 import type { components } from '@hop-and-barley/api-client';
 
-import { Button } from '../../components/ui/button';
 import { Field, Select } from '../../components/ui/field';
 import styles from './admin-products.module.css';
-import {
-  buildAdminProductsHref,
-  type AdminProductsQuery,
-} from './admin-products-query';
+import { type AdminProductsQuery } from './admin-products-query';
 
 export function AdminProductFilters({
   categories,
@@ -35,34 +33,35 @@ export function AdminProductFilters({
         placeholder="Search products"
         type="search"
       />
-      <fieldset className={styles.productTypes}>
-        <legend>Product Type</legend>
-        <div className={styles.productTypeList}>
-          {categories.map((category) => (
-            <label className={styles.productType} key={category.slug}>
-              <input
-                defaultChecked={query.category === category.slug}
-                name="category"
-                type="radio"
-                value={category.slug}
-              />
-              <span>{category.name}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
       <Select
-        className={styles.sortSelect}
-        defaultValue={query.sort}
-        id="admin-product-sort"
-        label="Sort by"
-        name="sort"
+        defaultValue={query.lifecycle ?? ''}
+        id="admin-product-status"
+        label="Status"
+        name="lifecycle"
+        onChange={(event) => event.currentTarget.form?.requestSubmit()}
       >
-        <option value="name-asc">Name: A to Z</option>
-        <option value="name-desc">Name: Z to A</option>
-        <option value="price-asc">Price: low to high</option>
-        <option value="price-desc">Price: high to low</option>
+        <option value="">All statuses</option>
+        <option value="ACTIVE">Active</option>
+        <option value="ENDING_SOON">Ending soon</option>
+        <option value="DISABLED">Deactivated</option>
+        <option value="SCHEDULED">Scheduled</option>
+        <option value="EXPIRED">Expired</option>
       </Select>
+      <Select
+        defaultValue={query.category ?? ''}
+        id="admin-product-category"
+        label="Category"
+        name="category"
+        onChange={(event) => event.currentTarget.form?.requestSubmit()}
+      >
+        <option value="">All categories</option>
+        {categories.map((category) => (
+          <option key={category.slug} value={category.slug}>
+            {category.name}
+          </option>
+        ))}
+      </Select>
+      <input name="sort" type="hidden" value={query.sort} />
       {query.minPriceMinor !== undefined ? (
         <input name="minPriceMinor" type="hidden" value={query.minPriceMinor} />
       ) : null}
@@ -72,15 +71,12 @@ export function AdminProductFilters({
       {query.limit !== 12 ? (
         <input name="limit" type="hidden" value={query.limit} />
       ) : null}
-      <Button type="submit">Apply</Button>
+      <button className={styles.filterSubmit} type="submit">
+        Search
+      </button>
       {showClear ? (
-        <Button href="/admin/products" variant="secondary">
+        <a className={styles.clearFilters} href="/admin/products">
           Clear filters
-        </Button>
-      ) : null}
-      {query.category ? (
-        <a href={buildAdminProductsHref(query, { category: undefined }, true)}>
-          Clear product type
         </a>
       ) : null}
     </form>

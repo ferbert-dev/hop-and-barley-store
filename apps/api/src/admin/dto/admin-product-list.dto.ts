@@ -7,6 +7,7 @@ import { ProductCategoryDto } from '../../catalog/dto/product.dto';
 
 export const ADMIN_PRODUCT_LIFECYCLE_STATUSES = [
   'ACTIVE',
+  'ENDING_SOON',
   'DISABLED',
   'SCHEDULED',
   'EXPIRED',
@@ -27,6 +28,9 @@ export class AdminProductListItemDto {
 
   @ApiProperty({ type: String })
   description!: string;
+
+  @ApiProperty({ type: String })
+  imagePath!: string;
 
   @ApiProperty({ example: 499, format: 'int32', minimum: 0, type: 'integer' })
   priceMinor!: number;
@@ -84,6 +88,9 @@ export class AdminProductListFiltersDto {
     type: String,
   })
   category!: string | null;
+
+  @ApiProperty({ nullable: true, type: String })
+  lifecycle!: AdminProductLifecycleStatus | null;
 
   @ApiProperty({
     format: 'int32',

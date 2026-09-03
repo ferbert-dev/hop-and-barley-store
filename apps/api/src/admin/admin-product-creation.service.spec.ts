@@ -10,7 +10,10 @@ import {
   AdminProductCreationService,
   createProductSlug,
 } from './admin-product-creation.service';
-import type { AdminCreateProductBodyDto } from './dto/admin-product-create.dto';
+import type {
+  AdminCreateProductBodyDto,
+  AdminUpdateProductBodyDto,
+} from './dto/admin-product-create.dto';
 
 jest.mock('../database/prisma.service', () => ({
   PrismaService: class PrismaService {},
@@ -49,14 +52,27 @@ describe('AdminProductCreationService', () => {
     ]
   >();
   const deleteAsset = jest.fn();
+  const findUnique = jest.fn();
   const storeImage = jest.fn();
+  const updateMany = jest.fn<
+    Promise<{ count: number }>,
+    [
+      Readonly<{
+        data: Record<string, unknown>;
+        where: Record<string, unknown>;
+      }>,
+    ]
+  >();
   let service: AdminProductCreationService;
 
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         AdminProductCreationService,
-        { provide: PrismaService, useValue: { product: { create } } },
+        {
+          provide: PrismaService,
+          useValue: { product: { create, findUnique, updateMany } },
+        },
         {
           provide: ProductAssetStorageService,
           useValue: { deleteAsset, storeImage },
@@ -67,6 +83,7 @@ describe('AdminProductCreationService', () => {
     service = moduleRef.get(AdminProductCreationService);
     jest.clearAllMocks();
     jest.useFakeTimers().setSystemTime(new Date('2026-08-28T15:00:00.000Z'));
+    deleteAsset.mockResolvedValue(undefined);
     storeImage.mockResolvedValue(STORED_ASSET);
     create.mockResolvedValue({
       activeFrom: new Date('2026-08-28T15:00:00.000Z'),
@@ -83,6 +100,7 @@ describe('AdminProductCreationService', () => {
       minimumOrderAmount: 100_000,
       name: baseDto.name,
       orderStepAmount: 100_000,
+      kitYieldVolumeMl: null,
       packageNetWeightMg: null,
       priceBasisAmount: 100_000,
       priceMinor: 599,
@@ -93,13 +111,18 @@ describe('AdminProductCreationService', () => {
       teaser: baseDto.description,
       updatedAt: new Date('2026-08-28T15:00:00.000Z'),
     });
+    findUnique.mockResolvedValue({
+      imagePath: '/assets/products/citra-hops.webp',
+      updatedAt: new Date('2026-08-28T14:00:00.000Z'),
+    });
+    updateMany.mockResolvedValue({ count: 1 });
   });
 
   afterEach(() => {
     jest.useRealTimers();
   });
 
-  it('returns exactly the four ordered C1A categories and two sale kinds', () => {
+  it('returns all five ordered catalog categories and three sale kinds', () => {
     expect(service.getCreateOptions()).toEqual({
       categories: [
         { id: CATEGORY_ID, name: 'Hops', slug: 'hops' },
@@ -118,8 +141,13 @@ describe('AdminProductCreationService', () => {
           name: 'Adjuncts',
           slug: 'adjuncts',
         },
+        {
+          id: '10000000-0000-4000-8000-000000000005',
+          name: 'Kits',
+          slug: 'kits',
+        },
       ],
-      saleKinds: ['WEIGHT', 'PACKAGE'],
+      saleKinds: ['WEIGHT', 'PACKAGE', 'KIT'],
     });
   });
 
@@ -204,15 +232,56 @@ describe('AdminProductCreationService', () => {
     });
   });
 
+  it('derives the KIT contract and requires a positive yield volume', async () => {
+    create.mockResolvedValueOnce({
+      ...createResolvedProduct(),
+      amountUnit: 'EACH',
+      kitYieldVolumeMl: 18_927,
+      maximumOrderAmount: null,
+      minimumOrderAmount: 1,
+      orderStepAmount: 1,
+      packageNetWeightMg: null,
+      priceBasisAmount: 1,
+      priceQualifier: 'per kit',
+      saleKind: 'KIT',
+      stockAmount: 12,
+    });
+
+    await service.createProduct(
+      {
+        ...baseDto,
+        categoryId: '10000000-0000-4000-8000-000000000005',
+        kitYieldVolumeMl: '18927',
+        saleKind: 'KIT',
+        stockAmount: '12',
+      },
+      IMAGE,
+    );
+
+    expect(create.mock.calls[0]?.[0].data).toMatchObject({
+      amountUnit: 'EACH',
+      kitYieldVolumeMl: 18_927,
+      maximumOrderAmount: null,
+      minimumOrderAmount: 1,
+      orderStepAmount: 1,
+      packageNetWeightMg: null,
+      priceBasisAmount: 1,
+      priceQualifier: 'per kit',
+      saleKind: 'KIT',
+      stockAmount: 12,
+    });
+  });
+
   it.each([
     [
       'category',
-      { ...baseDto, categoryId: '10000000-0000-4000-8000-000000000005' },
+      { ...baseDto, categoryId: '10000000-0000-4000-8000-000000000006' },
     ],
     ['price', { ...baseDto, price: '0.00' }],
     ['price', { ...baseDto, price: '21474836.48' }],
     ['stock', { ...baseDto, stockAmount: '2000000001' }],
     ['weight metadata', { ...baseDto, packageNetWeightMg: '100000' }],
+    ['kit yield', { ...baseDto, saleKind: 'KIT' }],
     [
       'activity window',
       {
@@ -249,6 +318,70 @@ describe('AdminProductCreationService', () => {
     );
     expect(deleteAsset).toHaveBeenCalledWith(STORED_ASSET.key);
   });
+
+  it('updates the complete product contract only at the expected version', async () => {
+    findUnique
+      .mockResolvedValueOnce({
+        imagePath: '/assets/products/citra-hops.webp',
+        updatedAt: new Date('2026-08-28T14:00:00.000Z'),
+      })
+      .mockResolvedValueOnce(createResolvedProduct());
+
+    await service.updateProduct('product-id', updateDto());
+
+    const request = updateMany.mock.calls[0]?.[0];
+    expect(request?.data).toMatchObject({
+      categoryId: CATEGORY_ID,
+      name: 'Updated Hops',
+      priceMinor: 749,
+      stockAmount: 28_400_000,
+    });
+    expect(request?.where).toEqual({
+      id: 'product-id',
+      updatedAt: new Date('2026-08-28T14:00:00.000Z'),
+    });
+    expect(storeImage).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale edit without changing data or storing an image', async () => {
+    await expect(
+      service.updateProduct('product-id', {
+        ...updateDto(),
+        expectedUpdatedAt: '2026-08-28T13:00:00.000Z',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(updateMany).not.toHaveBeenCalled();
+    expect(storeImage).not.toHaveBeenCalled();
+  });
+
+  it('replaces an uploaded image while retaining the immutable superseded asset for cached pages', async () => {
+    const previousKey = '24c35fd6-0053-4acf-ae31-1d4b145484f7.webp';
+    findUnique
+      .mockResolvedValueOnce({
+        imagePath: `/product-assets/${previousKey}`,
+        updatedAt: new Date('2026-08-28T14:00:00.000Z'),
+      })
+      .mockResolvedValueOnce(createResolvedProduct());
+
+    await service.updateProduct('product-id', updateDto(), IMAGE);
+
+    expect(storeImage).toHaveBeenCalledWith(IMAGE);
+    expect(updateMany.mock.calls[0]?.[0].data).toMatchObject({
+      imagePath: STORED_ASSET.imagePath,
+    });
+    expect(deleteAsset).not.toHaveBeenCalledWith(previousKey);
+  });
+
+  it('removes a newly stored image when the optimistic update loses its race', async () => {
+    updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      service.updateProduct('product-id', updateDto(), IMAGE),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(deleteAsset).toHaveBeenCalledWith(STORED_ASSET.key);
+  });
 });
 
 describe('createProductSlug', () => {
@@ -273,11 +406,34 @@ function createResolvedProduct() {
     id: '30000000-0000-4000-8000-000000000001',
     imagePath: STORED_ASSET.imagePath,
     isActive: false,
+    kitYieldVolumeMl: null,
+    maximumOrderAmount: 100_000_000,
+    minimumOrderAmount: 100_000,
     name: baseDto.name,
+    orderStepAmount: 100_000,
+    packageNetWeightMg: null,
+    priceBasisAmount: 100_000,
     priceMinor: 599,
+    priceQualifier: 'per 100g',
+    saleKind: 'WEIGHT',
     slug: 'cafe-hops',
+    specifications: [{ label: 'Product Type', value: 'Hops' }],
     stockAmount: 100_000_000,
     teaser: baseDto.description,
     updatedAt: new Date('2026-08-28T15:00:00.000Z'),
+  };
+}
+
+function updateDto(): AdminUpdateProductBodyDto {
+  return {
+    categoryId: CATEGORY_ID,
+    description: 'Updated citrus aroma.',
+    expectedUpdatedAt: '2026-08-28T14:00:00.000Z',
+    isActive: 'true',
+    name: 'Updated Hops',
+    price: '7.49',
+    saleKind: 'WEIGHT',
+    stockAmount: '28400000',
+    teaser: 'Updated citrus.',
   };
 }

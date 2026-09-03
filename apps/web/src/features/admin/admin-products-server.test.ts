@@ -16,6 +16,7 @@ const product = {
   currency: 'USD',
   description: 'Citrus and floral whole-cone hops.',
   id: '20000000-0000-4000-8000-000000000002',
+  imagePath: '/assets/products/cascade-hops.webp',
   isActive: true,
   lifecycleStatus: 'ACTIVE',
   name: 'Cascade Hops',
@@ -34,6 +35,7 @@ const response = {
     facets: { categories: [{ name: 'Hops', slug: 'hops' }] },
     filters: {
       category: null,
+      lifecycle: null,
       maxPriceMinor: null,
       minPriceMinor: null,
       search: null,

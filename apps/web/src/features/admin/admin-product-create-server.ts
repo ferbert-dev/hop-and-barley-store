@@ -11,11 +11,12 @@ const EXPECTED_CATEGORIES = [
   ['Malt', 'malts'],
   ['Yeast', 'yeast'],
   ['Adjuncts', 'adjuncts'],
+  ['Kits', 'kits'],
 ] as const;
 
 export type AdminProductCreateOptions = Readonly<{
   categories: readonly Readonly<{ id: string; name: string; slug: string }>[];
-  saleKinds: readonly ['WEIGHT', 'PACKAGE'];
+  saleKinds: readonly ['WEIGHT', 'PACKAGE', 'KIT'];
 }>;
 
 export type AdminProductCreateOptionsResult =
@@ -81,8 +82,9 @@ function isOptions(value: unknown): value is AdminProductCreateOptions {
         (category as { slug?: unknown }).slug === expected?.[1]
       );
     }) &&
-    options.saleKinds.length === 2 &&
+    options.saleKinds.length === 3 &&
     options.saleKinds[0] === 'WEIGHT' &&
-    options.saleKinds[1] === 'PACKAGE'
+    options.saleKinds[1] === 'PACKAGE' &&
+    options.saleKinds[2] === 'KIT'
   );
 }

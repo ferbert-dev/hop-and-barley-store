@@ -12,6 +12,7 @@ import {
 } from '../catalog/product-amount';
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
+import { isPublicProductEligible } from '../catalog/product-public-eligibility';
 import type { ActiveCartCapability } from './cart-request';
 import { generateCartToken, hashCartToken } from './cart-token';
 import { runCartSerializable } from './cart-transaction';
@@ -38,6 +39,8 @@ const cartSelect = {
     select: {
       product: {
         select: {
+          activeFrom: true,
+          activeUntil: true,
           amountUnit: true,
           currency: true,
           id: true,
@@ -63,6 +66,8 @@ const cartSelect = {
 } satisfies Prisma.CartSelect;
 
 const cartProductSelect = {
+  activeFrom: true,
+  activeUntil: true,
   amountUnit: true,
   currency: true,
   id: true,
@@ -127,20 +132,24 @@ export class CartService {
       where: { expiresAt: { gt: now }, id: capability.cartId },
     });
     if (!cart) throw new UnauthorizedException(UNAUTHORIZED);
-    return toCartDto(cart);
+    return toCartDto(cart, now);
   }
 
   async createAndAdd(
     dto: AddCartItemDto,
     requestedNow?: Date,
   ): Promise<CreatedCart> {
+    const now = requestedNow ?? new Date();
     const rawToken = generateCartToken();
     const result = await runCartSerializable(
       this.prisma,
       async (transaction) => {
-        const product = await requireCartProduct(transaction, dto.productSlug);
+        const product = await requireCartProduct(
+          transaction,
+          dto.productSlug,
+          now,
+        );
         requireValidCartAmount(dto.amount, product);
-        const now = requestedNow ?? new Date();
         const expiresAt = new Date(now.getTime() + CART_LIFETIME_MS);
         const created = await transaction.cart.create({
           data: { expiresAt, tokenDigest: toPrismaBytes(rawToken) },
@@ -160,7 +169,7 @@ export class CartService {
       },
     );
     return {
-      cart: toCartDto(result.cart),
+      cart: toCartDto(result.cart, now),
       expiresAt: result.expiresAt,
       rawToken,
     };
@@ -171,11 +180,15 @@ export class CartService {
     dto: AddCartItemDto,
     requestedNow?: Date,
   ): Promise<CartDto> {
+    const now = requestedNow ?? new Date();
     const cart = await runCartSerializable(this.prisma, async (transaction) => {
       const cartExpiresAt = await lockCart(transaction, capability.cartId);
-      const now = requestedNow ?? new Date();
       requireActiveCartExpiry(cartExpiresAt, now);
-      const product = await requireCartProduct(transaction, dto.productSlug);
+      const product = await requireCartProduct(
+        transaction,
+        dto.productSlug,
+        now,
+      );
       const existing = await transaction.cartItem.findUnique({
         select: { amount: true, id: true },
         where: {
@@ -208,7 +221,7 @@ export class CartService {
       }
       return loadCart(transaction, capability.cartId);
     });
-    return toCartDto(cart);
+    return toCartDto(cart, now);
   }
 
   async update(
@@ -217,9 +230,9 @@ export class CartService {
     dto: UpdateCartItemDto,
     requestedNow?: Date,
   ): Promise<CartDto> {
+    const now = requestedNow ?? new Date();
     const cart = await runCartSerializable(this.prisma, async (transaction) => {
       const cartExpiresAt = await lockCart(transaction, capability.cartId);
-      const now = requestedNow ?? new Date();
       requireActiveCartExpiry(cartExpiresAt, now);
       const item = await transaction.cartItem.findFirst({
         select: {
@@ -229,6 +242,7 @@ export class CartService {
         where: { cartId: capability.cartId, product: { slug: productSlug } },
       });
       if (!item) throw new NotFoundException(NOT_FOUND);
+      if (!isPublicProductEligible(item.product, now)) unavailable();
       requireValidCartAmount(dto.amount, item.product);
       await transaction.cartItem.update({
         data: { amount: dto.amount },
@@ -236,7 +250,7 @@ export class CartService {
       });
       return loadCart(transaction, capability.cartId);
     });
-    return toCartDto(cart);
+    return toCartDto(cart, now);
   }
 
   async remove(
@@ -244,9 +258,9 @@ export class CartService {
     productSlug: string,
     requestedNow?: Date,
   ): Promise<CartDto> {
+    const now = requestedNow ?? new Date();
     const cart = await runCartSerializable(this.prisma, async (transaction) => {
       const cartExpiresAt = await lockCart(transaction, capability.cartId);
-      const now = requestedNow ?? new Date();
       requireActiveCartExpiry(cartExpiresAt, now);
       const item = await transaction.cartItem.findFirst({
         select: { id: true },
@@ -256,7 +270,7 @@ export class CartService {
       await transaction.cartItem.delete({ where: { id: item.id } });
       return loadCart(transaction, capability.cartId);
     });
-    return toCartDto(cart);
+    return toCartDto(cart, now);
   }
 
   async clear(
@@ -284,7 +298,7 @@ export class CartService {
     });
     if (!cart) throw new UnauthorizedException(UNAUTHORIZED);
     const lines = cart.items.map(({ amount, product }) => ({
-      outcome: checkoutLineOutcome(product, amount),
+      outcome: checkoutLineOutcome(product, amount, now),
       productSlug: product.slug,
       requestedAmount: amount,
     }));
@@ -304,12 +318,17 @@ export class CartService {
 async function requireCartProduct(
   transaction: Prisma.TransactionClient,
   slug: string,
+  evaluatedAt: Date,
 ): Promise<CartProduct> {
   const product = await transaction.product.findUnique({
     select: cartProductSelect,
     where: { slug },
   });
-  if (!product || !product.isActive || product.currency !== 'USD') {
+  if (
+    !product ||
+    !isPublicProductEligible(product, evaluatedAt) ||
+    product.currency !== 'USD'
+  ) {
     unavailable();
   }
   return product;
@@ -360,9 +379,11 @@ async function loadCart(
   });
 }
 
-function toCartDto(cart: StoredCart): CartDto {
+function toCartDto(cart: StoredCart, evaluatedAt: Date): CartDto {
   const items: CartItemDto[] = cart.items.map(({ product, amount }) => {
-    const isUsdActive = product.isActive && product.currency === 'USD';
+    const isUsdActive =
+      isPublicProductEligible(product, evaluatedAt) &&
+      product.currency === 'USD';
     let priceMinor = isUsdActive ? product.priceMinor : null;
     let lineTotalMinor: number | null = null;
     if (priceMinor !== null) {

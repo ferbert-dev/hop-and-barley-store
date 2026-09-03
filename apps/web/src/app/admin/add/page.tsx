@@ -8,6 +8,8 @@ import { selectSessionCookieHeader } from '../../../features/auth/auth-cookie';
 import { AdminShell } from '../../../features/admin/admin-shell';
 import { CreateProductForm } from '../../../features/admin/create-product-form';
 import { loadAdminProductCreateOptions } from '../../../features/admin/admin-product-create-server';
+import { loadAdminProduct } from '../../../features/admin/admin-product-edit-server';
+import styles from '../../../features/admin/create-product.module.css';
 
 export const metadata: Metadata = { title: 'Add Product' };
 export const dynamic = 'force-dynamic';
@@ -24,9 +26,8 @@ export default async function AdminAddProductPage({
 }: AdminAddProductPageProps) {
   const intent = parseCreateIntent(await searchParams);
   const cookieStore = await cookies();
-  const result = await loadAdminProductCreateOptions(
-    selectSessionCookieHeader(cookieStore.getAll()),
-  );
+  const sessionCookie = selectSessionCookieHeader(cookieStore.getAll());
+  const result = await loadAdminProductCreateOptions(sessionCookie);
 
   if (result.kind === 'anonymous') {
     redirect('/login?next=%2Fadmin%2Fadd');
@@ -34,19 +35,30 @@ export default async function AdminAddProductPage({
   if (result.kind === 'denied') notFound();
 
   if (intent.kind === 'edit') {
+    const productResult = await loadAdminProduct(sessionCookie, intent.id);
+    if (productResult.kind === 'anonymous') {
+      redirect(
+        `/login?next=${encodeURIComponent(`/admin/add?productId=${intent.id}`)}`,
+      );
+    }
+    if (productResult.kind === 'denied' || productResult.kind === 'not-found') {
+      notFound();
+    }
     return (
       <AdminShell>
-        <ErrorState
-          action={
-            <Button href="/admin/products" variant="secondary">
-              Back to product management
-            </Button>
-          }
-          title="Product editing is not available yet"
-        >
-          This page only creates new products. No change has been made to the
-          selected product.
-        </ErrorState>
+        {result.kind === 'loaded' && productResult.kind === 'loaded' ? (
+          <>
+            <h1 className={styles.pageTitle}>Edit product</h1>
+            <CreateProductForm
+              options={result.options}
+              product={productResult.product}
+            />
+          </>
+        ) : (
+          <ErrorState title="Product editing is unavailable">
+            We could not load this product safely. Please try again shortly.
+          </ErrorState>
+        )}
       </AdminShell>
     );
   }
@@ -71,7 +83,10 @@ export default async function AdminAddProductPage({
   return (
     <AdminShell>
       {result.kind === 'loaded' ? (
-        <CreateProductForm options={result.options} />
+        <>
+          <h1 className={styles.pageTitle}>Add product</h1>
+          <CreateProductForm options={result.options} />
+        </>
       ) : (
         <ErrorState title="Product creation is unavailable">
           We could not load the options required to create a product safely.
@@ -84,7 +99,7 @@ export default async function AdminAddProductPage({
 
 function parseCreateIntent(
   searchParams: Record<string, string | string[] | undefined>,
-): { kind: 'create' | 'edit' | 'invalid' } {
+): { kind: 'create' } | { kind: 'edit'; id: string } | { kind: 'invalid' } {
   const entries = Object.entries(searchParams).filter(
     ([, value]) => value !== undefined,
   );
@@ -94,6 +109,6 @@ function parseCreateIntent(
   }
   const value = entries[0]?.[1];
   return typeof value === 'string' && PRODUCT_ID.test(value)
-    ? { kind: 'edit' }
+    ? { id: value, kind: 'edit' }
     : { kind: 'invalid' };
 }

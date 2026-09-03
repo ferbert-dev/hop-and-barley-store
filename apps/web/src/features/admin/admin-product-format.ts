@@ -1,7 +1,7 @@
 import type { BadgeTone } from '../../components/ui/badge';
 
 export type AdminLifecycleStatus =
-  'ACTIVE' | 'DISABLED' | 'EXPIRED' | 'SCHEDULED';
+  'ACTIVE' | 'ENDING_SOON' | 'DISABLED' | 'EXPIRED' | 'SCHEDULED';
 
 type AdminSaleKind = 'WEIGHT' | 'PACKAGE' | 'KIT';
 type AdminAmountUnit = 'MILLIGRAM' | 'EACH';
@@ -63,7 +63,9 @@ export function getLifecyclePresentation(status: AdminLifecycleStatus): {
     case 'ACTIVE':
       return { label: 'Active', tone: 'success' };
     case 'DISABLED':
-      return { label: 'Disabled', tone: 'neutral' };
+      return { label: 'Deactivated', tone: 'danger' };
+    case 'ENDING_SOON':
+      return { label: 'Ending soon', tone: 'warning' };
     case 'SCHEDULED':
       return { label: 'Scheduled', tone: 'warning' };
     case 'EXPIRED':

@@ -14,6 +14,7 @@ import {
 const CATALOG_QUERY_KEYS = new Set([
   'category',
   'limit',
+  'lifecycle',
   'maxPriceMinor',
   'minPriceMinor',
   'page',

@@ -208,4 +208,12 @@ export class AdminCatalogQueryDto extends CatalogQueryBaseDto {
   @MaxLength(64)
   @Matches(CATEGORY_SLUG)
   category?: string;
+
+  @ApiPropertyOptional({
+    enum: ['ACTIVE', 'ENDING_SOON', 'DISABLED', 'SCHEDULED', 'EXPIRED'],
+    type: String,
+  })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsIn(['ACTIVE', 'ENDING_SOON', 'DISABLED', 'SCHEDULED', 'EXPIRED'])
+  lifecycle?: 'ACTIVE' | 'ENDING_SOON' | 'DISABLED' | 'SCHEDULED' | 'EXPIRED';
 }

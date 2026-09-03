@@ -5,6 +5,12 @@
   padding: 0;
 }
 
+.pageTitle {
+  font-size: clamp(2.75rem, 5vw, 4.5rem);
+  line-height: 0.95;
+  margin-block: 0 var(--hb-space-6);
+}
+
 .form > fieldset {
   display: grid;
   gap: var(--hb-space-6);
@@ -137,10 +143,58 @@
   font-weight: 600;
 }
 
+.activeToggle input {
+  appearance: none;
+  background: var(--hb-color-danger-soft);
+  border: 2px solid var(--hb-color-danger);
+  border-radius: 999px;
+  cursor: pointer;
+  block-size: 1.5rem;
+  inline-size: 2.75rem;
+  margin: 0;
+  padding: 0.125rem;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.activeToggle input::before {
+  background: var(--hb-color-surface);
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+  content: '';
+  display: block;
+  block-size: 1rem;
+  inline-size: 1rem;
+  transition: transform 120ms ease;
+}
+
+.activeToggle input:checked {
+  background: var(--hb-color-brand);
+  border-color: var(--hb-color-brand);
+}
+
+.activeToggle input:checked::before {
+  transform: translateX(1.25rem);
+}
+
+.activeToggle input:focus-visible {
+  outline: 3px solid var(--hb-color-warning);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activeToggle input,
+  .activeToggle input::before {
+    transition: none;
+  }
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--hb-space-3);
+  justify-content: flex-end;
 }
 
 .success {

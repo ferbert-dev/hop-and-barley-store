@@ -1,4 +1,4 @@
-export type AdminProductSaleKind = 'PACKAGE' | 'WEIGHT';
+export type AdminProductSaleKind = 'KIT' | 'PACKAGE' | 'WEIGHT';
 
 export type AdminProductCreateInput = Readonly<{
   activeFrom: string;
@@ -7,11 +7,13 @@ export type AdminProductCreateInput = Readonly<{
   description: string;
   image: File | null;
   isActive: boolean;
+  kitYieldLitres?: string;
   name: string;
   packageNetWeightGrams: string;
   price: string;
   saleKind: AdminProductSaleKind;
   stock: string;
+  teaser?: string;
 }>;
 
 export type AdminProductCreatePayload = Readonly<{
@@ -21,12 +23,23 @@ export type AdminProductCreatePayload = Readonly<{
   description: string;
   image: File;
   isActive: boolean;
+  kitYieldVolumeMl?: number;
   name: string;
   packageNetWeightMg?: number;
   price: string;
   saleKind: AdminProductSaleKind;
   stockAmount: number;
+  teaser?: string;
 }>;
+
+export type AdminProductUpdatePayload = Omit<
+  AdminProductCreatePayload,
+  'image'
+> &
+  Readonly<{
+    expectedUpdatedAt: string;
+    image?: File;
+  }>;
 
 export type AdminProductCreateValidation =
   | Readonly<{ errors: Record<string, string>; ok: false }>
@@ -43,9 +56,34 @@ const WHOLE_NUMBER = /^(?:0|[1-9]\d*)$/u;
 export function validateAdminProductCreate(
   input: AdminProductCreateInput,
 ): AdminProductCreateValidation {
+  return validate(input, true) as AdminProductCreateValidation;
+}
+
+export function validateAdminProductUpdate(
+  input: AdminProductCreateInput,
+  expectedUpdatedAt: string,
+):
+  | Readonly<{ errors: Record<string, string>; ok: false }>
+  | Readonly<{ ok: true; value: AdminProductUpdatePayload }> {
+  const result = validate(input, false);
+  return result.ok
+    ? { ok: true, value: { ...result.value, expectedUpdatedAt } }
+    : result;
+}
+
+function validate(
+  input: AdminProductCreateInput,
+  imageRequired: boolean,
+):
+  | Readonly<{ errors: Record<string, string>; ok: false }>
+  | Readonly<{
+      ok: true;
+      value: Omit<AdminProductCreatePayload, 'image'> & { image?: File };
+    }> {
   const errors: Record<string, string> = {};
   const name = input.name.trim();
   const description = input.description.trim();
+  const teaser = input.teaser?.trim() ?? '';
   const price = input.price.trim();
 
   if (name.length < 2 || name.length > 160) {
@@ -53,6 +91,9 @@ export function validateAdminProductCreate(
   }
   if (description.length < 2 || description.length > 4_000) {
     errors.description = 'Enter a description between 2 and 4,000 characters.';
+  }
+  if (teaser && (teaser.length < 2 || teaser.length > 160)) {
+    errors.teaser = 'Enter a short description up to 160 characters.';
   }
   const priceMinor = MONEY.test(price) ? decimalToMinor(price) : null;
   if (
@@ -66,7 +107,11 @@ export function validateAdminProductCreate(
   if (!UUID.test(input.categoryId)) {
     errors.categoryId = 'Choose a product type.';
   }
-  if (input.saleKind !== 'WEIGHT' && input.saleKind !== 'PACKAGE') {
+  if (
+    input.saleKind !== 'WEIGHT' &&
+    input.saleKind !== 'PACKAGE' &&
+    input.saleKind !== 'KIT'
+  ) {
     errors.saleKind = 'Choose how this product is sold.';
   }
 
@@ -78,7 +123,7 @@ export function validateAdminProductCreate(
     errors.stock =
       input.saleKind === 'WEIGHT'
         ? 'Enter stock in 0.1 kg steps.'
-        : 'Enter a whole number of packages.';
+        : `Enter a whole number of ${input.saleKind === 'KIT' ? 'kits' : 'packages'}.`;
   }
 
   const packageNetWeightMg =
@@ -88,6 +133,13 @@ export function validateAdminProductCreate(
   if (input.saleKind === 'PACKAGE' && packageNetWeightMg === null) {
     errors.packageNetWeightGrams =
       'Enter a positive package net weight in grams, or leave it empty.';
+  }
+  const kitYieldVolumeMl =
+    input.saleKind === 'KIT'
+      ? litresToMillilitres(input.kitYieldLitres ?? '')
+      : undefined;
+  if (input.saleKind === 'KIT' && kitYieldVolumeMl === null) {
+    errors.kitYieldLitres = 'Enter a positive kit yield in litres.';
   }
 
   const activeFrom = toIsoDate(input.activeFrom);
@@ -104,13 +156,13 @@ export function validateAdminProductCreate(
     errors.activeUntil = 'The end date must be after the start date.';
   }
 
-  if (!input.image) {
+  if (!input.image && imageRequired) {
     errors.image = 'Choose a JPEG, PNG, or WebP image.';
-  } else if (!ALLOWED_IMAGE_TYPES.has(input.image.type)) {
+  } else if (input.image && !ALLOWED_IMAGE_TYPES.has(input.image.type)) {
     errors.image = 'Use a JPEG, PNG, or WebP image.';
   } else if (
-    input.image.size === 0 ||
-    input.image.size > MAX_IMAGE_SIZE_BYTES
+    input.image &&
+    (input.image.size === 0 || input.image.size > MAX_IMAGE_SIZE_BYTES)
   ) {
     errors.image = 'The image must be no larger than 5 MiB.';
   }
@@ -118,8 +170,9 @@ export function validateAdminProductCreate(
   if (
     Object.keys(errors).length > 0 ||
     stockAmount === null ||
-    !input.image ||
-    packageNetWeightMg === null
+    (!input.image && imageRequired) ||
+    packageNetWeightMg === null ||
+    kitYieldVolumeMl === null
   ) {
     return { errors, ok: false };
   }
@@ -131,13 +184,15 @@ export function validateAdminProductCreate(
       ...(activeUntil ? { activeUntil } : {}),
       categoryId: input.categoryId,
       description,
-      image: input.image,
+      ...(input.image ? { image: input.image } : {}),
       isActive: input.isActive,
+      ...(kitYieldVolumeMl === undefined ? {} : { kitYieldVolumeMl }),
       name,
       ...(packageNetWeightMg === undefined ? {} : { packageNetWeightMg }),
       price: normalizeMoney(price),
       saleKind: input.saleKind,
       stockAmount,
+      ...(teaser ? { teaser } : {}),
     },
   };
 }
@@ -161,6 +216,16 @@ function gramsToMilligrams(value: string): number | null | undefined {
   const [whole, fraction = ''] = trimmed.split('.');
   const fractionMg = `${fraction}000`.slice(0, 3);
   const result = boundedNumber(Number(whole) * 1_000 + Number(fractionMg));
+  return result && result > 0 ? result : null;
+}
+
+function litresToMillilitres(value: string): number | null {
+  const trimmed = value.trim();
+  if (!/^(?:0|[1-9]\d*)(?:[.]\d{1,3})?$/u.test(trimmed)) return null;
+  const [whole, fraction = ''] = trimmed.split('.');
+  const result = boundedNumber(
+    Number(whole) * 1_000 + Number(`${fraction}000`.slice(0, 3)),
+  );
   return result && result > 0 ? result : null;
 }
 

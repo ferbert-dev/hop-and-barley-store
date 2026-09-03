@@ -82,6 +82,8 @@ export type OrderCheckoutContext = Readonly<{
 type CheckoutLine = Readonly<{
   id: string;
   product: Readonly<{
+    activeFrom: Date | null;
+    activeUntil: Date | null;
     amountUnit: 'EACH' | 'MILLIGRAM';
     currency: string;
     id: string;
@@ -159,6 +161,8 @@ export class OrdersService {
             id: true,
             product: {
               select: {
+                activeFrom: true,
+                activeUntil: true,
                 amountUnit: true,
                 currency: true,
                 id: true,
@@ -179,7 +183,7 @@ export class OrdersService {
           },
           where: { cartId: context.cartId },
         });
-        const outcomes = allocationOutcomes(lines, checkout);
+        const outcomes = allocationOutcomes(lines, checkout, now);
         if (outcomes.some(({ outcome }) => outcome !== 'available')) {
           allocationUnavailable(now, outcomes);
         }
@@ -300,6 +304,7 @@ async function findIdempotentOrder(
 function allocationOutcomes(
   lines: readonly CheckoutLine[],
   checkout: CanonicalCheckout,
+  evaluatedAt: Date,
 ): CheckoutReadinessLineDto[] {
   const requestedBySlug = new Map<string, number>();
   const requestCounts = new Map<string, number>();
@@ -319,7 +324,7 @@ function allocationOutcomes(
       requestedAmount === line.amount;
     return {
       outcome: matches
-        ? checkoutLineOutcome(line.product, line.amount)
+        ? checkoutLineOutcome(line.product, line.amount, evaluatedAt)
         : ('invalid_amount' as const),
       productSlug: line.product.slug,
       requestedAmount,

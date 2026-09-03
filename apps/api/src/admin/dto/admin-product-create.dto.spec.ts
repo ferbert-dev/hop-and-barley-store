@@ -40,7 +40,7 @@ describe('AdminCreateProductBodyDto', () => {
     ['zero price', { price: '0.00' }],
     ['price precision', { price: '5.999' }],
     ['non-canonical stock', { stockAmount: '00100000' }],
-    ['sale kind', { saleKind: 'KIT' }],
+    ['sale kind', { saleKind: 'BULK' }],
     ['boolean', { isActive: '1' }],
     ['instant', { activeFrom: 'tomorrow' }],
     ['instant without zone', { activeFrom: '2026-08-29T00:00:00' }],

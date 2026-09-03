@@ -9,7 +9,7 @@ import type {
   CatalogQueryDto,
   CatalogSort,
 } from './dto/catalog-query.dto';
-import { CATALOG_INGREDIENT_PRODUCT_TYPE_SLUGS } from './catalog-product-types';
+import { CATALOG_ADMIN_PRODUCT_TYPES } from './catalog-product-types';
 
 export type CatalogListVisibility = 'admin' | 'public';
 
@@ -110,7 +110,7 @@ export function buildCatalogFacetQuery(
     },
     where: {
       ...(visibility === 'admin'
-        ? { slug: { in: [...CATALOG_INGREDIENT_PRODUCT_TYPE_SLUGS] } }
+        ? { slug: { in: CATALOG_ADMIN_PRODUCT_TYPES.map(({ slug }) => slug) } }
         : {}),
       products: {
         some: {

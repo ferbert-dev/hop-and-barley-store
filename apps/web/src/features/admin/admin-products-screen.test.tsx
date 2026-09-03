@@ -17,6 +17,7 @@ const response = {
     facets: { categories: [{ name: 'Hops', slug: 'hops' }] },
     filters: {
       category: null,
+      lifecycle: null,
       maxPriceMinor: null,
       minPriceMinor: null,
       search: null,
@@ -43,16 +44,14 @@ describe('admin product results', () => {
     expect(
       screen.getByRole('search', { name: 'Filter products' }),
     ).toHaveAttribute('action', '/admin/products');
-    expect(screen.getByRole('link', { name: '+ Add Product' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '+ Add product' })).toHaveAttribute(
       'href',
       '/admin/add',
     );
-    expect(
-      screen.getByRole('columnheader', { name: 'Lifecycle' }),
-    ).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: 'Status' })).toBeVisible();
     expect(screen.getByRole('list', { name: 'Product stock' })).toBeVisible();
     expect(screen.getAllByText('Active')).toHaveLength(3);
-    expect(screen.getAllByText('Disabled')).toHaveLength(3);
+    expect(screen.getAllByText('Deactivated')).toHaveLength(3);
     expect(screen.getAllByText('Scheduled')).toHaveLength(3);
     expect(screen.getAllByText('Expired')).toHaveLength(3);
     expect(screen.getAllByRole('link', { name: 'Edit' })[0]).toHaveAttribute(
@@ -80,7 +79,7 @@ describe('admin product results', () => {
     );
 
     expect(screen.getByRole('status')).toHaveTextContent('No products found');
-    expect(screen.getByRole('link', { name: '+ Add Product' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '+ Add product' })).toHaveAttribute(
       'href',
       '/admin/add',
     );
@@ -117,6 +116,7 @@ function product(
     createdAt: '2026-08-28T10:00:00.000Z',
     currency: 'USD' as const,
     description: 'Citrus and floral whole-cone hops.',
+    imagePath: '/assets/products/cascade-hops.webp',
     id: `20000000-0000-4000-8000-${String(idSuffix).padStart(12, '0')}`,
     isActive,
     lifecycleStatus,

@@ -45,9 +45,9 @@ test.describe('connected administrator product management', () => {
     const response = await page.goto('/admin/products');
 
     expect(response?.status()).toBe(404);
-    await expect(
-      page.getByRole('heading', { name: 'Admin - Product Stock' }),
-    ).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Products' })).toHaveCount(
+      0,
+    );
     await expect(page.getByRole('link', { name: /Add Product/i })).toHaveCount(
       0,
     );
@@ -69,21 +69,16 @@ test.describe('connected administrator product management', () => {
     await managementLink.click();
     await expect(page).toHaveURL(/\/admin\/products$/);
 
-    await expect(
-      page.getByRole('heading', { name: 'Admin - Product Stock' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Products' })).toBeVisible();
     await expect(
       page.getByRole('navigation', { name: 'Admin sections' }),
     ).toBeVisible();
     await expect(
       page
         .getByRole('navigation', { name: 'Admin sections' })
-        .getByText('Product Management', { exact: true }),
+        .getByRole('link', { name: 'Products' }),
     ).toBeVisible();
-    await expect(page.getByText('Dashboard', { exact: true })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
+    await expect(page.getByText('Dashboard', { exact: true })).toHaveCount(0);
 
     const filterSurface = page.getByRole('search', {
       name: 'Filter products',
@@ -93,13 +88,28 @@ test.describe('connected administrator product management', () => {
       'the existing product-list filter controls must remain available',
     ).toBeVisible();
     await expect(page.getByLabel('Search products')).toBeVisible();
-    await expect(page.getByRole('radio')).toHaveCount(4);
-    await expect(page.getByLabel('Sort by')).toBeVisible();
+    await expect(page.getByLabel('Status')).toBeVisible();
+    await expect(page.getByLabel('Category')).toBeVisible();
+    await expect(page.getByRole('radio')).toHaveCount(0);
+
+    const lifecycleResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/admin/products?') &&
+        response.url().includes('lifecycle=ACTIVE') &&
+        response.request().method() === 'GET',
+    );
+    await page.getByLabel('Status').selectOption('ACTIVE');
+    expect((await lifecycleResponse).status()).toBe(200);
+    await expect(page).toHaveURL(/lifecycle=ACTIVE/);
+    await expect(
+      page.getByRole('table').getByText('Active', { exact: true }).first(),
+    ).toBeVisible();
 
     const productSurface = page
       .getByRole('table')
       .or(page.getByRole('list', { name: /products?/i }));
-    await expect(productSurface.first(), 'product table/list').toBeVisible();
+    const visibleProductSurface = productSurface.first();
+    await expect(visibleProductSurface, 'product table/list').toBeVisible();
 
     await expect(
       page.getByRole('link', { name: /Add Product/i }),
@@ -113,7 +123,7 @@ test.describe('connected administrator product management', () => {
       /^\/admin\/add\?productId=[0-9a-f-]+$/i,
     );
 
-    for (const heading of ['Price', 'Category', 'Stock', 'Lifecycle']) {
+    for (const heading of ['Product', 'Price', 'Stock', 'Status']) {
       await expect(
         page
           .getByRole('columnheader', { name: new RegExp(heading, 'i') })
@@ -123,25 +133,26 @@ test.describe('connected administrator product management', () => {
       ).toBeVisible();
     }
 
-    await expect(page.getByText(/\$\s?\d[\d,.]*\.\d{2}/).first()).toBeVisible();
     await expect(
-      page.getByText(/\b(?:Hops|Malt|Yeast|Adjuncts)\b/i).first(),
+      visibleProductSurface.getByText(/\$\s?\d[\d,.]*\.\d{2}/).first(),
     ).toBeVisible();
     await expect(
-      page
+      visibleProductSurface
+        .getByText(/\b(?:Hops|Malt|Yeast|Adjuncts)\b/i)
+        .first(),
+    ).toBeVisible();
+    await expect(
+      visibleProductSurface
         .getByText(
           /\b(?:\d[\d,.]*\s?(?:mg|g|kg|packs?|kits?|units?)|in stock|out of stock)\b/i,
         )
         .first(),
     ).toBeVisible();
     await expect(
-      page.getByText(/\b(?:ACTIVE|SCHEDULED|EXPIRED|DISABLED)\b/i).first(),
+      visibleProductSurface
+        .getByText(/\b(?:Active|Ending soon|Scheduled|Expired|Deactivated)\b/i)
+        .first(),
     ).toBeVisible();
-
-    const windowText = page.getByText(
-      /(?:active\s*(?:from|until)|window|no (?:start|end)|never|—)/i,
-    );
-    await expect(windowText.first()).toBeVisible();
 
     const visibleText = await page.locator('body').innerText();
     expect(visibleText).not.toMatch(
@@ -189,7 +200,7 @@ test.describe('connected administrator product management', () => {
     const productName = `E2E Harvest Hops ${Date.now()}`;
     await page.getByLabel('Title').fill(productName);
     await page
-      .getByLabel('Description')
+      .getByLabel('Description', { exact: true })
       .fill('A connected browser proof for administrator product creation.');
     await page.getByLabel('Price (USD)').fill('5.99');
     await page.getByLabel('Stock (kg)').fill('1.2');
@@ -241,6 +252,66 @@ test.describe('connected administrator product management', () => {
     await expect(
       productRow.getByText('Scheduled', { exact: true }),
     ).toBeVisible();
+
+    await productRow.getByRole('link', { name: 'Edit' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Edit product' }),
+    ).toBeVisible();
+    const updatedName = `${productName} Updated`;
+    await page.getByLabel('Title').fill(updatedName);
+    const lifecycleSwitch = page.getByRole('switch', { name: 'Active' });
+    await lifecycleSwitch.uncheck();
+    await expect(
+      page.getByRole('switch', { name: 'Disabled' }),
+    ).not.toBeChecked();
+    await page
+      .getByLabel('Replace image')
+      .setInputFiles(
+        path.join(
+          process.cwd(),
+          '../web/public/assets/products/caramel-malt.webp',
+        ),
+      );
+    const updateResponse = page.waitForResponse(
+      (response) =>
+        /\/api\/v1\/admin\/products\/[0-9a-f-]+$/i.test(response.url()) &&
+        response.request().method() === 'PATCH',
+    );
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    expect((await updateResponse).status()).toBe(200);
+    expect(
+      (
+        await page.request.get(
+          new URL(created.imagePath, page.url()).toString(),
+        )
+      ).status(),
+      'the superseded immutable image must remain available to primed storefront caches',
+    ).toBe(200);
+    await expect(
+      page.getByRole('heading', { name: 'Product updated' }),
+    ).toBeVisible();
+    await page
+      .getByRole('link', { name: 'Back to product management' })
+      .click();
+    await page.getByLabel('Search products').fill(updatedName);
+    await page.getByLabel('Search products').press('Enter');
+    const updatedRow = page.getByRole('row').filter({ hasText: updatedName });
+    await expect(updatedRow).toBeVisible();
+    const updatedImagePath = await updatedRow
+      .locator('img')
+      .getAttribute('src');
+    expect(updatedImagePath).toMatch(
+      /^\/product-assets\/[0-9a-f-]{36}[.]webp$/u,
+    );
+    expect(updatedImagePath).not.toBe(created.imagePath);
+    expect(
+      (
+        await page.request.get(
+          new URL(updatedImagePath!, page.url()).toString(),
+        )
+      ).status(),
+    ).toBe(200);
+    await expect(updatedRow.getByText('Deactivated')).toBeVisible();
   });
 
   test('keeps the connected product list keyboard reachable and responsive', async ({
@@ -274,7 +345,7 @@ test.describe('connected administrator product management', () => {
     ]) {
       await page.setViewportSize(viewport);
       await expect(
-        page.getByRole('heading', { name: 'Admin - Product Stock' }),
+        page.getByRole('heading', { name: 'Products' }),
       ).toBeVisible();
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - window.innerWidth,
@@ -302,9 +373,9 @@ test.describe('administrator product listing unavailable state', () => {
   }) => {
     await page.goto('/admin/products');
 
-    await expect(
-      page.getByRole('heading', { name: 'Admin - Product Stock' }),
-    ).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Products' })).toHaveCount(
+      0,
+    );
     await expect(page.getByRole('link', { name: /Add Product/i })).toHaveCount(
       0,
     );

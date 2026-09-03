@@ -18,6 +18,7 @@ const adminProductSelect = {
   currency: true,
   description: true,
   id: true,
+  imagePath: true,
   isActive: true,
   name: true,
   priceMinor: true,
@@ -71,6 +72,7 @@ describe('AdminProductListService', () => {
         currency: 'USD',
         description: 'Bright whole-cone hops',
         id: 'product-id',
+        imagePath: '/assets/products/cascade-hops.webp',
         isActive: true,
         name: 'Cascade Hops',
         priceMinor: 699,
@@ -133,7 +135,7 @@ describe('AdminProductListService', () => {
       },
       where: {
         products: { some: { currency: 'USD' } },
-        slug: { in: ['hops', 'malts', 'yeast', 'adjuncts'] },
+        slug: { in: ['hops', 'malts', 'yeast', 'adjuncts', 'kits'] },
       },
     });
     expect(result.items[0]).toMatchObject({
@@ -149,6 +151,7 @@ describe('AdminProductListService', () => {
       'currency',
       'description',
       'id',
+      'imagePath',
       'isActive',
       'lifecycleStatus',
       'name',
@@ -174,11 +177,48 @@ describe('AdminProductListService', () => {
     });
   });
 
+  it('filters ending-soon products without excluding a null start date', async () => {
+    await service.listProducts({
+      lifecycle: 'ENDING_SOON',
+      limit: 12,
+      page: 1,
+      sort: 'name-asc',
+    });
+
+    expect(count).toHaveBeenCalledWith({
+      where: {
+        AND: [
+          {
+            AND: [
+              {
+                OR: [
+                  { activeFrom: null },
+                  {
+                    activeFrom: {
+                      lte: new Date('2026-08-28T12:00:00.000Z'),
+                    },
+                  },
+                ],
+              },
+            ],
+            activeUntil: {
+              gt: new Date('2026-08-28T12:00:00.000Z'),
+              lte: new Date('2026-09-04T12:00:00.000Z'),
+            },
+            isActive: true,
+          },
+        ],
+        currency: 'USD',
+      },
+    });
+  });
+
   it.each([
     [false, '2026-08-27T00:00:00.000Z', '2026-08-28T12:00:00.000Z', 'DISABLED'],
     [true, '2026-08-29T00:00:00.000Z', '2026-08-30T00:00:00.000Z', 'SCHEDULED'],
     [true, '2026-08-27T00:00:00.000Z', '2026-08-28T12:00:00.000Z', 'EXPIRED'],
     [true, '2026-08-28T12:00:00.000Z', null, 'ACTIVE'],
+    [true, null, '2026-09-01T12:00:00.000Z', 'ENDING_SOON'],
     [true, null, null, 'ACTIVE'],
   ] as const)(
     'uses lifecycle precedence for enabled=%s from=%s until=%s',

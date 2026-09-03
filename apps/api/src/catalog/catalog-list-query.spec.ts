@@ -13,11 +13,11 @@ describe('catalog Product Type facets', () => {
     expect(buildCatalogFacetQuery('public').where).not.toHaveProperty('slug');
   });
 
-  it('preserves the ingredient-only admin selector boundary', () => {
+  it('includes every product type supported by the admin editor', () => {
     expect(buildCatalogFacetQuery('admin')).toMatchObject({
       where: {
         products: { some: { currency: 'USD' } },
-        slug: { in: ['hops', 'malts', 'yeast', 'adjuncts'] },
+        slug: { in: ['hops', 'malts', 'yeast', 'adjuncts', 'kits'] },
       },
     });
   });

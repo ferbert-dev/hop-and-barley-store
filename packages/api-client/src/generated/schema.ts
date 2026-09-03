@@ -309,6 +309,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one administrator-managed product */
+        get: operations["AdminController_getProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update an administrator-managed product */
+        patch: operations["AdminController_updateProduct"];
+        trace?: never;
+    };
     "/api/v1/orders": {
         parameters: {
             query?: never;
@@ -648,6 +666,7 @@ export interface components {
             slug: string;
             name: string;
             description: string;
+            imagePath: string;
             /**
              * Format: int32
              * @example 499
@@ -669,7 +688,7 @@ export interface components {
             /** Format: date-time */
             activeUntil: string | null;
             /** @enum {string} */
-            lifecycleStatus: "ACTIVE" | "DISABLED" | "SCHEDULED" | "EXPIRED";
+            lifecycleStatus: "ACTIVE" | "ENDING_SOON" | "DISABLED" | "SCHEDULED" | "EXPIRED";
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -678,6 +697,7 @@ export interface components {
         AdminProductListFiltersDto: {
             search: string | null;
             category: string | null;
+            lifecycle: string | null;
             /** Format: int32 */
             minPriceMinor: number | null;
             /** Format: int32 */
@@ -716,11 +736,12 @@ export interface components {
         };
         AdminProductCreateOptionsDto: {
             categories: components["schemas"]["AdminProductCreateCategoryDto"][];
-            saleKinds: ("WEIGHT" | "PACKAGE")[];
+            saleKinds: ("WEIGHT" | "PACKAGE" | "KIT")[];
         };
         AdminCreateProductMultipartDto: {
             name: string;
             description: string;
+            teaser?: string;
             /**
              * @description Positive USD decimal string with one or two fractional digits; minor units must fit int32.
              * @example 5.99
@@ -728,11 +749,11 @@ export interface components {
             price: string;
             /**
              * Format: uuid
-             * @description One of the four IDs returned by create-options.
+             * @description One of the product type IDs returned by create-options.
              */
             categoryId: string;
             /** @enum {string} */
-            saleKind: "WEIGHT" | "PACKAGE";
+            saleKind: "WEIGHT" | "PACKAGE" | "KIT";
             /**
              * @description Canonical non-negative inventory integer, at most 2000000000.
              * @example 100000000
@@ -752,6 +773,8 @@ export interface components {
             activeUntil?: string;
             /** @description PACKAGE-only canonical positive net weight in milligrams, bounded to int32. */
             packageNetWeightMg?: string;
+            /** @description KIT-only canonical positive yield volume in millilitres. */
+            kitYieldVolumeMl?: string;
             /**
              * Format: binary
              * @description One JPEG, PNG or WebP image, at most 5 MiB.
@@ -770,10 +793,10 @@ export interface components {
             /** @enum {string} */
             currency: "USD";
             /** @enum {string} */
-            priceQualifier: "per 100g" | "per package";
+            priceQualifier: "per 100g" | "per package" | "per kit";
             category: components["schemas"]["AdminProductCreateCategoryDto"];
             /** @enum {string} */
-            saleKind: "WEIGHT" | "PACKAGE";
+            saleKind: "WEIGHT" | "PACKAGE" | "KIT";
             /** @enum {string} */
             amountUnit: "MILLIGRAM" | "EACH";
             /** Format: int32 */
@@ -788,9 +811,11 @@ export interface components {
             stockAmount: number;
             /** Format: int32 */
             packageNetWeightMg: number | null;
+            /** Format: int32 */
+            kitYieldVolumeMl: number | null;
             isActive: boolean;
             /** Format: date-time */
-            activeFrom: string;
+            activeFrom: string | null;
             /** Format: date-time */
             activeUntil: string | null;
             /** @example /product-assets/7ed6a7c7-5210-4b1f-ae50-0d8d596216cb.webp */
@@ -800,6 +825,51 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        AdminUpdateProductMultipartDto: {
+            name: string;
+            description: string;
+            teaser?: string;
+            /**
+             * @description Positive USD decimal string with one or two fractional digits; minor units must fit int32.
+             * @example 5.99
+             */
+            price: string;
+            /**
+             * Format: uuid
+             * @description One of the product type IDs returned by create-options.
+             */
+            categoryId: string;
+            /** @enum {string} */
+            saleKind: "WEIGHT" | "PACKAGE" | "KIT";
+            /**
+             * @description Canonical non-negative inventory integer, at most 2000000000.
+             * @example 100000000
+             */
+            stockAmount: string;
+            /** @enum {string} */
+            isActive: "true" | "false";
+            /**
+             * Format: date-time
+             * @description ISO instant with Z or numeric offset; defaults to the server current instant.
+             */
+            activeFrom?: string;
+            /**
+             * Format: date-time
+             * @description ISO instant with Z or numeric offset; must be strictly after activeFrom.
+             */
+            activeUntil?: string;
+            /** @description PACKAGE-only canonical positive net weight in milligrams, bounded to int32. */
+            packageNetWeightMg?: string;
+            /** @description KIT-only canonical positive yield volume in millilitres. */
+            kitYieldVolumeMl?: string;
+            /** Format: date-time */
+            expectedUpdatedAt: string;
+            /**
+             * Format: binary
+             * @description Optional replacement JPEG, PNG or WebP image, at most 5 MiB.
+             */
+            image?: string;
         };
         AllocationUnavailableDto: {
             /** @enum {string} */
@@ -1731,6 +1801,7 @@ export interface operations {
                 maxPriceMinor?: number;
                 minPriceMinor?: number;
                 category?: string;
+                lifecycle?: "ACTIVE" | "ENDING_SOON" | "DISABLED" | "SCHEDULED" | "EXPIRED";
                 search?: string;
             };
             header?: never;
@@ -1871,6 +1942,125 @@ export interface operations {
             };
             /** @description Administrator access is required */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session verification is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_getProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCreatedProductDto"];
+                };
+            };
+            /** @description Session is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Administrator access is required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Product not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session verification is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_updateProduct: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["AdminUpdateProductMultipartDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCreatedProductDto"];
+                };
+            };
+            /** @description Invalid product fields or image */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Administrator access is required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Product not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Product was changed by another request */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

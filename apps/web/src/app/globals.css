@@ -56,6 +56,11 @@ main {
   min-width: 0;
 }
 
+body:has(.admin-workspace) > .site-header,
+body:has(.admin-workspace) > .site-footer {
+  display: none;
+}
+
 .visually-hidden {
   block-size: 1px;
   clip: rect(0 0 0 0);

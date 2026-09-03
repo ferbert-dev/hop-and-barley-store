@@ -1,3 +1,4 @@
+import { UnprocessableEntityException } from '@nestjs/common';
 import { Client } from 'pg';
 import type { ActiveCartCapability } from '../src/cart/cart-request';
 import { CartService } from '../src/cart/cart.service';
@@ -59,7 +60,13 @@ describePostgres('O2S desired carts with disposable PostgreSQL', () => {
     await prisma.order.deleteMany();
     await prisma.cart.deleteMany();
     await prisma.product.updateMany({
-      data: { currency: 'USD', isActive: true, stockAmount: 10 },
+      data: {
+        activeFrom: null,
+        activeUntil: null,
+        currency: 'USD',
+        isActive: true,
+        stockAmount: 10,
+      },
       where: { slug: { in: [alphaSlug, betaSlug] } },
     });
   });
@@ -172,6 +179,41 @@ describePostgres('O2S desired carts with disposable PostgreSQL', () => {
       await prisma.cartItem.count({ where: { cartId: capability.cartId } }),
     ).toBe(2);
     expect(await prisma.cartReservation.count()).toBe(0);
+  });
+
+  it('rejects scheduled additions and expired line updates at the exact server time', async () => {
+    await prisma.product.update({
+      data: { activeFrom: new Date(now.getTime() + 1) },
+      where: { slug: betaSlug },
+    });
+    await expect(
+      carts.createAndAdd({ productSlug: betaSlug, amount: 1 }, now),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+
+    const created = await carts.createAndAdd(
+      { productSlug: alphaSlug, amount: 1 },
+      now,
+    );
+    const capability = await requireCapability(created.rawToken);
+    await prisma.product.update({
+      data: { activeUntil: now },
+      where: { slug: alphaSlug },
+    });
+
+    await expect(
+      carts.update(capability, alphaSlug, { amount: 2 }, now),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(carts.checkoutReadiness(capability, now)).resolves.toEqual({
+      checkedAt: now.toISOString(),
+      lines: [
+        {
+          outcome: 'product_unavailable',
+          productSlug: alphaSlug,
+          requestedAmount: 1,
+        },
+      ],
+      status: 'unavailable',
+    });
   });
 
   it('allows two distinct weight lines to request 100 kg each', async () => {

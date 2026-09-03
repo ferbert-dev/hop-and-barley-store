@@ -12,7 +12,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ProductSpecificationDto } from '../../catalog/dto/product-detail.dto';
 
-export const ADMIN_PRODUCT_SALE_KINDS = ['WEIGHT', 'PACKAGE'] as const;
+export const ADMIN_PRODUCT_SALE_KINDS = ['WEIGHT', 'PACKAGE', 'KIT'] as const;
 export type AdminProductSaleKind = (typeof ADMIN_PRODUCT_SALE_KINDS)[number];
 
 const CANONICAL_INTEGER = /^(?:0|[1-9]\d*)$/;
@@ -54,6 +54,14 @@ export class AdminCreateProductBodyDto {
   @MaxLength(5_000)
   description!: string;
 
+  @ApiPropertyOptional({ maxLength: 160, minLength: 1, type: String })
+  @Transform(({ value }) => trimString(value))
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(160)
+  teaser?: string;
+
   @ApiProperty({
     description:
       'Positive USD decimal string with one or two fractional digits; minor units must fit int32.',
@@ -69,7 +77,7 @@ export class AdminCreateProductBodyDto {
   price!: string;
 
   @ApiProperty({
-    description: 'One of the four IDs returned by create-options.',
+    description: 'One of the product type IDs returned by create-options.',
     format: 'uuid',
     type: String,
   })
@@ -140,6 +148,19 @@ export class AdminCreateProductBodyDto {
   @MaxLength(10)
   @Matches(POSITIVE_CANONICAL_INTEGER)
   packageNetWeightMg?: string;
+
+  @ApiPropertyOptional({
+    description: 'KIT-only canonical positive yield volume in millilitres.',
+    maxLength: 10,
+    pattern: POSITIVE_CANONICAL_INTEGER.source,
+    type: String,
+  })
+  @Transform(({ value }) => trimString(value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  @Matches(POSITIVE_CANONICAL_INTEGER)
+  kitYieldVolumeMl?: string;
 }
 
 export class AdminCreateProductMultipartDto extends AdminCreateProductBodyDto {
@@ -149,6 +170,23 @@ export class AdminCreateProductMultipartDto extends AdminCreateProductBodyDto {
     type: String,
   })
   image!: string;
+}
+
+export class AdminUpdateProductBodyDto extends AdminCreateProductBodyDto {
+  @ApiProperty({ format: 'date-time', type: String })
+  @Transform(({ value }) => trimString(value))
+  @IsISO8601({ strict: true, strictSeparator: true })
+  @Matches(ISO_INSTANT_WITH_ZONE)
+  expectedUpdatedAt!: string;
+}
+
+export class AdminUpdateProductMultipartDto extends AdminUpdateProductBodyDto {
+  @ApiPropertyOptional({
+    description: 'Optional replacement JPEG, PNG or WebP image, at most 5 MiB.',
+    format: 'binary',
+    type: String,
+  })
+  image?: string;
 }
 
 export class AdminCreatedProductDto {
@@ -173,8 +211,8 @@ export class AdminCreatedProductDto {
   @ApiProperty({ enum: ['USD'], type: String })
   currency!: 'USD';
 
-  @ApiProperty({ enum: ['per 100g', 'per package'], type: String })
-  priceQualifier!: 'per 100g' | 'per package';
+  @ApiProperty({ enum: ['per 100g', 'per package', 'per kit'], type: String })
+  priceQualifier!: 'per 100g' | 'per package' | 'per kit';
 
   @ApiProperty({ type: () => AdminProductCreateCategoryDto })
   category!: AdminProductCreateCategoryDto;
@@ -220,11 +258,20 @@ export class AdminCreatedProductDto {
   })
   packageNetWeightMg!: number | null;
 
+  @ApiProperty({
+    format: 'int32',
+    maximum: 2_147_483_647,
+    minimum: 1,
+    nullable: true,
+    type: 'integer',
+  })
+  kitYieldVolumeMl!: number | null;
+
   @ApiProperty({ type: Boolean })
   isActive!: boolean;
 
-  @ApiProperty({ format: 'date-time', type: String })
-  activeFrom!: Date;
+  @ApiProperty({ format: 'date-time', nullable: true, type: String })
+  activeFrom!: Date | null;
 
   @ApiProperty({ format: 'date-time', nullable: true, type: String })
   activeUntil!: Date | null;
@@ -232,7 +279,7 @@ export class AdminCreatedProductDto {
   @ApiProperty({
     example: '/product-assets/7ed6a7c7-5210-4b1f-ae50-0d8d596216cb.webp',
     pattern:
-      '^/product-assets/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.]webp$',
+      '^/(?:assets/products/[a-z0-9]+(?:-[a-z0-9]+)*[.]webp|product-assets/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.]webp)$',
     type: String,
   })
   imagePath!: string;
