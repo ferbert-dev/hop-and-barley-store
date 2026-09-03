@@ -7,6 +7,7 @@ import {
 } from '../../web/src/quality/acceptance-matrix';
 
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
+const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
 
 async function waitForShellAssets(page: Page) {
   const images = await page
@@ -243,6 +244,85 @@ test('fills the complete catalog hero section with the hop image', async ({
             imageBox.y === heroBox.y &&
             imageBox.width === heroBox.width &&
             imageBox.height === heroBox.height
+          );
+        }),
+      )
+      .toBe(true);
+  }
+});
+
+test('keeps the header visible while the catalog hero scrolls away', async ({
+  page,
+}) => {
+  test.skip(unavailable, 'requires the connected catalog');
+
+  for (const width of [360, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+    const header = page.getByRole('banner', {
+      name: 'Hop and Barley storefront',
+    });
+    const hero = page.getByRole('region', { name: 'Product catalog' });
+    const catalogTitle = page.getByRole('heading', {
+      name: 'Find your ingredients',
+    });
+
+    await expect(header).toHaveCSS('position', 'sticky');
+    await expect
+      .poll(() =>
+        header.evaluate((element) => {
+          const headerBox = element.getBoundingClientRect();
+          const heroBox = document
+            .querySelector('[aria-label="Product catalog"]')!
+            .getBoundingClientRect();
+
+          return (
+            Math.abs(headerBox.top) <= 1 &&
+            Math.abs(heroBox.top - headerBox.bottom) <= 1
+          );
+        }),
+      )
+      .toBe(true);
+
+    await catalogTitle.evaluate((element) => {
+      element.scrollIntoView({ behavior: 'instant', block: 'start' });
+    });
+    await expect
+      .poll(() =>
+        header.evaluate((element) => {
+          const headerBox = element.getBoundingClientRect();
+          const heroBox = document
+            .querySelector('[aria-label="Product catalog"]')!
+            .getBoundingClientRect();
+          const titleBox = document
+            .querySelector('#catalog-title')!
+            .getBoundingClientRect();
+
+          return (
+            Math.abs(headerBox.top) <= 1 &&
+            heroBox.bottom <= headerBox.bottom + 1 &&
+            titleBox.top >= headerBox.bottom - 1
+          );
+        }),
+      )
+      .toBe(true);
+
+    await page.evaluate(() => {
+      window.scrollTo({ behavior: 'instant', top: 0 });
+    });
+    await expect
+      .poll(() =>
+        hero.evaluate((element) => {
+          const headerBox = document
+            .querySelector('.site-header')!
+            .getBoundingClientRect();
+          const heroBox = element.getBoundingClientRect();
+
+          return (
+            Math.abs(headerBox.top) <= 1 &&
+            Math.abs(heroBox.top - headerBox.bottom) <= 1 &&
+            heroBox.bottom > headerBox.bottom
           );
         }),
       )

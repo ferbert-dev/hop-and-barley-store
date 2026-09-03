@@ -213,6 +213,15 @@ Page 1 (0:1)
   frame. It does not change the confirmed immediate sort behavior or canonical
   catalog query contract.
 
+**User-confirmed catalog scroll extension — 2026-09-03**
+
+- The shared storefront header remains visible at the top of the viewport while
+  the catalog page scrolls.
+- The full-bleed hop hero stays in normal document flow: it scrolls completely
+  beneath the sticky header and returns naturally when the user scrolls back up.
+- This extension adds no scroll listener, animated height, parallax, or other
+  motion beyond the browser's native scrolling behavior.
+
 ### Product details — `product`
 
 [Open node `9:2284`](https://www.figma.com/design/H7jIUNYzAGc7o8R0iABQjy/Project-M4-1--Next.js--share-?node-id=9-2284)

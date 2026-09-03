@@ -81,7 +81,7 @@ body:has(.admin-workspace) > .site-footer {
   position: fixed;
   transform: translateY(calc(-100% - var(--hb-space-4)));
   transition: transform var(--hb-duration-fast) ease;
-  z-index: 10;
+  z-index: 40;
 }
 
 .skip-link:focus {
@@ -91,7 +91,16 @@ body:has(.admin-workspace) > .site-footer {
 .site-header {
   background: var(--hb-color-surface);
   border-block-end: 1px solid var(--hb-color-border);
+  inset-block-start: 0;
+  position: sticky;
   width: 100%;
+  z-index: 30;
+}
+
+#main-content,
+#top,
+#catalog-title {
+  scroll-margin-block-start: 5.5rem;
 }
 
 .site-header__inner {
@@ -477,6 +486,12 @@ h1 {
 }
 
 @media (min-width: 64rem) {
+  #main-content,
+  #top,
+  #catalog-title {
+    scroll-margin-block-start: 7.25rem;
+  }
+
   .site-header__inner {
     flex-wrap: nowrap;
     min-height: 6.25rem;
