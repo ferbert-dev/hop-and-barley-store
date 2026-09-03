@@ -272,15 +272,19 @@ test.describe('connected administrator product management', () => {
           '../web/public/assets/products/caramel-malt.webp',
         ),
       );
-    const updateResponse = page.waitForResponse(
-      (response) =>
-        /\/api\/v1\/admin\/products\/[0-9a-f-]+$/i.test(response.url()) &&
-        response.request().method() === 'PATCH',
-    );
+    const updateResult = page
+      .waitForResponse(
+        (response) =>
+          /\/api\/v1\/admin\/products\/[0-9a-f-]+$/i.test(response.url()) &&
+          response.request().method() === 'PATCH',
+      )
+      .then(async (response) => ({
+        body: (await response.json()) as { imagePath: string },
+        status: response.status(),
+      }));
     await page.getByRole('button', { name: 'Save changes' }).click();
-    const updatedResponse = await updateResponse;
-    expect(updatedResponse.status()).toBe(200);
-    const updated = (await updatedResponse.json()) as { imagePath: string };
+    const { body: updated, status: updatedStatus } = await updateResult;
+    expect(updatedStatus).toBe(200);
     expect(updated.imagePath).not.toBe(created.imagePath);
     await expect
       .poll(async () =>
