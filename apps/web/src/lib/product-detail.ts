@@ -88,7 +88,7 @@ function normalizeProductDetail(value: unknown): ProductDetailProduct {
     (priceMinor as number) < 0 ||
     !Number.isSafeInteger(stockAmount) ||
     (stockAmount as number) < 0 ||
-    currency !== 'USD' ||
+    currency !== 'EUR' ||
     !isNonEmptyString(teaser) ||
     !isNonEmptyString(priceQualifier) ||
     !isProductImagePath(imagePath) ||

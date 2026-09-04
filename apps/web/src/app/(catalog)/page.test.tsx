@@ -32,7 +32,7 @@ const pagedResult = {
     items: [],
     kind: 'paged' as const,
     meta: {
-      currency: 'USD' as const,
+      currency: 'EUR' as const,
       facets: { categories: [{ count: 1, name: 'Hops', slug: 'hops' }] },
       filters: {
         category: [],

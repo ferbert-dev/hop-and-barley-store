@@ -445,7 +445,7 @@ export interface components {
             /** Format: int32 */
             kitYieldVolumeMl: number | null;
             /** @enum {string} */
-            currency: "USD";
+            currency: "EUR";
             teaser: string;
             priceQualifier: string;
             /**
@@ -489,7 +489,7 @@ export interface components {
             /** @enum {string} */
             sort: "name-asc" | "name-desc" | "price-asc" | "price-desc";
             /** @enum {string} */
-            currency: "USD";
+            currency: "EUR";
             filters: components["schemas"]["CatalogFiltersDto"];
             facets: components["schemas"]["CatalogFacetsDto"];
         };
@@ -531,7 +531,7 @@ export interface components {
             /** Format: int32 */
             kitYieldVolumeMl: number | null;
             /** @enum {string} */
-            currency: "USD";
+            currency: "EUR";
             teaser: string;
             priceQualifier: string;
             /**
@@ -578,7 +578,7 @@ export interface components {
         };
         CartDto: {
             /** @enum {string} */
-            currency: "USD";
+            currency: "EUR";
             items: components["schemas"]["CartItemDto"][];
             /** Format: int32 */
             distinctItemCount: number;
@@ -704,7 +704,7 @@ export interface components {
              */
             priceMinor: number;
             /** @enum {string} */
-            currency: "USD";
+            currency: "EUR";
             priceQualifier: string;
             category: components["schemas"]["ProductCategoryDto"];
             /** @enum {string} */
@@ -751,7 +751,7 @@ export interface components {
             /** @enum {string} */
             sort: "name-asc" | "name-desc" | "price-asc" | "price-desc";
             /** @enum {string} */
-            currency: "USD";
+            currency: "EUR";
             filters: components["schemas"]["AdminProductListFiltersDto"];
             facets: components["schemas"]["AdminProductListFacetsDto"];
         };
@@ -774,7 +774,7 @@ export interface components {
             description: string;
             teaser?: string;
             /**
-             * @description Positive USD decimal string with one or two fractional digits; minor units must fit int32.
+             * @description Positive EUR decimal string with one or two fractional digits; minor units must fit int32.
              * @example 5.99
              */
             price: string;
@@ -822,7 +822,7 @@ export interface components {
             /** Format: int32 */
             priceMinor: number;
             /** @enum {string} */
-            currency: "USD";
+            currency: "EUR";
             /** @enum {string} */
             priceQualifier: "per 100g" | "per package" | "per kit";
             category: components["schemas"]["AdminProductCreateCategoryDto"];
@@ -862,7 +862,7 @@ export interface components {
             description: string;
             teaser?: string;
             /**
-             * @description Positive USD decimal string with one or two fractional digits; minor units must fit int32.
+             * @description Positive EUR decimal string with one or two fractional digits; minor units must fit int32.
              * @example 5.99
              */
             price: string;
@@ -960,7 +960,7 @@ export interface components {
             /** @enum {string} */
             paymentState: "paid" | "due_on_delivery";
             /** @enum {string} */
-            currency: "USD";
+            currency: "EUR" | "USD";
             items: components["schemas"]["OrderItemDto"][];
             /** Format: int32 */
             itemSubtotalMinor: number;

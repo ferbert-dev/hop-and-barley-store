@@ -212,7 +212,8 @@ backstop; repository rules should keep that check required before merge.
 
 Implemented now:
 
-- `Product` and `Category` database models using integer minor currency units;
+- `Product` and `Category` database models using integer minor currency units,
+  with EUR as the current product currency;
 - repeatable catalog migrations and 12 deterministic products across five categories;
 - `GET /api/v1/products`;
 - `GET /api/v1/products/:slug` and one responsive detail template for all 12
@@ -223,7 +224,8 @@ Implemented now:
   loading, empty, invalid, and API-unavailable states;
 - guest carts with expiring stock reservations and server-owned totals;
 - transactional cash-on-delivery order creation with immutable commercial
-  snapshots;
+  snapshots, EUR 5 delivery for new orders, and saved-currency preservation for
+  historical orders;
 - measured sale rules for bulk weight, packages, and kits, including kg entry,
   known package net weight, and aggregate kit yield;
 - Nest-owned email/password registration, login, and opaque sessions;

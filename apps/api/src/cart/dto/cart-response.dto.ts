@@ -95,8 +95,8 @@ export class CartItemDto {
 }
 
 export class CartDto {
-  @ApiProperty({ enum: ['USD'], type: String })
-  currency!: 'USD';
+  @ApiProperty({ enum: ['EUR'], type: String })
+  currency!: 'EUR';
 
   @ApiProperty({ type: () => [CartItemDto] })
   items!: CartItemDto[];

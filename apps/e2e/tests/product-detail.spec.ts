@@ -91,7 +91,7 @@ test.describe('database-backed product details', () => {
       page.getByRole('button', { name: /^Add .+ to Cart$/ }),
     ).toBeVisible();
     await expect(
-      page.getByRole('main').getByText('US$5.99', { exact: true }).first(),
+      page.getByRole('main').getByText('€5.99', { exact: true }).first(),
     ).toBeVisible();
     const specificationTerms = page.getByRole('term');
     expect(await specificationTerms.allTextContents()).toEqual([
@@ -203,7 +203,7 @@ test.describe('database-backed product details', () => {
           .getByLabel('Quantity'),
       ).toHaveValue('0.3');
       await expect(
-        page.getByLabel('Cart summary').getByText('US$28.50'),
+        page.getByLabel('Cart summary').getByText('€28.50'),
       ).toBeVisible();
       await page.reload();
       await expect(
@@ -212,7 +212,7 @@ test.describe('database-backed product details', () => {
           .getByLabel('Quantity'),
       ).toHaveValue('0.3');
       await expect(
-        page.getByLabel('Cart summary').getByText('US$28.50'),
+        page.getByLabel('Cart summary').getByText('€28.50'),
       ).toBeVisible();
     } finally {
       await clearGuestCart(page);
@@ -668,7 +668,7 @@ async function interceptEmptyCart(page: Page) {
         body: JSON.stringify({
           adjustmentMessage: null,
           checkoutEligible: false,
-          currency: 'USD',
+          currency: 'EUR',
           distinctItemCount: 0,
           items: [],
           serverNow: new Date().toISOString(),

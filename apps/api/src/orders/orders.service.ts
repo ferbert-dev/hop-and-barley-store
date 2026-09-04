@@ -246,7 +246,7 @@ export class OrdersService {
           data: {
             cartId: context.cartId,
             city: checkout.city,
-            currency: 'USD',
+            currency: 'EUR',
             fullName: checkout.fullName,
             idempotencyKey: context.idempotencyKey,
             itemSubtotalMinor,
@@ -456,7 +456,7 @@ function allocationUnavailable(
 
 function toOrderDto(order: StoredOrder): OrderDto {
   return {
-    currency: 'USD',
+    currency: requireOrderCurrency(order.currency),
     id: order.id,
     itemSubtotalMinor: order.itemSubtotalMinor,
     items: order.items,
@@ -477,4 +477,11 @@ function toOrderDto(order: StoredOrder): OrderDto {
     status: order.status.toLowerCase() as OrderDto['status'],
     totalMinor: order.totalMinor,
   };
+}
+
+function requireOrderCurrency(currency: string): OrderDto['currency'] {
+  if (currency !== 'EUR' && currency !== 'USD') {
+    throw new TypeError('Stored order currency is invalid');
+  }
+  return currency;
 }

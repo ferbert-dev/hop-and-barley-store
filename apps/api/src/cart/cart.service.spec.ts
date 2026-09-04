@@ -20,7 +20,7 @@ describe('CartService desired-amount cart', () => {
   it('returns a public empty cart without reservation-derived fields', () => {
     const cart = new CartService({} as PrismaService).empty();
     expect(cart).toEqual({
-      currency: 'USD',
+      currency: 'EUR',
       distinctItemCount: 0,
       items: [],
       subtotalMinor: 0,
@@ -159,7 +159,7 @@ function product(overrides: Record<string, unknown> = {}) {
     activeFrom: null,
     activeUntil: null,
     amountUnit: 'EACH',
-    currency: 'USD',
+    currency: 'EUR',
     id: productId,
     imagePath: '/assets/products/fixture.webp',
     isActive: true,

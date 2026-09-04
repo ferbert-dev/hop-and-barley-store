@@ -259,8 +259,14 @@ const safeOrder: components['schemas']['OrderDto'] = {
 };
 void safeOrder;
 
+const safeCurrentOrder: components['schemas']['OrderDto'] = {
+  ...safeOrder,
+  currency: 'EUR',
+};
+void safeCurrentOrder;
+
 const safeCart: components['schemas']['CartDto'] = {
-  currency: 'USD',
+  currency: 'EUR',
   distinctItemCount: 1,
   items: [
     {
@@ -357,7 +363,7 @@ const detail: components['schemas']['ProductDetailDto'] = {
   amountUnit: 'MILLIGRAM',
   availability: 'in-stock',
   category: { name: 'Hops', slug: 'hops' },
-  currency: 'USD',
+  currency: 'EUR',
   description: 'Three-paragraph detail copy',
   id: '20000000-0000-4000-8000-000000000001',
   imagePath: '/assets/products/citra-hops.webp',

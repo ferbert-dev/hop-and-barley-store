@@ -308,7 +308,7 @@ async function startCountingUpstream() {
     response.end(
       JSON.stringify([
         {
-          currency: 'USD',
+          currency: 'EUR',
           description: `Production cache response ${attempt}`,
           id: '10000000-0000-4000-8000-000000000001',
           name: `${search} response ${attempt}`,
@@ -355,7 +355,7 @@ function respondWithProductDetail(slug: string, response: ServerResponse) {
     amountUnit: 'MILLIGRAM',
     availability: slug === 'citra-hops' ? 'out-of-stock' : 'in-stock',
     category: { name: 'Hops', slug: 'hops' },
-    currency: 'USD',
+    currency: 'EUR',
     description:
       'A focused runtime product description.\n\nThe second paragraph proves the shared detail template.',
     id:

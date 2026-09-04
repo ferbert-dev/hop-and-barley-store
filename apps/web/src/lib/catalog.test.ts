@@ -8,7 +8,7 @@ import {
 import { DEFAULT_CATALOG_QUERY } from '../features/catalog/catalog-query';
 
 const legacyItem = {
-  currency: 'USD',
+  currency: 'EUR',
   description: 'Bright whole-cone hops',
   id: '20000000-0000-4000-8000-000000000002',
   name: 'Cascade Hops',
@@ -35,7 +35,7 @@ const pagedItem = {
 };
 
 const meta = {
-  currency: 'USD',
+  currency: 'EUR',
   facets: { categories: [{ count: 1, name: 'Hops', slug: 'hops' }] },
   filters: {
     category: [],

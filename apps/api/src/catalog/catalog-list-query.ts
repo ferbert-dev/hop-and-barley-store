@@ -36,7 +36,7 @@ export function buildCatalogProductWhere(
   evaluatedAt = new Date(),
 ): Prisma.ProductWhereInput {
   const where: Prisma.ProductWhereInput = {
-    currency: 'USD',
+    currency: 'EUR',
     ...(visibility === 'public'
       ? {
           ...buildPublicProductLifecycleWhere(evaluatedAt),
@@ -89,7 +89,7 @@ export function buildCatalogFacetQuery(
         evaluatedAt,
       )
     : {
-        currency: 'USD' as const,
+        currency: 'EUR' as const,
         ...(visibility === 'public'
           ? buildPublicProductLifecycleWhere(evaluatedAt)
           : {}),
@@ -114,7 +114,7 @@ export function buildCatalogFacetQuery(
         : {}),
       products: {
         some: {
-          currency: 'USD',
+          currency: 'EUR',
           ...(visibility === 'public'
             ? buildPublicProductLifecycleWhere(evaluatedAt)
             : {}),
@@ -141,7 +141,7 @@ export function buildCatalogSearchFacetQuery(
       SELECT 1
       FROM "Product" visible
       WHERE visible."categoryId" = c."id"
-        AND visible."currency" = 'USD'
+        AND visible."currency" = 'EUR'
         AND visible."isActive" = true
         AND (visible."activeFrom" IS NULL OR visible."activeFrom" <= ${evaluatedAt})
         AND (visible."activeUntil" IS NULL OR visible."activeUntil" > ${evaluatedAt})
@@ -209,7 +209,7 @@ function buildCatalogSearchProductWhere(
       : sql`AND p."priceMinor" <= ${query.maxPriceMinor}`;
 
   return sql`
-    p."currency" = 'USD'
+    p."currency" = 'EUR'
     AND p."isActive" = true
     AND (p."activeFrom" IS NULL OR p."activeFrom" <= ${evaluatedAt})
     AND (p."activeUntil" IS NULL OR p."activeUntil" > ${evaluatedAt})

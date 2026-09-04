@@ -13,7 +13,7 @@ const response = {
     product('EXPIRED', true, 5),
   ],
   meta: {
-    currency: 'USD' as const,
+    currency: 'EUR' as const,
     facets: { categories: [{ name: 'Hops', slug: 'hops' }] },
     filters: {
       category: null,
@@ -114,7 +114,7 @@ function product(
     amountUnit: 'MILLIGRAM' as const,
     category: { name: 'Hops', slug: 'hops' },
     createdAt: '2026-08-28T10:00:00.000Z',
-    currency: 'USD' as const,
+    currency: 'EUR' as const,
     description: 'Citrus and floral whole-cone hops.',
     imagePath: '/assets/products/cascade-hops.webp',
     id: `20000000-0000-4000-8000-${String(idSuffix).padStart(12, '0')}`,

@@ -1,4 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsIn } from 'class-validator';
+
+export const ORDER_CURRENCIES = ['EUR', 'USD'] as const;
+export type OrderCurrency = (typeof ORDER_CURRENCIES)[number];
 
 export class OrderItemDto {
   @ApiProperty({ pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', type: String })
@@ -72,8 +76,9 @@ export class OrderDto {
   @ApiProperty({ enum: ['paid', 'due_on_delivery'], type: String })
   paymentState!: 'paid' | 'due_on_delivery';
 
-  @ApiProperty({ enum: ['USD'], type: String })
-  currency!: 'USD';
+  @ApiProperty({ enum: ORDER_CURRENCIES, type: String })
+  @IsIn(ORDER_CURRENCIES)
+  currency!: OrderCurrency;
 
   @ApiProperty({ type: () => [OrderItemDto] })
   items!: OrderItemDto[];

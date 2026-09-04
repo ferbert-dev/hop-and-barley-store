@@ -35,8 +35,8 @@ export class AdminProductListItemDto {
   @ApiProperty({ example: 499, format: 'int32', minimum: 0, type: 'integer' })
   priceMinor!: number;
 
-  @ApiProperty({ enum: ['USD'], type: String })
-  currency!: 'USD';
+  @ApiProperty({ enum: ['EUR'], type: String })
+  currency!: 'EUR';
 
   @ApiProperty({ type: String })
   priceQualifier!: string;
@@ -143,8 +143,8 @@ export class AdminProductListMetaDto {
   @ApiProperty({ enum: CATALOG_SORT_VALUES, type: String })
   sort!: CatalogSort;
 
-  @ApiProperty({ enum: ['USD'], type: String })
-  currency!: 'USD';
+  @ApiProperty({ enum: ['EUR'], type: String })
+  currency!: 'EUR';
 
   @ApiProperty({ type: () => AdminProductListFiltersDto })
   filters!: AdminProductListFiltersDto;

@@ -93,7 +93,7 @@ export class AdminProductCreationService {
       throw new BadRequestException({ status: 'invalid-product-category' });
     }
 
-    const priceMinor = parseUsdMinor(dto.price);
+    const priceMinor = parseEurMinor(dto.price);
     const stockAmount = parseCanonicalInteger(
       dto.stockAmount,
       0,
@@ -120,7 +120,7 @@ export class AdminProductCreationService {
           activeUntil,
           ...sale,
           category: { connect: { id: category.id } },
-          currency: 'USD',
+          currency: 'EUR',
           description: dto.description,
           imagePath: storedAsset.imagePath,
           isActive: dto.isActive === 'true',
@@ -141,7 +141,7 @@ export class AdminProductCreationService {
         ...created,
         activeFrom: created.activeFrom ?? activeFrom,
         amountUnit: sale.amountUnit,
-        currency: 'USD',
+        currency: 'EUR',
         priceQualifier: sale.priceQualifier,
         saleKind: dto.saleKind,
         specifications,
@@ -172,7 +172,7 @@ export class AdminProductCreationService {
         product.saleKind === 'WEIGHT'
           ? ('MILLIGRAM' as const)
           : ('EACH' as const),
-      currency: 'USD',
+      currency: requireEurCurrency(product.currency),
       priceQualifier:
         product.saleKind === 'WEIGHT'
           ? ('per 100g' as const)
@@ -203,7 +203,7 @@ export class AdminProductCreationService {
     if (!category) {
       throw new BadRequestException({ status: 'invalid-product-category' });
     }
-    const priceMinor = parseUsdMinor(dto.price);
+    const priceMinor = parseEurMinor(dto.price);
     const stockAmount = parseCanonicalInteger(
       dto.stockAmount,
       0,
@@ -304,7 +304,7 @@ function createTeaser(description: string): string {
   return Array.from(normalized).slice(0, 160).join('');
 }
 
-function parseUsdMinor(value: string): number {
+function parseEurMinor(value: string): number {
   const match = /^(0|[1-9]\d{0,7})\.(\d{1,2})$/.exec(value);
   if (!match) {
     throw new BadRequestException({ status: 'invalid-product-price' });
@@ -316,6 +316,13 @@ function parseUsdMinor(value: string): number {
     throw new BadRequestException({ status: 'invalid-product-price' });
   }
   return minor;
+}
+
+function requireEurCurrency(currency: string): 'EUR' {
+  if (currency !== 'EUR') {
+    throw new TypeError('Stored product currency is invalid');
+  }
+  return currency;
 }
 
 function resolvePackageNetWeight(

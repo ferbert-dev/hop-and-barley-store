@@ -7,7 +7,7 @@ describe('catalog Product Type facets', () => {
   it('discovers public selectors from categories with matching products', () => {
     expect(buildCatalogFacetQuery('public')).toMatchObject({
       where: {
-        products: { some: { currency: 'USD' } },
+        products: { some: { currency: 'EUR' } },
       },
     });
     expect(buildCatalogFacetQuery('public').where).not.toHaveProperty('slug');
@@ -16,7 +16,7 @@ describe('catalog Product Type facets', () => {
   it('includes every product type supported by the admin editor', () => {
     expect(buildCatalogFacetQuery('admin')).toMatchObject({
       where: {
-        products: { some: { currency: 'USD' } },
+        products: { some: { currency: 'EUR' } },
         slug: { in: ['hops', 'malts', 'yeast', 'adjuncts', 'kits'] },
       },
     });
@@ -34,7 +34,7 @@ describe('catalog Product Type facets', () => {
     });
 
     expect(query.select._count.select.products.where).toMatchObject({
-      currency: 'USD',
+      currency: 'EUR',
       priceMinor: { gte: 500 },
     });
     expect(query.select._count.select.products.where).not.toHaveProperty(
@@ -63,7 +63,7 @@ describe('public product activity windows', () => {
           OR: [{ activeUntil: null }, { activeUntil: { gt: evaluatedAt } }],
         },
       ],
-      currency: 'USD',
+      currency: 'EUR',
       isActive: true,
     });
   });
@@ -75,6 +75,6 @@ describe('public product activity windows', () => {
         'admin',
         evaluatedAt,
       ),
-    ).toEqual({ currency: 'USD' });
+    ).toEqual({ currency: 'EUR' });
   });
 });

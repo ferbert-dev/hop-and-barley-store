@@ -6,6 +6,13 @@
 
 This document is the navigation index for the supplied design. It records only what is visible in that file plus requirements explicitly agreed by the user. It is not evidence that any behavior is implemented.
 
+**User-confirmed currency decision — O2C, 2026-09-04:** Current product,
+catalog, cart, checkout, and admin price surfaces use EUR with unchanged numeric
+prices, and delivery is EUR 5. Historical orders continue to display their
+saved currency and amounts. This product decision supersedes the design's
+sample dollar labels without otherwise changing the approved layouts; category
+records have no currency field or selector.
+
 ## Evidence labels
 
 - **Confirmed by the design** — visible layer, text, control, state, or neighboring frame.
@@ -331,7 +338,7 @@ Page 1 (0:1)
 
 **Unclear — ask the user**
 
-- Empty cart, removal undo/confirmation, stock conflicts, recalculation/loading/error behavior, taxes, shipping, discounts, and currency rules.
+- Empty cart, removal undo/confirmation, stock conflicts, recalculation/loading/error behavior, taxes, shipping, and discounts.
 
 **User-confirmed quantity extension — 2026-08-27**
 
@@ -480,7 +487,7 @@ These additions define required behavior only. The implementation may use the sm
 
 **Unclear — ask the user**
 
-- Whether a row opens order details, the complete status vocabulary/order, tracking/cancellation/returns, empty/loading/error states, page size, and date/currency formatting.
+- Whether a row opens order details, the complete status vocabulary/order, tracking/cancellation/returns, empty/loading/error states, page size, and date formatting. Currency formatting follows each order's saved currency.
 
 ### Admin product list — `admin/products`
 
@@ -510,7 +517,7 @@ These additions define required behavior only. The implementation may use the sm
 
 **Unclear — ask the user**
 
-- Whether this frame serves both add and edit, why it says `Shipping information`, category values, image constraints/crop/preview, price units/currency, validation, save success/error, hide semantics, and delete confirmation/rollback.
+- Whether this frame serves both add and edit, why it says `Shipping information`, category values, image constraints/crop/preview, price units, validation, save success/error, hide semantics, and delete confirmation/rollback. Current prices are EUR; categories remain currency-free.
 
 ### Admin dashboard — `admin/Dashboard`
 

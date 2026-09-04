@@ -134,7 +134,7 @@ test.describe('connected administrator product management', () => {
     }
 
     await expect(
-      visibleProductSurface.getByText(/\$\s?\d[\d,.]*\.\d{2}/).first(),
+      visibleProductSurface.getByText(/€\s?\d[\d,.]*\.\d{2}/).first(),
     ).toBeVisible();
     await expect(
       visibleProductSurface
@@ -202,7 +202,7 @@ test.describe('connected administrator product management', () => {
     await page
       .getByLabel('Description', { exact: true })
       .fill('A connected browser proof for administrator product creation.');
-    await page.getByLabel('Price (USD)').fill('5.99');
+    await page.getByLabel('Price (EUR)').fill('5.99');
     await page.getByLabel('Stock (kg)').fill('1.2');
     await page.getByLabel('Active from').fill('2099-01-01T00:00');
     await page

@@ -82,11 +82,11 @@ export class AdminProductListService {
     return {
       items: products.map((product) => ({
         ...product,
-        currency: 'USD',
+        currency: 'EUR',
         lifecycleStatus: resolveAdminProductLifecycle(product, evaluatedAt),
       })),
       meta: {
-        currency: 'USD',
+        currency: 'EUR',
         facets: {
           categories: categories.map(({ name, slug }) => ({ name, slug })),
         },

@@ -26,7 +26,7 @@ test.describe('measured product quantities', () => {
     await expect(page.getByRole('combobox')).toHaveCount(0);
     await expect(amount).toHaveValue('0.1');
     await expect(
-      page.getByText('US$5.99', { exact: true }).first(),
+      page.getByText('€5.99', { exact: true }).first(),
     ).toBeVisible();
 
     const increase = page.getByRole('button', {
@@ -38,7 +38,7 @@ test.describe('measured product quantities', () => {
     await increase.click();
     await expect(amount).toHaveValue('0.2');
     await expect(
-      page.getByText('US$11.98', { exact: true }).first(),
+      page.getByText('€11.98', { exact: true }).first(),
     ).toBeVisible();
     await decrease.click();
     await expect(amount).toHaveValue('0.1');
@@ -49,21 +49,21 @@ test.describe('measured product quantities', () => {
     await expect(page.getByText(/selected$/i)).toHaveCount(0);
     await expect(page.getByText(/^Price\b/)).toBeVisible();
     await expect(
-      page.getByText('US$53.91', { exact: true }).first(),
+      page.getByText('€53.91', { exact: true }).first(),
     ).toBeVisible();
 
     await amount.fill('10');
     await amount.press('Tab');
     await expect(amount).toHaveValue('10');
     await expect(
-      page.getByText('US$599.00', { exact: true }).first(),
+      page.getByText('€599.00', { exact: true }).first(),
     ).toBeVisible();
 
     await amount.fill('100');
     await amount.press('Tab');
     await expect(amount).toHaveValue('100');
     await expect(
-      page.getByText('US$5,990.00', { exact: true }).first(),
+      page.getByText('€5,990.00', { exact: true }).first(),
     ).toBeVisible();
 
     await expect(addSelectedAmount(page)).resolves.toEqual({
@@ -117,7 +117,7 @@ test.describe('measured product quantities', () => {
     await amount.fill('0.9');
     await amount.press('Tab');
     await expect(
-      page.getByText('US$53.91', { exact: true }).first(),
+      page.getByText('€53.91', { exact: true }).first(),
     ).toBeVisible();
 
     await expect(addSelectedAmount(page)).resolves.toEqual({
@@ -136,7 +136,7 @@ test.describe('measured product quantities', () => {
       page.getByLabel('Citra Hops quantity').getByLabel('Quantity'),
     ).toHaveValue('0.9');
     await expect(
-      page.getByLabel('Cart summary').getByText('US$53.91'),
+      page.getByLabel('Cart summary').getByText('€53.91'),
     ).toBeVisible();
 
     await page.reload();
@@ -144,7 +144,7 @@ test.describe('measured product quantities', () => {
       page.getByLabel('Citra Hops quantity').getByLabel('Quantity'),
     ).toHaveValue('0.9');
     await expect(
-      page.getByLabel('Cart summary').getByText('US$53.91'),
+      page.getByLabel('Cart summary').getByText('€53.91'),
     ).toBeVisible();
   });
 
@@ -244,7 +244,7 @@ test.describe('measured product quantities', () => {
     await page.keyboard.press('Tab');
     await expect(amount).toHaveValue('0.9');
     await expect(
-      page.getByText('US$53.91', { exact: true }).first(),
+      page.getByText('€53.91', { exact: true }).first(),
     ).toBeVisible();
 
     const increase = page.getByRole('button', {

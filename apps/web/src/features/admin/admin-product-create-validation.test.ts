@@ -21,7 +21,7 @@ const input = {
 };
 
 describe('admin product creation validation', () => {
-  it('converts weight stock exactly to canonical milligrams and normalizes USD', () => {
+  it('converts weight stock exactly to canonical milligrams and normalizes EUR', () => {
     const result = validateAdminProductCreate(input);
 
     expect(result).toMatchObject({

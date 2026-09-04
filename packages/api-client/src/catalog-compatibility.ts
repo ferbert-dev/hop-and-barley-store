@@ -175,13 +175,13 @@ function projectCommonProduct(
     !SLUG.test(value.slug) ||
     typeof value.description !== 'string' ||
     !isInt32(value.priceMinor) ||
-    value.currency !== 'USD'
+    value.currency !== 'EUR'
   ) {
     fail();
   }
 
   return {
-    currency: 'USD',
+    currency: 'EUR',
     description: value.description,
     id: value.id,
     name: value.name,
@@ -248,7 +248,7 @@ function projectMeta(value: unknown): {
     typeof value.hasPreviousPage !== 'boolean' ||
     typeof value.sort !== 'string' ||
     !SORT_VALUES.has(value.sort) ||
-    value.currency !== 'USD'
+    value.currency !== 'EUR'
   ) {
     fail();
   }
@@ -268,7 +268,7 @@ function projectMeta(value: unknown): {
   return {
     kind,
     meta: {
-      currency: 'USD',
+      currency: 'EUR',
       facets: { categories: projectedCategories },
       filters,
       hasNextPage: value.hasNextPage,

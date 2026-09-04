@@ -108,7 +108,7 @@ export class CartService {
 
   empty(): CartDto {
     return {
-      currency: 'USD',
+      currency: 'EUR',
       distinctItemCount: 0,
       items: [],
       subtotalMinor: 0,
@@ -502,7 +502,7 @@ async function requireCartProduct(
   if (
     !product ||
     !isPublicProductEligible(product, evaluatedAt) ||
-    product.currency !== 'USD'
+    product.currency !== 'EUR'
   ) {
     unavailable();
   }
@@ -608,10 +608,10 @@ async function loadCart(
 
 function toCartDto(cart: StoredCart, evaluatedAt: Date): CartDto {
   const items: CartItemDto[] = cart.items.map(({ product, amount }) => {
-    const isUsdActive =
+    const isEurActive =
       isPublicProductEligible(product, evaluatedAt) &&
-      product.currency === 'USD';
-    let priceMinor = isUsdActive ? product.priceMinor : null;
+      product.currency === 'EUR';
+    let priceMinor = isEurActive ? product.priceMinor : null;
     let lineTotalMinor: number | null = null;
     if (priceMinor !== null) {
       try {
@@ -655,7 +655,7 @@ function toCartDto(cart: StoredCart, evaluatedAt: Date): CartDto {
     }
   }
   return {
-    currency: 'USD',
+    currency: 'EUR',
     distinctItemCount: items.length,
     items,
     subtotalMinor,

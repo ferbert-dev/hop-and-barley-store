@@ -21,7 +21,7 @@ vi.mock('next/image', () => ({
 }));
 
 const cart: Cart = {
-  currency: 'USD',
+  currency: 'EUR',
   distinctItemCount: 1,
   items: [
     {
@@ -100,8 +100,7 @@ describe('CartScreen', () => {
     expect(
       screen.getByText(
         (_content, element) =>
-          element?.tagName === 'P' &&
-          element.textContent === 'US$5.99 per 100g',
+          element?.tagName === 'P' && element.textContent === '€5.99 per 100g',
       ),
     ).toBeVisible();
     expect(screen.getByLabelText('Quantity')).toHaveValue('0.1');
@@ -256,7 +255,7 @@ describe('CartScreen', () => {
     );
 
     expect(screen.getByLabelText('Quantity')).toHaveValue('0.2');
-    expect(screen.getAllByText('US$11.98')).toHaveLength(2);
+    expect(screen.getAllByText('€11.98')).toHaveLength(2);
     expect(
       screen.queryByText(/updating from the store/i),
     ).not.toBeInTheDocument();

@@ -41,7 +41,7 @@ test.describe('API-backed guest cart', () => {
       page.getByRole('heading', { name: 'Citra Hops' }),
     ).toBeVisible();
     await expect(
-      page.getByLabel('Cart summary').getByText('US$5.99'),
+      page.getByLabel('Cart summary').getByText('€5.99'),
     ).toBeVisible();
 
     const updateResponse = page.waitForResponse(
@@ -57,7 +57,7 @@ test.describe('API-backed guest cart', () => {
       quantityForm(page, 'Citra Hops').getByLabel('Quantity'),
     ).toHaveValue('0.2');
     await expect(
-      page.getByLabel('Cart summary').getByText('US$11.98'),
+      page.getByLabel('Cart summary').getByText('€11.98'),
     ).toBeVisible();
 
     await seedCartLine(page, 'mosaic-hops');
@@ -376,7 +376,7 @@ test.describe('cart unavailable state', () => {
 });
 
 type CartFixture = Readonly<{
-  currency: 'USD';
+  currency: 'EUR';
   distinctItemCount: number;
   items: CartFixtureItem[];
   subtotalMinor: number;
@@ -433,7 +433,7 @@ function cartFixture({
   items,
 }: Readonly<{ items: CartFixtureItem[] }>): CartFixture {
   return {
-    currency: 'USD',
+    currency: 'EUR',
     distinctItemCount: items.length,
     items,
     subtotalMinor: items.reduce(

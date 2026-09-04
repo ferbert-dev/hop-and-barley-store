@@ -20,7 +20,7 @@ const activeCart: ActiveCartCapability = {
   rawToken,
 };
 const cart: CartDto = {
-  currency: 'USD',
+  currency: 'EUR',
   distinctItemCount: 1,
   items: [
     {
@@ -54,7 +54,7 @@ describe('Cart API security contract (e2e)', () => {
       Promise.resolve(candidate === rawToken ? activeCart : null),
     ),
     clear: jest.fn().mockResolvedValue({
-      currency: 'USD',
+      currency: 'EUR',
       distinctItemCount: 0,
       items: [],
       subtotalMinor: 0,
@@ -76,7 +76,7 @@ describe('Cart API security contract (e2e)', () => {
       rawToken,
     }),
     empty: jest.fn().mockReturnValue({
-      currency: 'USD',
+      currency: 'EUR',
       distinctItemCount: 0,
       items: [],
       subtotalMinor: 0,

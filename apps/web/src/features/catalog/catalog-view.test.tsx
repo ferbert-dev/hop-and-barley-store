@@ -37,7 +37,7 @@ const query: CatalogQuery = { limit: 12, page: 1, sort: 'name-asc' };
 const product = {
   availability: 'in-stock' as const,
   category: { name: 'Hops', slug: 'hops' },
-  currency: 'USD' as const,
+  currency: 'EUR' as const,
   description: 'Bright whole-cone hops',
   id: '20000000-0000-4000-8000-000000000002',
   imagePath: '/assets/products/cascade-hops.webp',
@@ -71,7 +71,7 @@ function pagedResult(
       items: [product],
       kind: 'paged',
       meta: {
-        currency: 'USD',
+        currency: 'EUR',
         facets: {
           categories: [
             { count: 3, name: 'Hops', slug: 'hops' },
@@ -113,6 +113,7 @@ describe('catalog discovery screen', () => {
       screen.getByRole('search', { name: 'Search products' }),
     ).toBeVisible();
     expect(screen.getByRole('button', { name: 'Filters' })).toBeVisible();
+    expect(screen.getByText('€7.49')).toBeVisible();
     expect(
       screen.getByRole('button', { name: 'Sort by: Name A–Z' }),
     ).toBeInTheDocument();
@@ -467,7 +468,7 @@ describe('catalog discovery screen', () => {
             capabilities: { facets: 'unavailable', pagination: 'unavailable' },
             items: [
               {
-                currency: 'USD',
+                currency: 'EUR',
                 description: product.description,
                 id: product.id,
                 name: product.name,

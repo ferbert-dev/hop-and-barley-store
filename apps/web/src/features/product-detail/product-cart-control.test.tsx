@@ -25,7 +25,7 @@ const quantityMetadata = {
 };
 
 const emptyCart: Cart = {
-  currency: 'USD',
+  currency: 'EUR',
   distinctItemCount: 0,
   items: [],
   subtotalMinor: 0,
@@ -125,6 +125,7 @@ function renderControl(
     <CartProvider transport={transport}>
       <ProductCartControl
         availability={availability}
+        currency="EUR"
         priceMinor={599}
         productName={productName}
         productSlug={productSlug}

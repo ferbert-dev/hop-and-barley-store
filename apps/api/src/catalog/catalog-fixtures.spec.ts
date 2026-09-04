@@ -46,14 +46,14 @@ describe('C1 catalog fixtures', () => {
     );
   });
 
-  it('defines exactly the twelve USD products using the accepted D1 paths', () => {
+  it('defines exactly the twelve EUR products using the accepted D1 paths', () => {
     expect(catalogProducts).toHaveLength(12);
     expect(new Set(catalogProducts.map(({ id }) => id)).size).toBe(12);
     expect(new Set(catalogProducts.map(({ slug }) => slug)).size).toBe(12);
 
     for (const product of catalogProducts) {
       expect(isUuid(product.id)).toBe(true);
-      expect(product.currency).toBe('USD');
+      expect(product.currency).toBe('EUR');
       expect(product.stockAmount).toBe(
         product.saleKind === 'WEIGHT' ? 100_000_000 : 100,
       );

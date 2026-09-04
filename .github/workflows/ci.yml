@@ -97,6 +97,8 @@ jobs:
         run: pnpm test:o2:postgres
       - name: Verify measured quantities, pricing, backfills, and checkout
         run: pnpm test:o2q:postgres
+      - name: Verify EUR currency migration and historical order preservation
+        run: pnpm test:o2c:postgres
       - name: Verify the A1B Argon2 resource profile
         run: pnpm test:a1b:argon2:alpine
 

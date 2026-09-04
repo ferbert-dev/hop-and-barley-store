@@ -69,7 +69,7 @@ describe('AdminProductListService', () => {
         amountUnit: 'MILLIGRAM',
         category: { name: 'Hops', slug: 'hops' },
         createdAt: new Date('2026-08-01T10:00:00.000Z'),
-        currency: 'USD',
+        currency: 'EUR',
         description: 'Bright whole-cone hops',
         id: 'product-id',
         imagePath: '/assets/products/cascade-hops.webp',
@@ -109,7 +109,7 @@ describe('AdminProductListService', () => {
     const where = {
       AND: [textFilter('Café'), textFilter('hops')],
       category: { slug: 'hops' },
-      currency: 'USD',
+      currency: 'EUR',
       priceMinor: { gte: 100, lte: 900 },
     };
 
@@ -128,13 +128,13 @@ describe('AdminProductListService', () => {
       orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }, { slug: 'asc' }],
       select: {
         _count: {
-          select: { products: { where: { currency: 'USD' } } },
+          select: { products: { where: { currency: 'EUR' } } },
         },
         name: true,
         slug: true,
       },
       where: {
-        products: { some: { currency: 'USD' } },
+        products: { some: { currency: 'EUR' } },
         slug: { in: ['hops', 'malts', 'yeast', 'adjuncts', 'kits'] },
       },
     });
@@ -208,7 +208,7 @@ describe('AdminProductListService', () => {
             isActive: true,
           },
         ],
-        currency: 'USD',
+        currency: 'EUR',
       },
     });
   });

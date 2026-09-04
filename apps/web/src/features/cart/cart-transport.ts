@@ -179,7 +179,7 @@ function assertPrivateResponse(response: Response) {
 function isCart(value: unknown): value is Cart {
   if (
     !isRecord(value) ||
-    value.currency !== 'USD' ||
+    value.currency !== 'EUR' ||
     !Array.isArray(value.items)
   ) {
     return false;

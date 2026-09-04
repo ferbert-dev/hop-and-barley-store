@@ -53,7 +53,7 @@ export class CatalogService {
     const product = await this.prisma.product.findFirst({
       select: productDetailSelect,
       where: {
-        currency: 'USD',
+        currency: 'EUR',
         slug,
         ...buildPublicProductLifecycleWhere(evaluatedAt),
       },
@@ -69,7 +69,7 @@ export class CatalogService {
         product.stockAmount >= product.minimumOrderAmount
           ? 'in-stock'
           : 'out-of-stock',
-      currency: 'USD',
+      currency: 'EUR',
       specifications: parseProductSpecifications(specifications),
     };
   }
@@ -149,10 +149,10 @@ export class CatalogService {
           product.stockAmount >= product.minimumOrderAmount
             ? 'in-stock'
             : 'out-of-stock',
-        currency: 'USD',
+        currency: 'EUR',
       })),
       meta: {
-        currency: 'USD',
+        currency: 'EUR',
         facets: {
           categories,
         },
