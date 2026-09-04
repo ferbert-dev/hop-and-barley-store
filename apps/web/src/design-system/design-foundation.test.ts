@@ -196,6 +196,17 @@ describe('design foundation', () => {
     );
   });
 
+  it('keeps hero-bound header movement on the compositor', () => {
+    const css = readFileSync(globalCssPath, 'utf8');
+
+    expect(css).toMatch(
+      /\.site-header\[data-scroll-mode='hero-bound'\]\s*{[\s\S]*?transform:\s*translate3d\(0, var\(--site-header-exit-offset, 0\), 0\);/,
+    );
+    expect(css).toMatch(
+      /\.site-header\[data-scroll-mode='hero-bound'\]\s*{[\s\S]*?will-change:\s*transform;/,
+    );
+  });
+
   it('does not introduce runtime font or icon CDNs', () => {
     const sources = [
       tokenCssPath,

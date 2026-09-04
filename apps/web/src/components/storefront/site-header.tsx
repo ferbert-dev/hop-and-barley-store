@@ -75,6 +75,7 @@ function SiteHeaderDisclosure({
     if (!header) return;
 
     let animationFrame = 0;
+    let appliedOffset: number | null = null;
     const observedHeroes = new Set<HTMLElement>();
     const intersectionObserver =
       typeof IntersectionObserver === 'undefined'
@@ -89,6 +90,19 @@ function SiteHeaderDisclosure({
             scheduleHeaderOffset();
           });
 
+    const applyHeaderOffset = (offset: number) => {
+      const pixelRatio = window.devicePixelRatio || 1;
+      const devicePixelOffset = Math.round(offset * pixelRatio) / pixelRatio;
+
+      if (appliedOffset === devicePixelOffset) return;
+
+      appliedOffset = devicePixelOffset;
+      header.style.setProperty(
+        '--site-header-exit-offset',
+        `${String(devicePixelOffset)}px`,
+      );
+    };
+
     const updateHeaderOffset = () => {
       animationFrame = 0;
 
@@ -99,7 +113,7 @@ function SiteHeaderDisclosure({
         .reverse()
         .find((candidate) => candidate.getClientRects().length > 0);
       if (!hero) {
-        header.style.setProperty('--site-header-exit-offset', '0px');
+        applyHeaderOffset(0);
         return;
       }
 
@@ -110,7 +124,7 @@ function SiteHeaderDisclosure({
         Math.min(0, heroBottom - headerHeight),
       );
 
-      header.style.setProperty('--site-header-exit-offset', `${offset}px`);
+      applyHeaderOffset(offset);
     };
 
     function scheduleHeaderOffset() {
@@ -146,7 +160,7 @@ function SiteHeaderDisclosure({
         ? null
         : new MutationObserver(observeCatalogHeroes);
 
-    header.style.setProperty('--site-header-exit-offset', '0px');
+    applyHeaderOffset(0);
     updateHeaderOffset();
     observeCatalogHeroes();
     resizeObserver?.observe(header);

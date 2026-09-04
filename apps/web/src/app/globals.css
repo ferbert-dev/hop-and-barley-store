@@ -93,9 +93,13 @@ body:has(.admin-workspace) > .site-footer {
   border-block-end: 1px solid var(--hb-color-border);
   inset-block-start: 0;
   position: sticky;
-  transform: translateY(var(--site-header-exit-offset, 0));
   width: 100%;
   z-index: 30;
+}
+
+.site-header[data-scroll-mode='hero-bound'] {
+  transform: translate3d(0, var(--site-header-exit-offset, 0), 0);
+  will-change: transform;
 }
 
 #main-content,
