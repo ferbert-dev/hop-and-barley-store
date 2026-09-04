@@ -418,7 +418,7 @@
 .productGrid {
   display: grid;
   gap: clamp(1rem, 2vw, 1.5rem);
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16.75rem), 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .productCard {
@@ -513,8 +513,24 @@
     grid-template-columns: minmax(0, 1fr) auto minmax(11rem, 13rem);
   }
 
+  .productGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .filterDrawer {
     width: 23rem;
+  }
+}
+
+@media (min-width: 64rem) {
+  .productGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 80rem) {
+  .productGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
