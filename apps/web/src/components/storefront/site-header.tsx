@@ -75,6 +75,19 @@ function SiteHeaderDisclosure({
     if (!header) return;
 
     let animationFrame = 0;
+    const observedHeroes = new Set<HTMLElement>();
+    const intersectionObserver =
+      typeof IntersectionObserver === 'undefined'
+        ? null
+        : new IntersectionObserver(() => {
+            scheduleHeaderOffset();
+          });
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            scheduleHeaderOffset();
+          });
 
     const updateHeaderOffset = () => {
       animationFrame = 0;
@@ -85,7 +98,10 @@ function SiteHeaderDisclosure({
       const hero = Array.from(heroes)
         .reverse()
         .find((candidate) => candidate.getClientRects().length > 0);
-      if (!hero) return;
+      if (!hero) {
+        header.style.setProperty('--site-header-exit-offset', '0px');
+        return;
+      }
 
       const headerHeight = header.getBoundingClientRect().height;
       const heroBottom = hero.getBoundingClientRect().bottom;
@@ -97,18 +113,70 @@ function SiteHeaderDisclosure({
       header.style.setProperty('--site-header-exit-offset', `${offset}px`);
     };
 
-    const scheduleHeaderOffset = () => {
+    function scheduleHeaderOffset() {
       if (animationFrame) return;
       animationFrame = window.requestAnimationFrame(updateHeaderOffset);
+    }
+
+    const observeCatalogHeroes = () => {
+      const heroes = document.querySelectorAll<HTMLElement>(
+        '[data-catalog-hero]',
+      );
+
+      for (const hero of heroes) {
+        if (observedHeroes.has(hero)) continue;
+        observedHeroes.add(hero);
+        intersectionObserver?.observe(hero);
+        resizeObserver?.observe(hero);
+      }
+
+      scheduleHeaderOffset();
     };
 
+    const restoreHeaderOffset = () => {
+      scheduleHeaderOffset();
+    };
+
+    const restoreVisibleHeaderOffset = () => {
+      if (document.visibilityState === 'visible') scheduleHeaderOffset();
+    };
+
+    const mutationObserver =
+      typeof MutationObserver === 'undefined'
+        ? null
+        : new MutationObserver(observeCatalogHeroes);
+
+    header.style.setProperty('--site-header-exit-offset', '0px');
     updateHeaderOffset();
+    observeCatalogHeroes();
+    resizeObserver?.observe(header);
+    mutationObserver?.observe(
+      document.querySelector('#main-content') ?? document.body,
+      { childList: true, subtree: true },
+    );
+    window.addEventListener('focus', restoreHeaderOffset);
+    window.addEventListener('pageshow', restoreHeaderOffset);
     window.addEventListener('resize', scheduleHeaderOffset);
     window.addEventListener('scroll', scheduleHeaderOffset, { passive: true });
+    window.visualViewport?.addEventListener('resize', scheduleHeaderOffset);
+    document.addEventListener('visibilitychange', restoreVisibleHeaderOffset);
 
     return () => {
+      intersectionObserver?.disconnect();
+      mutationObserver?.disconnect();
+      resizeObserver?.disconnect();
+      window.removeEventListener('focus', restoreHeaderOffset);
+      window.removeEventListener('pageshow', restoreHeaderOffset);
       window.removeEventListener('resize', scheduleHeaderOffset);
       window.removeEventListener('scroll', scheduleHeaderOffset);
+      window.visualViewport?.removeEventListener(
+        'resize',
+        scheduleHeaderOffset,
+      );
+      document.removeEventListener(
+        'visibilitychange',
+        restoreVisibleHeaderOffset,
+      );
       if (animationFrame) window.cancelAnimationFrame(animationFrame);
       header.style.removeProperty('--site-header-exit-offset');
     };

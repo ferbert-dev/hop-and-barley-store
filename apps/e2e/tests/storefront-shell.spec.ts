@@ -386,6 +386,76 @@ test('keeps the header sticky only while the catalog hero owns it', async ({
   }
 });
 
+test('reconciles the hero-bound header after browser restoration', async ({
+  page,
+}) => {
+  test.skip(unavailable, 'requires the connected catalog');
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+  const header = page.getByRole('banner', {
+    name: 'Hop and Barley storefront',
+  });
+  const hero = page.getByRole('region', { name: 'Product catalog' });
+
+  await expect(hero).toBeVisible();
+  await header.evaluate((element) => {
+    element.style.setProperty(
+      '--site-header-exit-offset',
+      `${String(-element.getBoundingClientRect().height)}px`,
+    );
+    window.dispatchEvent(
+      new PageTransitionEvent('pageshow', { persisted: true }),
+    );
+  });
+  await expect
+    .poll(() =>
+      header.evaluate(
+        (element) => Math.abs(element.getBoundingClientRect().top) <= 1,
+      ),
+    )
+    .toBe(true);
+
+  await page.mouse.wheel(0, 480);
+  await expect
+    .poll(() =>
+      header.evaluate((element) => {
+        const headerBox = element.getBoundingClientRect();
+        const heroBox = document
+          .querySelector('[aria-label="Product catalog"]')!
+          .getBoundingClientRect();
+
+        return heroBox.bottom <= 0 && Math.abs(headerBox.bottom) <= 2;
+      }),
+    )
+    .toBe(true);
+
+  await page.goto('/cart', { waitUntil: 'domcontentloaded' });
+  await page.goBack({ waitUntil: 'domcontentloaded' });
+  await expect(header).toHaveAttribute('data-scroll-mode', 'hero-bound');
+
+  await page.mouse.wheel(0, -160);
+  await expect
+    .poll(() =>
+      header.evaluate((element) => {
+        const headerBox = element.getBoundingClientRect();
+        const heroBox = document
+          .querySelector('[aria-label="Product catalog"]')!
+          .getBoundingClientRect();
+
+        return (
+          heroBox.bottom > 0 &&
+          headerBox.bottom > 0 &&
+          Math.abs(
+            headerBox.bottom - Math.min(heroBox.bottom, headerBox.height),
+          ) <= 2
+        );
+      }),
+    )
+    .toBe(true);
+});
+
 test('adapts catalog columns to the usable viewport width', async ({
   page,
 }) => {
