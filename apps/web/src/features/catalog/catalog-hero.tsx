@@ -22,7 +22,12 @@ export function CatalogHero({
   const hero = assets.hopsFieldHero;
 
   return (
-    <section aria-label="Product catalog" className={styles.hero} id="top">
+    <section
+      aria-label="Product catalog"
+      className={styles.hero}
+      data-catalog-hero
+      id="top"
+    >
       <h1 className="visually-hidden">Hop &amp; Barley Store</h1>
       <Image
         alt={hero.alt}

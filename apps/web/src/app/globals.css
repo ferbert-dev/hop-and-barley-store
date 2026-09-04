@@ -93,6 +93,7 @@ body:has(.admin-workspace) > .site-footer {
   border-block-end: 1px solid var(--hb-color-border);
   inset-block-start: 0;
   position: sticky;
+  transform: translateY(var(--site-header-exit-offset, 0));
   width: 100%;
   z-index: 30;
 }
@@ -485,7 +486,7 @@ h1 {
   }
 }
 
-@media (min-width: 64rem) {
+@media (min-width: 80rem) {
   #main-content,
   #top,
   #catalog-title {

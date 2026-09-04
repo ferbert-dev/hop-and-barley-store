@@ -222,6 +222,27 @@ Page 1 (0:1)
 - This extension adds no scroll listener, animated height, parallax, or other
   motion beyond the browser's native scrolling behavior.
 
+**User-confirmed responsive catalog viewport extension — 2026-09-04**
+
+- This decision supersedes F9's immediate persistent sticky trigger: on the
+  catalog route the header stays pinned while the hero remains in its visual
+  ownership area. When the hero's bottom edge reaches the header, that edge
+  pushes the header upward; once the hero is gone, the header is gone too and
+  product content continues scrolling normally through the complete viewport.
+- The catalog keeps its canonical 12-product page size. Responsive behavior
+  changes the number of complete cards visible at once, with one column on
+  mobile, two on tablet, two or three on a small laptop according to usable
+  width, and up to four on a wide desktop.
+- Hero height, catalog spacing, heading and controls respond to both viewport
+  width and short laptop height while keeping the approved full-bleed crop.
+- The desktop navigation activates only when all signed-in/admin actions fit;
+  narrower desktop and laptop widths retain the compact menu instead of
+  allowing header content to collide or disappear.
+- This behavior is a user-approved responsive extension absent from the Figma
+  ProductList frame. It does not change catalog search, filter, sort, data or
+  pagination contracts; the header position follows scroll geometry directly
+  without an eased or time-based animation.
+
 ### Product details — `product`
 
 [Open node `9:2284`](https://www.figma.com/design/H7jIUNYzAGc7o8R0iABQjy/Project-M4-1--Next.js--share-?node-id=9-2284)

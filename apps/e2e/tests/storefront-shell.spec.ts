@@ -66,14 +66,14 @@ test('supports the mobile disclosure with keyboard-only navigation', async ({
 test('closes the inline disclosure when crossing the wide breakpoint', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 1023, height: 900 });
+  await page.setViewportSize({ width: 1279, height: 900 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Open menu' }).click();
   await expect(
     page.getByRole('button', { name: 'Close menu' }),
   ).toHaveAttribute('aria-expanded', 'true');
 
-  await page.setViewportSize({ width: 1024, height: 900 });
+  await page.setViewportSize({ width: 1280, height: 900 });
   await expect(page.getByRole('button', { name: 'Open menu' })).toBeHidden();
   await expect(
     page.getByRole('navigation', { name: 'Storefront' }),
@@ -251,23 +251,27 @@ test('fills the complete catalog hero section with the hop image', async ({
   }
 });
 
-test('keeps the header visible while the catalog hero scrolls away', async ({
+test('keeps the header sticky only while the catalog hero owns it', async ({
   page,
 }) => {
   test.skip(unavailable, 'requires the connected catalog');
 
-  for (const width of [360, 1280]) {
-    await page.setViewportSize({ width, height: 900 });
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1024, height: 768 },
+    { width: 1280, height: 900 },
+    { width: 1440, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport);
     await page.goto('/', { waitUntil: 'domcontentloaded' });
 
     const header = page.getByRole('banner', {
       name: 'Hop and Barley storefront',
     });
     const hero = page.getByRole('region', { name: 'Product catalog' });
-    const catalogTitle = page.getByRole('heading', {
-      name: 'Find your ingredients',
-    });
 
+    await expect(header).toHaveAttribute('data-scroll-mode', 'hero-bound');
     await expect(header).toHaveCSS('position', 'sticky');
     await expect
       .poll(() =>
@@ -285,8 +289,15 @@ test('keeps the header visible while the catalog hero scrolls away', async ({
       )
       .toBe(true);
 
-    await catalogTitle.evaluate((element) => {
-      element.scrollIntoView({ behavior: 'instant', block: 'start' });
+    await hero.evaluate((element) => {
+      const header = document.querySelector<HTMLElement>('.site-header')!;
+      const heroBox = element.getBoundingClientRect();
+      window.scrollTo({
+        behavior: 'instant',
+        top:
+          window.scrollY +
+          Math.max(1, (heroBox.height - header.offsetHeight) / 2),
+      });
     });
     await expect
       .poll(() =>
@@ -295,15 +306,60 @@ test('keeps the header visible while the catalog hero scrolls away', async ({
           const heroBox = document
             .querySelector('[aria-label="Product catalog"]')!
             .getBoundingClientRect();
-          const titleBox = document
-            .querySelector('#catalog-title')!
-            .getBoundingClientRect();
 
           return (
             Math.abs(headerBox.top) <= 1 &&
-            heroBox.bottom <= headerBox.bottom + 1 &&
-            titleBox.top >= headerBox.bottom - 1
+            heroBox.bottom > headerBox.bottom + 1
           );
+        }),
+      )
+      .toBe(true);
+
+    await hero.evaluate((element) => {
+      const header = document.querySelector<HTMLElement>('.site-header')!;
+      const heroBox = element.getBoundingClientRect();
+      window.scrollTo({
+        behavior: 'instant',
+        top: window.scrollY + heroBox.bottom - header.offsetHeight / 2,
+      });
+    });
+    await expect
+      .poll(
+        () =>
+          header.evaluate((element) => {
+            const headerBox = element.getBoundingClientRect();
+            const heroBox = document
+              .querySelector('[aria-label="Product catalog"]')!
+              .getBoundingClientRect();
+
+            return (
+              headerBox.top < -1 &&
+              headerBox.bottom > 1 &&
+              Math.abs(headerBox.bottom - heroBox.bottom) <= 2
+            );
+          }),
+        {
+          message: `header follows the hero edge at ${String(viewport.width)}x${String(viewport.height)}`,
+        },
+      )
+      .toBe(true);
+
+    await hero.evaluate((element) => {
+      const heroBox = element.getBoundingClientRect();
+      window.scrollTo({
+        behavior: 'instant',
+        top: window.scrollY + heroBox.bottom + 1,
+      });
+    });
+    await expect
+      .poll(() =>
+        header.evaluate((element) => {
+          const headerBox = element.getBoundingClientRect();
+          const heroBox = document
+            .querySelector('[aria-label="Product catalog"]')!
+            .getBoundingClientRect();
+
+          return heroBox.bottom <= 0 && Math.abs(headerBox.bottom) <= 2;
         }),
       )
       .toBe(true);
@@ -327,5 +383,111 @@ test('keeps the header visible while the catalog hero scrolls away', async ({
         }),
       )
       .toBe(true);
+  }
+});
+
+test('reconciles the hero-bound header after browser restoration', async ({
+  page,
+}) => {
+  test.skip(unavailable, 'requires the connected catalog');
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+  const header = page.getByRole('banner', {
+    name: 'Hop and Barley storefront',
+  });
+  const hero = page.getByRole('region', { name: 'Product catalog' });
+
+  await expect(hero).toBeVisible();
+  await header.evaluate((element) => {
+    element.style.setProperty(
+      '--site-header-exit-offset',
+      `${String(-element.getBoundingClientRect().height)}px`,
+    );
+    window.dispatchEvent(
+      new PageTransitionEvent('pageshow', { persisted: true }),
+    );
+  });
+  await expect
+    .poll(() =>
+      header.evaluate(
+        (element) => Math.abs(element.getBoundingClientRect().top) <= 1,
+      ),
+    )
+    .toBe(true);
+
+  await page.mouse.wheel(0, 480);
+  await expect
+    .poll(() =>
+      header.evaluate((element) => {
+        const headerBox = element.getBoundingClientRect();
+        const heroBox = document
+          .querySelector('[aria-label="Product catalog"]')!
+          .getBoundingClientRect();
+
+        return heroBox.bottom <= 0 && Math.abs(headerBox.bottom) <= 2;
+      }),
+    )
+    .toBe(true);
+
+  await page.goto('/cart', { waitUntil: 'domcontentloaded' });
+  await page.goBack({ waitUntil: 'domcontentloaded' });
+  await expect(header).toHaveAttribute('data-scroll-mode', 'hero-bound');
+
+  await page.mouse.wheel(0, -160);
+  await expect
+    .poll(() =>
+      header.evaluate((element) => {
+        const headerBox = element.getBoundingClientRect();
+        const heroBox = document
+          .querySelector('[aria-label="Product catalog"]')!
+          .getBoundingClientRect();
+
+        return (
+          heroBox.bottom > 0 &&
+          headerBox.bottom > 0 &&
+          Math.abs(
+            headerBox.bottom - Math.min(heroBox.bottom, headerBox.height),
+          ) <= 2
+        );
+      }),
+    )
+    .toBe(true);
+});
+
+test('adapts catalog columns to the usable viewport width', async ({
+  page,
+}) => {
+  test.skip(unavailable, 'requires the connected catalog');
+
+  for (const probe of [
+    { columns: 1, height: 844, width: 390 },
+    { columns: 2, height: 1024, width: 768 },
+    { columns: 3, height: 768, width: 1024 },
+    { columns: 4, height: 900, width: 1280 },
+    { columns: 4, height: 900, width: 1440 },
+  ]) {
+    await page.setViewportSize({ width: probe.width, height: probe.height });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+    const cards = page.locator('article').filter({
+      has: page.getByRole('link', { name: /^View .+ details$/ }),
+    });
+    await expect(cards.first()).toBeVisible();
+
+    const firstRowCount = await cards.evaluateAll((elements) => {
+      const firstTop = elements[0]?.getBoundingClientRect().top;
+      if (firstTop === undefined) return 0;
+
+      return elements.filter(
+        (element) =>
+          Math.abs(element.getBoundingClientRect().top - firstTop) <= 1,
+      ).length;
+    });
+
+    expect(firstRowCount, `${String(probe.width)}px catalog columns`).toBe(
+      probe.columns,
+    );
   }
 });
