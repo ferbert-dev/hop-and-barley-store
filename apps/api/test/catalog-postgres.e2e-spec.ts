@@ -233,7 +233,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
           { name: 'Excluded orphan', slug: 'excluded-orphan' },
         ]),
       );
-      for (const slug of ['hidden-inactive', 'hidden-eur', 'missing-product']) {
+      for (const slug of ['hidden-inactive', 'hidden-usd', 'missing-product']) {
         const hidden = await request(app.getHttpServer() as App)
           .get(`/api/v1/products/${slug}`)
           .expect(404);
@@ -247,7 +247,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
       await prisma.product.deleteMany({
         where: {
           slug: {
-            in: ['hidden-inactive', 'hidden-eur', 'hidden-inactive-category'],
+            in: ['hidden-inactive', 'hidden-usd', 'hidden-inactive-category'],
           },
         },
       });
