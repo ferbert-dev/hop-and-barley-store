@@ -93,14 +93,18 @@ function SiteHeaderDisclosure({
     const applyHeaderOffset = (offset: number) => {
       const pixelRatio = window.devicePixelRatio || 1;
       const devicePixelOffset = Math.round(offset * pixelRatio) / pixelRatio;
+      const nextOffset = `${String(devicePixelOffset)}px`;
 
-      if (appliedOffset === devicePixelOffset) return;
+      if (
+        appliedOffset === devicePixelOffset &&
+        header.style.getPropertyValue('--site-header-exit-offset') ===
+          nextOffset
+      ) {
+        return;
+      }
 
       appliedOffset = devicePixelOffset;
-      header.style.setProperty(
-        '--site-header-exit-offset',
-        `${String(devicePixelOffset)}px`,
-      );
+      header.style.setProperty('--site-header-exit-offset', nextOffset);
     };
 
     const updateHeaderOffset = () => {

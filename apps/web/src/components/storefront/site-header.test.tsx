@@ -180,6 +180,28 @@ describe('SiteHeader', () => {
       });
       expect(offsetWrites()).toHaveLength(1);
 
+      const header = document.querySelector<HTMLElement>('.site-header');
+      expect(header).not.toBeNull();
+      header!.style.setProperty('--site-header-exit-offset', '-72px');
+      styleSpy.mockClear();
+
+      act(() => {
+        window.dispatchEvent(
+          new PageTransitionEvent('pageshow', { persisted: true }),
+        );
+        flushAnimationFrames();
+      });
+      expect(offsetWrites()).toEqual([['--site-header-exit-offset', '0px']]);
+
+      styleSpy.mockClear();
+      act(() => {
+        window.dispatchEvent(new Event('scroll'));
+        flushAnimationFrames();
+        window.dispatchEvent(new Event('scroll'));
+        flushAnimationFrames();
+      });
+      expect(offsetWrites()).toHaveLength(0);
+
       heroBottom = 40;
       act(() => {
         window.dispatchEvent(new Event('scroll'));
@@ -187,10 +209,7 @@ describe('SiteHeader', () => {
         window.dispatchEvent(new Event('scroll'));
         flushAnimationFrames();
       });
-      expect(offsetWrites()).toEqual([
-        ['--site-header-exit-offset', '0px'],
-        ['--site-header-exit-offset', '-32px'],
-      ]);
+      expect(offsetWrites()).toEqual([['--site-header-exit-offset', '-32px']]);
     } finally {
       unmount();
       styleSpy.mockRestore();
