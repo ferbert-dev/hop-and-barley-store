@@ -22,14 +22,14 @@ describe('storefront shell architecture', () => {
     );
   });
 
-  it('pins the disclosure boundary and project target-size gate', () => {
+  it('pins the collision-safe disclosure boundary and target-size gate', () => {
     const css = readFileSync(
       join(process.cwd(), 'src/app/globals.css'),
       'utf8',
     );
 
     expect(css).toContain('@media (max-width: 63.999rem)');
-    expect(css).toContain('@media (min-width: 64rem)');
+    expect(css).toContain('@media (min-width: 80rem)');
     expect(css).toMatch(/\.brand\s*{[\s\S]*?min-block-size:\s*44px;/);
     expect(css).toMatch(/\.menu-trigger\s*{[\s\S]*?min-block-size:\s*44px;/);
     expect(css).toMatch(/\.menu-trigger\s*{[\s\S]*?min-inline-size:\s*44px;/);

@@ -11,7 +11,7 @@ import { INITIAL_AUTH_FORM_STATE } from '../../features/auth/auth-state';
 import { useCart } from '../../features/cart/cart-context';
 import { Button } from '../ui/button';
 
-const WIDE_VIEWPORT_QUERY = '(min-width: 64rem)';
+const DESKTOP_NAVIGATION_QUERY = '(min-width: 80rem)';
 
 function isProductsPath(pathname: string) {
   return pathname === '/' || pathname.startsWith('/product/');
@@ -45,6 +45,7 @@ function SiteHeaderDisclosure({
 }: SiteHeaderDisclosureProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { ensureLoaded, items, state: cartState } = useCart();
+  const headerRef = useRef<HTMLElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const cartLineCount = items.length;
@@ -56,7 +57,7 @@ function SiteHeaderDisclosure({
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
 
-    const wideViewport = window.matchMedia(WIDE_VIEWPORT_QUERY);
+    const wideViewport = window.matchMedia(DESKTOP_NAVIGATION_QUERY);
     const closeAtWideViewport = (event: MediaQueryListEvent) => {
       if (event.matches) setMenuOpen(false);
     };
@@ -66,6 +67,52 @@ function SiteHeaderDisclosure({
       wideViewport.removeEventListener('change', closeAtWideViewport);
     };
   }, []);
+
+  useEffect(() => {
+    if (pathname !== '/') return;
+
+    const header = headerRef.current;
+    if (!header) return;
+
+    let animationFrame = 0;
+
+    const updateHeaderOffset = () => {
+      animationFrame = 0;
+
+      const heroes = document.querySelectorAll<HTMLElement>(
+        '[data-catalog-hero]',
+      );
+      const hero = Array.from(heroes)
+        .reverse()
+        .find((candidate) => candidate.getClientRects().length > 0);
+      if (!hero) return;
+
+      const headerHeight = header.getBoundingClientRect().height;
+      const heroBottom = hero.getBoundingClientRect().bottom;
+      const offset = Math.max(
+        -headerHeight,
+        Math.min(0, heroBottom - headerHeight),
+      );
+
+      header.style.setProperty('--site-header-exit-offset', `${offset}px`);
+    };
+
+    const scheduleHeaderOffset = () => {
+      if (animationFrame) return;
+      animationFrame = window.requestAnimationFrame(updateHeaderOffset);
+    };
+
+    updateHeaderOffset();
+    window.addEventListener('resize', scheduleHeaderOffset);
+    window.addEventListener('scroll', scheduleHeaderOffset, { passive: true });
+
+    return () => {
+      window.removeEventListener('resize', scheduleHeaderOffset);
+      window.removeEventListener('scroll', scheduleHeaderOffset);
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      header.style.removeProperty('--site-header-exit-offset');
+    };
+  }, [pathname]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -87,7 +134,12 @@ function SiteHeaderDisclosure({
   const closeMenu = () => setMenuOpen(false);
 
   return (
-    <header className="site-header" aria-label="Hop and Barley storefront">
+    <header
+      ref={headerRef}
+      className="site-header"
+      aria-label="Hop and Barley storefront"
+      data-scroll-mode={pathname === '/' ? 'hero-bound' : 'persistent'}
+    >
       <div className="site-header__inner">
         <Link className="brand" href="/" aria-label="Hop and Barley home">
           <Image

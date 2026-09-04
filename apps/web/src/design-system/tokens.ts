@@ -10,7 +10,7 @@ export type BreakpointName = keyof typeof breakpoints;
 export const responsiveImageSizes = {
   fullBleed: '100vw',
   productGrid:
-    '(max-width: 47.999rem) 100vw, (max-width: 63.999rem) 50vw, 33vw',
+    '(max-width: 47.999rem) 100vw, (max-width: 63.999rem) 50vw, (max-width: 79.999rem) 33vw, 25vw',
   footerArtwork: '(max-width: 47.999rem) 80vw, 484px',
   avatar: '40px',
   icon: '38px',
