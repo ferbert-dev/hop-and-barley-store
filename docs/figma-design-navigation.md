@@ -243,6 +243,17 @@ Page 1 (0:1)
   pagination contracts; the header position follows scroll geometry directly
   without an eased or time-based animation.
 
+**User-confirmed catalog scroll performance extension — 2026-09-04**
+
+- Keep native browser scrolling and the direct hero-bound geometry above; do
+  not add synthetic inertia or a time-based trailing animation.
+- Make the header movement compositor-friendly and avoid applying an identical
+  offset repeatedly while it is stationary or fully hidden.
+- Align the offset to physical device pixels to avoid subpixel shimmer. The
+  existing reduced-motion behavior remains unchanged.
+- This is a user-approved smoothness refinement absent from the Figma frame; it
+  does not change the header threshold, hero layout or catalog behavior.
+
 ### Product details — `product`
 
 [Open node `9:2284`](https://www.figma.com/design/H7jIUNYzAGc7o8R0iABQjy/Project-M4-1--Next.js--share-?node-id=9-2284)

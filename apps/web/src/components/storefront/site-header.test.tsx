@@ -107,6 +107,119 @@ describe('SiteHeader', () => {
     expect(current).toHaveAttribute('aria-current', 'page');
   });
 
+  it('avoids redundant offset writes while the header remains stationary', () => {
+    const hero = document.createElement('section');
+    hero.dataset.catalogHero = '';
+    document.body.append(hero);
+
+    let heroBottom = 400;
+    let nextAnimationFrame = 0;
+    const animationFrames = new Map<number, FrameRequestCallback>();
+    const rect = (top: number, bottom: number, height: number) =>
+      ({
+        bottom,
+        height,
+        left: 0,
+        right: 100,
+        toJSON: () => ({}),
+        top,
+        width: 100,
+        x: 0,
+        y: top,
+      }) as DOMRect;
+    const headerRect = rect(0, 72, 72);
+
+    const boundingRectSpy = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.matches('.site-header')) return headerRect;
+        if (this === hero) return rect(heroBottom - 288, heroBottom, 288);
+        return rect(0, 0, 0);
+      });
+    const clientRectsSpy = vi
+      .spyOn(hero, 'getClientRects')
+      .mockImplementation(
+        () =>
+          [rect(heroBottom - 288, heroBottom, 288)] as unknown as DOMRectList,
+      );
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        const id = ++nextAnimationFrame;
+        animationFrames.set(id, callback);
+        return id;
+      }),
+    );
+    vi.stubGlobal(
+      'cancelAnimationFrame',
+      vi.fn((id: number) => animationFrames.delete(id)),
+    );
+    const styleSpy = vi.spyOn(CSSStyleDeclaration.prototype, 'setProperty');
+
+    const flushAnimationFrames = () => {
+      const pendingFrames = Array.from(animationFrames.entries());
+      animationFrames.clear();
+      pendingFrames.forEach(([, callback]) => callback(performance.now()));
+    };
+    const offsetWrites = () =>
+      styleSpy.mock.calls.filter(
+        ([property]) => property === '--site-header-exit-offset',
+      );
+
+    const { unmount } = render(<SiteHeader />);
+
+    try {
+      act(flushAnimationFrames);
+      expect(offsetWrites()).toEqual([['--site-header-exit-offset', '0px']]);
+
+      act(() => {
+        window.dispatchEvent(new Event('scroll'));
+        flushAnimationFrames();
+        window.dispatchEvent(new Event('scroll'));
+        flushAnimationFrames();
+      });
+      expect(offsetWrites()).toHaveLength(1);
+
+      const header = document.querySelector<HTMLElement>('.site-header');
+      expect(header).not.toBeNull();
+      header!.style.setProperty('--site-header-exit-offset', '-72px');
+      styleSpy.mockClear();
+
+      act(() => {
+        window.dispatchEvent(
+          new PageTransitionEvent('pageshow', { persisted: true }),
+        );
+        flushAnimationFrames();
+      });
+      expect(offsetWrites()).toEqual([['--site-header-exit-offset', '0px']]);
+
+      styleSpy.mockClear();
+      act(() => {
+        window.dispatchEvent(new Event('scroll'));
+        flushAnimationFrames();
+        window.dispatchEvent(new Event('scroll'));
+        flushAnimationFrames();
+      });
+      expect(offsetWrites()).toHaveLength(0);
+
+      heroBottom = 40;
+      act(() => {
+        window.dispatchEvent(new Event('scroll'));
+        flushAnimationFrames();
+        window.dispatchEvent(new Event('scroll'));
+        flushAnimationFrames();
+      });
+      expect(offsetWrites()).toEqual([['--site-header-exit-offset', '-32px']]);
+    } finally {
+      unmount();
+      styleSpy.mockRestore();
+      clientRectsSpy.mockRestore();
+      boundingRectSpy.mockRestore();
+      vi.unstubAllGlobals();
+      hero.remove();
+    }
+  });
+
   it('exposes an inline disclosure and preserves native Tab order', async () => {
     const user = userEvent.setup();
     render(<SiteHeader />);
