@@ -34,7 +34,7 @@ export type CatalogCategoryFixture = {
 export type CatalogProductFixture = {
   amountUnit: 'EACH' | 'MILLIGRAM';
   categorySlug: CatalogCategorySlug;
-  currency: 'USD';
+  currency: 'EUR';
   description: string;
   id: string;
   imagePath: `/assets/products/${string}.webp`;
@@ -471,7 +471,7 @@ function defineProduct(
   return {
     ...input,
     ...saleRulesFor(input.slug),
-    currency: 'USD',
+    currency: 'EUR',
     description: input.description.join('\n\n'),
     isActive: true,
   };

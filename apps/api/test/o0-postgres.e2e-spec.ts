@@ -169,12 +169,12 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
     ).rejects.toMatchObject({ code: 'P2002' });
   });
 
-  it('fails active/USD checks, ignores stock for cart persistence and rejects expiry', async () => {
+  it('fails active/EUR checks, ignores stock for cart persistence and rejects expiry', async () => {
     const server = app.getHttpServer() as App;
     const product = await prisma.product.findUniqueOrThrow({
       where: { slug: 'safale-us05-yeast' },
     });
-    for (const data of [{ isActive: false }, { currency: 'EUR' }]) {
+    for (const data of [{ isActive: false }, { currency: 'USD' }]) {
       await prisma.product.update({ data, where: { id: product.id } });
       await request(server)
         .post('/api/v1/cart/items')
@@ -183,7 +183,7 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
         .expect(422);
       expect(await prisma.cart.count()).toBe(0);
       await prisma.product.update({
-        data: { currency: 'USD', isActive: true, stockAmount: 100 },
+        data: { currency: 'EUR', isActive: true, stockAmount: 100 },
         where: { id: product.id },
       });
     }
@@ -216,7 +216,7 @@ describePostgres('O0 guest cart with disposable PostgreSQL 17.6', () => {
     const category = await prisma.category.findFirstOrThrow();
     await postgres.query(
       `INSERT INTO "Product" ("id", "name", "slug", "teaser", "description", "priceMinor", "priceQualifier", "currency", "saleKind", "amountUnit", "priceBasisAmount", "minimumOrderAmount", "orderStepAmount", "stockAmount", "isActive", "imagePath", "specifications", "categoryId", "updatedAt")
-       SELECT gen_random_uuid(), 'O0 line ' || value, 'o0-line-' || lpad(value::text, 2, '0'), 'fixture', 'fixture', 100, 'fixture', 'USD', 'PACKAGE', 'EACH', 1, 1, 1, 100, true, '/assets/products/o0-line-' || lpad(value::text, 2, '0') || '.webp', '[]'::jsonb, $1, CURRENT_TIMESTAMP
+       SELECT gen_random_uuid(), 'O0 line ' || value, 'o0-line-' || lpad(value::text, 2, '0'), 'fixture', 'fixture', 100, 'fixture', 'EUR', 'PACKAGE', 'EACH', 1, 1, 1, 100, true, '/assets/products/o0-line-' || lpad(value::text, 2, '0') || '.webp', '[]'::jsonb, $1, CURRENT_TIMESTAMP
        FROM generate_series(1, 51) value`,
       [category.id],
     );

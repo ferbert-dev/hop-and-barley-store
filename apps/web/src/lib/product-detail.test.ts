@@ -8,7 +8,7 @@ import {
 const product = {
   availability: 'in-stock' as const,
   category: { name: 'Hops', slug: 'hops' },
-  currency: 'USD' as const,
+  currency: 'EUR' as const,
   description: 'First paragraph.\n\nSecond paragraph.\n\nThird paragraph.',
   id: '20000000-0000-4000-8000-000000000001',
   imagePath: '/assets/products/citra-hops.webp',
@@ -116,7 +116,7 @@ describe('loadProductDetail', () => {
     { ...product, stockQuantity: 100 },
     { ...product, categoryId: 'private-category-id' },
     { ...product, isActive: true },
-    { ...product, currency: 'EUR' },
+    { ...product, currency: 'USD' },
     { ...product, specifications: {} },
     { ...product, specifications: [] },
     { ...product, specifications: [{ label: 'Origin', value: [] }] },

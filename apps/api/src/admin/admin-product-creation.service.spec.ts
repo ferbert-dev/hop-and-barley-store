@@ -91,7 +91,7 @@ describe('AdminProductCreationService', () => {
       amountUnit: 'MILLIGRAM',
       category: { id: CATEGORY_ID, name: 'Hops', slug: 'hops' },
       createdAt: new Date('2026-08-28T15:00:00.000Z'),
-      currency: 'USD',
+      currency: 'EUR',
       description: baseDto.description,
       id: '30000000-0000-4000-8000-000000000001',
       imagePath: STORED_ASSET.imagePath,
@@ -151,7 +151,7 @@ describe('AdminProductCreationService', () => {
     });
   });
 
-  it('derives the bounded WEIGHT contract, USD price and product type specification', async () => {
+  it('derives the bounded WEIGHT contract, EUR price and product type specification', async () => {
     const result = await service.createProduct(baseDto, IMAGE);
 
     expect(storeImage).toHaveBeenCalledWith(IMAGE);
@@ -162,7 +162,7 @@ describe('AdminProductCreationService', () => {
       activeUntil: null,
       amountUnit: 'MILLIGRAM',
       category: { connect: { id: CATEGORY_ID } },
-      currency: 'USD',
+      currency: 'EUR',
       description: baseDto.description,
       imagePath: STORED_ASSET.imagePath,
       isActive: true,
@@ -187,7 +187,7 @@ describe('AdminProductCreationService', () => {
     });
     expect(result).toMatchObject({
       activeFrom: new Date('2026-08-28T15:00:00.000Z'),
-      currency: 'USD',
+      currency: 'EUR',
       imagePath: STORED_ASSET.imagePath,
       priceMinor: 599,
       priceQualifier: 'per 100g',
@@ -401,7 +401,7 @@ function createResolvedProduct() {
     activeUntil: null,
     category: { id: CATEGORY_ID, name: 'Hops', slug: 'hops' },
     createdAt: new Date('2026-08-28T15:00:00.000Z'),
-    currency: 'USD',
+    currency: 'EUR',
     description: baseDto.description,
     id: '30000000-0000-4000-8000-000000000001',
     imagePath: STORED_ASSET.imagePath,

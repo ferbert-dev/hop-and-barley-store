@@ -237,7 +237,7 @@ function productFixture(overrides: {
   return {
     amountUnit: 'EACH' as const,
     categoryId,
-    currency: 'USD',
+    currency: 'EUR',
     description: `${overrides.name} description`,
     imagePath: `/assets/products/${overrides.slug}.webp`,
     isActive: true,

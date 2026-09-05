@@ -41,6 +41,7 @@ describePostgres('O2S atomic orders with disposable PostgreSQL', () => {
       data: {
         activeFrom: null,
         activeUntil: null,
+        currency: 'EUR',
         isActive: true,
         priceMinor: 499,
         stockAmount: 100,
@@ -74,6 +75,7 @@ describePostgres('O2S atomic orders with disposable PostgreSQL', () => {
 
     expect(replayed).toEqual(created);
     expect(created).toMatchObject({
+      currency: 'EUR',
       itemSubtotalMinor: 998,
       paymentMethod: 'cash_on_delivery',
       paymentState: 'due_on_delivery',
@@ -87,6 +89,47 @@ describePostgres('O2S atomic orders with disposable PostgreSQL', () => {
       await prisma.cartItem.count({ where: { cartId: cart.cartId } }),
     ).toBe(0);
     expect(await prisma.cartReservation.count()).toBe(0);
+  });
+
+  it('replays a stored historical USD order without relabelling its amounts', async () => {
+    const userId = await createUser('historical-usd@example.com');
+    const checkout = checkoutBody(2);
+    const cart = await desiredCart(2);
+    const context = {
+      cartId: cart.cartId,
+      idempotencyKey: 'historical-usd-order-0001',
+      userId,
+    };
+    const created = await orders.create(context, checkout, now);
+    await prisma.order.update({
+      data: { currency: 'USD' },
+      where: { id: created.id },
+    });
+    const storedBeforeReplay = await prisma.order.findUniqueOrThrow({
+      include: { items: true },
+      where: { id: created.id },
+    });
+    const stockBeforeReplay = await productStock();
+
+    const replayed = await orders.create(
+      context,
+      checkout,
+      new Date(now.getTime() + 60_000),
+    );
+
+    expect(replayed).toMatchObject({
+      currency: 'USD',
+      itemSubtotalMinor: storedBeforeReplay.itemSubtotalMinor,
+      items: storedBeforeReplay.items.map((item) => ({
+        amount: item.amount,
+        lineTotalMinor: item.lineTotalMinor,
+        priceMinor: item.priceMinor,
+      })),
+      shippingMinor: storedBeforeReplay.shippingMinor,
+      totalMinor: storedBeforeReplay.totalMinor,
+    });
+    expect(await productStock()).toBe(stockBeforeReplay);
+    expect(await prisma.order.count()).toBe(1);
   });
 
   it('uses current server prices and rejects changed idempotent input', async () => {

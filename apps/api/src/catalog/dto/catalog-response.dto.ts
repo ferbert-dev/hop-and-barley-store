@@ -77,8 +77,8 @@ export class CatalogMetaDto {
   @ApiProperty({ enum: CATALOG_SORT_VALUES, type: String })
   sort!: CatalogSort;
 
-  @ApiProperty({ enum: ['USD'], type: String })
-  currency!: 'USD';
+  @ApiProperty({ enum: ['EUR'], type: String })
+  currency!: 'EUR';
 
   @ApiProperty({ type: () => CatalogFiltersDto })
   filters!: CatalogFiltersDto;

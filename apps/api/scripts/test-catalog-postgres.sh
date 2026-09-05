@@ -75,7 +75,9 @@ for migration in \
   20260828153000_add_product_activity_window \
   20260828163000_align_ingredient_product_types \
   20260828170000_enable_uploaded_product_assets \
-  20260901110000_add_catalog_full_text_search; do
+  20260901110000_add_catalog_full_text_search \
+  20260903173500_add_account_cart_ownership \
+  20260905120000_use_eur_product_currency; do
   docker exec --interactive "$container_name" psql \
     --set ON_ERROR_STOP=1 --username "$database_user" --dbname upgrade_catalog \
     < "$repo_root/apps/api/prisma/migrations/$migration/migration.sql"
@@ -115,7 +117,7 @@ seed_twice_and_verify() {
   local final_state
   final_state=$(docker exec "$container_name" psql --tuples-only --no-align \
     --username "$database_user" --dbname "$database_name" \
-    --command 'SELECT (SELECT count(*) FROM "Product") || '"'"':'"'"' || (SELECT count(*) FROM "Category") || '"'"':'"'"' || (SELECT count(*) FROM "Category" WHERE "slug" = '"'"'legacy-foundation'"'"') || '"'"':'"'"' || (SELECT count(*) FROM "Product" WHERE "slug" IN ('"'"'house-lager'"'"', '"'"'citrus-pale-ale'"'"')) || '"'"':'"'"' || (SELECT count(*) FROM "Product" WHERE "currency" = '"'"'USD'"'"' AND "isActive" AND (("saleKind" = '"'"'WEIGHT'"'"' AND "stockAmount" = 100000000) OR ("saleKind" IN ('"'"'PACKAGE'"'"', '"'"'KIT'"'"') AND "stockAmount" = 100)));')
+    --command 'SELECT (SELECT count(*) FROM "Product") || '"'"':'"'"' || (SELECT count(*) FROM "Category") || '"'"':'"'"' || (SELECT count(*) FROM "Category" WHERE "slug" = '"'"'legacy-foundation'"'"') || '"'"':'"'"' || (SELECT count(*) FROM "Product" WHERE "slug" IN ('"'"'house-lager'"'"', '"'"'citrus-pale-ale'"'"')) || '"'"':'"'"' || (SELECT count(*) FROM "Product" WHERE "currency" = '"'"'EUR'"'"' AND "isActive" AND (("saleKind" = '"'"'WEIGHT'"'"' AND "stockAmount" = 100000000) OR ("saleKind" IN ('"'"'PACKAGE'"'"', '"'"'KIT'"'"') AND "stockAmount" = 100)));')
   test "$final_state" = "12:5:0:0:$expected_fixture_stock_rows"
 }
 
@@ -196,7 +198,7 @@ docker exec "$container_name" createdb -U "$database_user" \
   --template fresh_catalog rollback_m3_assets_refusal
 docker exec "$container_name" psql --no-psqlrc --set ON_ERROR_STOP=1 \
   --username "$database_user" --dbname rollback_m3_assets_refusal \
-  --command 'INSERT INTO "Product" ("id", "name", "slug", "teaser", "description", "priceMinor", "priceQualifier", "currency", "saleKind", "amountUnit", "priceBasisAmount", "minimumOrderAmount", "orderStepAmount", "maximumOrderAmount", "stockAmount", "packageNetWeightMg", "kitYieldVolumeMl", "isActive", "activeFrom", "activeUntil", "imagePath", "specifications", "categoryId", "updatedAt") VALUES ('"'"'30000000-0000-4000-8000-000000000001'"'"', '"'"'Uploaded Test'"'"', '"'"'uploaded-test'"'"', '"'"'Uploaded test'"'"', '"'"'Uploaded test product'"'"', 100, '"'"'per 100g'"'"', '"'"'USD'"'"', '"'"'WEIGHT'"'"', '"'"'MILLIGRAM'"'"', 100000, 100000, 100000, 100000000, 100000, NULL, NULL, true, CURRENT_TIMESTAMP, NULL, '"'"'/product-assets/30000000-0000-4000-8000-000000000001.webp'"'"', '"'"'[{"label":"Product Type","value":"Hops"}]'"'"'::jsonb, '"'"'10000000-0000-4000-8000-000000000001'"'"', CURRENT_TIMESTAMP);' >/dev/null
+  --command 'INSERT INTO "Product" ("id", "name", "slug", "teaser", "description", "priceMinor", "priceQualifier", "currency", "saleKind", "amountUnit", "priceBasisAmount", "minimumOrderAmount", "orderStepAmount", "maximumOrderAmount", "stockAmount", "packageNetWeightMg", "kitYieldVolumeMl", "isActive", "activeFrom", "activeUntil", "imagePath", "specifications", "categoryId", "updatedAt") VALUES ('"'"'30000000-0000-4000-8000-000000000001'"'"', '"'"'Uploaded Test'"'"', '"'"'uploaded-test'"'"', '"'"'Uploaded test'"'"', '"'"'Uploaded test product'"'"', 100, '"'"'per 100g'"'"', '"'"'EUR'"'"', '"'"'WEIGHT'"'"', '"'"'MILLIGRAM'"'"', 100000, 100000, 100000, 100000000, 100000, NULL, NULL, true, CURRENT_TIMESTAMP, NULL, '"'"'/product-assets/30000000-0000-4000-8000-000000000001.webp'"'"', '"'"'[{"label":"Product Type","value":"Hops"}]'"'"'::jsonb, '"'"'10000000-0000-4000-8000-000000000001'"'"', CURRENT_TIMESTAMP);' >/dev/null
 if docker exec --interactive "$container_name" psql --no-psqlrc \
   --set ON_ERROR_STOP=1 --username "$database_user" --dbname rollback_m3_assets_refusal \
   < "$m3_assets_rollback_path" >/dev/null 2>&1; then

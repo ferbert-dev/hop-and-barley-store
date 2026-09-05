@@ -8,7 +8,7 @@ import {
 } from '../dist/index.js';
 
 const legacyItem = {
-  currency: 'USD',
+  currency: 'EUR',
   description: 'Bright whole-cone hops',
   id: '20000000-0000-4000-8000-000000000002',
   name: 'Cascade Hops',
@@ -35,7 +35,7 @@ const pagedItem = {
 };
 
 const meta = {
-  currency: 'USD',
+  currency: 'EUR',
   facets: { categories: [{ count: 1, name: 'Hops', slug: 'hops' }] },
   filters: {
     category: [],
@@ -278,7 +278,7 @@ test('normalizer rejects malformed common, paged and nested structures', () => {
     { items: 'not-an-array', meta },
     [{ ...legacyItem, id: undefined }],
     [{ ...legacyItem, priceMinor: '699' }],
-    [{ ...legacyItem, currency: 'EUR' }],
+    [{ ...legacyItem, currency: 'USD' }],
     { items: [{ ...pagedItem, availability: 'unknown' }], meta },
     { items: [{ ...pagedItem, category: null }], meta },
     { items: [{ ...pagedItem, imagePath: undefined }], meta },

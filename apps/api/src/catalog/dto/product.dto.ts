@@ -77,8 +77,8 @@ export class ProductDto {
   @ApiProperty({ format: 'int32', minimum: 1, nullable: true, type: 'integer' })
   kitYieldVolumeMl!: number | null;
 
-  @ApiProperty({ enum: ['USD'], type: String })
-  currency!: 'USD';
+  @ApiProperty({ enum: ['EUR'], type: String })
+  currency!: 'EUR';
 
   @ApiProperty({ type: String })
   teaser!: string;

@@ -108,7 +108,7 @@ const expectedCleanOrder = [
 ];
 
 const expectedPolicyDigest =
-  'sha256:fcc4012937e0de9aef415354eb7ea25427d81e6033aab2830a3c663339c0871a';
+  'sha256:260abd41afa2b7f4ebb940d410438053a64c6fa3028da9c28d22d924323e9bfc';
 const expectedNextStrategies = [
   'serialized-build-start-test-stop',
   'unique-build-output-per-server',
@@ -643,7 +643,7 @@ function validateWorkflowContract(candidate, markdown, rootPackage) {
     JSON.stringify({
       categories: 5,
       products: 12,
-      currency: 'USD',
+      currency: 'EUR',
       transactionIsolation: 'RepeatableRead',
       publicRevalidateSeconds: 60,
       requestTimeoutMilliseconds: 1000,
@@ -929,7 +929,7 @@ test('project-ops bootstrap generates exact, idempotent, fail-closed core templa
   assert.match(unsupportedMode.stderr, /invalid choice: 'light'/u);
 });
 
-test('R2 catalog baseline remains grounded in executable source contracts', () => {
+test('the current catalog baseline remains grounded in executable source contracts', () => {
   const fixtureTest = readFileSync(
     join(repositoryRoot, 'apps/api/src/catalog/catalog-fixtures.spec.ts'),
     'utf8',

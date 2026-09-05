@@ -30,7 +30,7 @@ describePostgres('O2S desired carts with disposable PostgreSQL', () => {
         create: {
           amountUnit: 'EACH',
           categoryId: category.id,
-          currency: 'USD',
+          currency: 'EUR',
           description: 'O2S disposable desired-cart fixture',
           imagePath: `/assets/products/${slug}.webp`,
           isActive: true,
@@ -49,7 +49,7 @@ describePostgres('O2S desired carts with disposable PostgreSQL', () => {
           stockAmount: 10,
           teaser: 'O2S fixture',
         },
-        update: { currency: 'USD', isActive: true, stockAmount: 10 },
+        update: { currency: 'EUR', isActive: true, stockAmount: 10 },
         where: { slug },
       });
     }
@@ -63,7 +63,7 @@ describePostgres('O2S desired carts with disposable PostgreSQL', () => {
       data: {
         activeFrom: null,
         activeUntil: null,
-        currency: 'USD',
+        currency: 'EUR',
         isActive: true,
         stockAmount: 10,
       },

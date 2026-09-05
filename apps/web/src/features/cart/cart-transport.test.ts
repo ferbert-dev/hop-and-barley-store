@@ -6,7 +6,7 @@ import {
 } from './cart-transport';
 
 const cart = {
-  currency: 'USD' as const,
+  currency: 'EUR' as const,
   distinctItemCount: 1,
   items: [
     {

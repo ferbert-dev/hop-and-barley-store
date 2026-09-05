@@ -248,7 +248,7 @@ export function CreateProductForm({
               error={errors.price}
               id="product-price"
               inputMode="decimal"
-              label="Price (USD)"
+              label="Price (EUR)"
               min="0.01"
               name="price"
               required

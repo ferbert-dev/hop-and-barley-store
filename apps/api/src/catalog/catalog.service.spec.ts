@@ -60,7 +60,7 @@ const facetQuery = {
     _count: {
       select: {
         products: {
-          where: { currency: 'USD', ...publicLifecycleWhere },
+          where: { currency: 'EUR', ...publicLifecycleWhere },
         },
       },
     },
@@ -68,7 +68,7 @@ const facetQuery = {
     slug: true,
   },
   where: {
-    products: { some: { currency: 'USD', ...publicLifecycleWhere } },
+    products: { some: { currency: 'EUR', ...publicLifecycleWhere } },
   },
 };
 
@@ -129,7 +129,7 @@ describe('CatalogService', () => {
       {
         ...saleRuleValues,
         category: { name: 'Hops', slug: 'hops' },
-        currency: 'USD',
+        currency: 'EUR',
         description: 'Bright whole-cone hops',
         id: 'product-id',
         imagePath: '/assets/products/cascade-hops.webp',
@@ -144,7 +144,7 @@ describe('CatalogService', () => {
     rootProductFindFirst.mockResolvedValue({
       ...saleRuleValues,
       category: { name: 'Hops', slug: 'hops' },
-      currency: 'USD',
+      currency: 'EUR',
       description: 'Bright whole-cone hops',
       id: 'product-id',
       imagePath: '/assets/products/cascade-hops.webp',
@@ -161,12 +161,12 @@ describe('CatalogService', () => {
     });
   });
 
-  it('returns one active USD detail with ordered specifications and derived availability', async () => {
+  it('returns one active EUR detail with ordered specifications and derived availability', async () => {
     await expect(service.getProduct('cascade-hops')).resolves.toEqual({
       ...saleRuleValues,
       availability: 'out-of-stock',
       category: { name: 'Hops', slug: 'hops' },
-      currency: 'USD',
+      currency: 'EUR',
       description: 'Bright whole-cone hops',
       id: 'product-id',
       imagePath: '/assets/products/cascade-hops.webp',
@@ -184,7 +184,7 @@ describe('CatalogService', () => {
     expect(rootProductFindFirst).toHaveBeenCalledWith({
       select: productDetailSelect,
       where: {
-        currency: 'USD',
+        currency: 'EUR',
         slug: 'cascade-hops',
         ...publicLifecycleWhere,
       },
@@ -212,7 +212,7 @@ describe('CatalogService', () => {
       rootProductFindFirst.mockResolvedValue({
         ...saleRuleValues,
         category: { name: 'Hops', slug: 'hops' },
-        currency: 'USD',
+        currency: 'EUR',
         description: 'Bright whole-cone hops',
         id: 'product-id',
         imagePath: '/assets/products/cascade-hops.webp',
@@ -237,7 +237,7 @@ describe('CatalogService', () => {
       page: 1,
       sort: 'name-asc',
     });
-    const where = { currency: 'USD', ...publicLifecycleWhere };
+    const where = { currency: 'EUR', ...publicLifecycleWhere };
 
     expect(transaction).toHaveBeenCalledWith(expect.any(Function), {
       isolationLevel: 'RepeatableRead',
@@ -260,7 +260,7 @@ describe('CatalogService', () => {
           ...saleRuleValues,
           availability: 'out-of-stock',
           category: { name: 'Hops', slug: 'hops' },
-          currency: 'USD',
+          currency: 'EUR',
           description: 'Bright whole-cone hops',
           id: 'product-id',
           imagePath: '/assets/products/cascade-hops.webp',
@@ -273,7 +273,7 @@ describe('CatalogService', () => {
         },
       ],
       meta: {
-        currency: 'USD',
+        currency: 'EUR',
         facets: { categories: [{ count: 1, name: 'Hops', slug: 'hops' }] },
         filters: {
           category: [],
@@ -380,7 +380,7 @@ describe('CatalogService', () => {
     });
 
     expect(count).toHaveBeenCalledWith({
-      where: { currency: 'USD', ...publicLifecycleWhere, priceMinor },
+      where: { currency: 'EUR', ...publicLifecycleWhere, priceMinor },
     });
     expect(findCategories).toHaveBeenCalledWith({
       ...facetQuery,
@@ -390,7 +390,7 @@ describe('CatalogService', () => {
           select: {
             products: {
               where: {
-                currency: 'USD',
+                currency: 'EUR',
                 ...publicLifecycleWhere,
                 priceMinor,
               },

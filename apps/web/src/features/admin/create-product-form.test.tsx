@@ -75,7 +75,7 @@ describe('CreateProductForm', () => {
       screen.getByLabelText('Description'),
       'Fresh aromatic hops.',
     );
-    await user.type(screen.getByLabelText('Price (USD)'), '5.9');
+    await user.type(screen.getByLabelText('Price (EUR)'), '5.9');
     await user.type(screen.getByLabelText('Stock (kg)'), '1.2');
     await user.upload(
       screen.getByLabelText('Choose image'),
@@ -141,7 +141,7 @@ describe('CreateProductForm', () => {
           amountUnit: 'MILLIGRAM',
           category: options.categories[0]!,
           createdAt: '2026-09-01T10:00:00.000Z',
-          currency: 'USD',
+          currency: 'EUR',
           description: 'Bright citrus hops.',
           id: '12345678-1234-4abc-8abc-1234567890ab',
           imagePath: '/assets/products/citra-hops.webp',
@@ -176,8 +176,8 @@ describe('CreateProductForm', () => {
     expect(
       cancel.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    await user.clear(screen.getByLabelText('Price (USD)'));
-    await user.type(screen.getByLabelText('Price (USD)'), '6.49');
+    await user.clear(screen.getByLabelText('Price (EUR)'));
+    await user.type(screen.getByLabelText('Price (EUR)'), '6.49');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() =>

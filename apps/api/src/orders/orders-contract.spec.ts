@@ -3,10 +3,12 @@ import {
   ConflictException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { validate } from 'class-validator';
 import { API_CORS_ALLOWED_HEADERS } from '../app-cors';
 import { createAppValidationPipe } from '../app-validation';
 import type { PrismaService } from '../database/prisma.service';
 import { CheckoutPaymentMethod, CreateOrderDto } from './dto/create-order.dto';
+import { OrderDto } from './dto/order-response.dto';
 import { IdempotencyKeyPipe } from './idempotency-key.pipe';
 import { assertOrderStatusTransition } from './order-status';
 import { runOrderSerializable } from './order-transaction';
@@ -90,6 +92,17 @@ describe('O2 order contract', () => {
     expect(
       API_CORS_ALLOWED_HEADERS.map((header) => header.toLowerCase()),
     ).toContain('idempotency-key');
+  });
+
+  it('validates both preserved USD history and new EUR order currencies', async () => {
+    for (const currency of ['EUR', 'USD']) {
+      await expect(
+        validate(Object.assign(new OrderDto(), { currency })),
+      ).resolves.toHaveLength(0);
+    }
+    await expect(
+      validate(Object.assign(new OrderDto(), { currency: 'GBP' })),
+    ).resolves.toHaveLength(1);
   });
 
   it('allows only forward order-status transitions', () => {

@@ -11,8 +11,8 @@ The Hop & Barley backend is a NestJS modular monolith. It owns business rules an
 | `GET /`                      | Developer service console with safe API/PostgreSQL status and links |
 | `GET /api/v1/health/live`    | Process liveness                                                    |
 | `GET /api/v1/health/ready`   | API readiness including a real PostgreSQL query                     |
-| `GET /api/v1/products`       | Filtered, sorted and paged active USD catalog envelope              |
-| `GET /api/v1/products/:slug` | One active USD product detail with ordered specifications           |
+| `GET /api/v1/products`       | Filtered, sorted and paged active EUR catalog envelope              |
+| `GET /api/v1/products/:slug` | One active EUR product detail with ordered specifications           |
 | `GET /api/docs`              | Swagger UI generated from the NestJS OpenAPI document               |
 
 Start the complete stack from the repository root with `pnpm local:up`, then open [http://localhost:3001](http://localhost:3001) or [Swagger UI](http://localhost:3001/api/docs).
@@ -84,15 +84,15 @@ Count, page items, and dynamic
 product-backed category facets are read in one `RepeatableRead` transaction.
 Facet counts honor search and price filters while deliberately ignoring the
 selected category, so the drawer always describes the available catalog. Only
-active USD products are public; stock quantity becomes the literal
+active EUR products are public; stock quantity becomes the literal
 `in-stock`/`out-of-stock` availability and is never exposed. DTO decorators,
 Swagger, and the generated client describe the same envelope.
 
 ### P1 product-detail contract
 
-`GET /api/v1/products/:slug` uses the same active-USD visibility boundary as
+`GET /api/v1/products/:slug` uses the same active-EUR visibility boundary as
 catalog discovery. The slug is a bounded canonical lowercase value. Unknown,
-inactive and non-USD products all return the same generic 404, while successful
+inactive and non-EUR products all return the same generic 404, while successful
 responses include the public catalog fields, category summary, derived
 availability and the database-ordered specification list. Exact stock quantity,
 category foreign keys and persistence flags never cross the DTO boundary.
@@ -148,6 +148,18 @@ foundation fixtures or otherwise undo seed data. Restore a backup when data
 rollback is required, and coordinate ledger resolution plus a forward recovery
 migration before using the script outside an isolated rollback rehearsal. Never
 use a reset or volume deletion as rollback.
+
+### O2C current currency migration
+
+The forward O2C migration changes USD products and the Product currency default
+to EUR without converting numeric prices or changing product, inventory, or
+cart data. Existing EUR products remain unchanged, and any other product
+currency aborts the migration transaction. New products and orders use EUR;
+historical orders and idempotent replays continue to return their saved currency
+and commercial amounts.
+
+Run `pnpm test:o2c:postgres` from the repository root for the disposable fresh,
+upgrade, historical-snapshot, and unexpected-currency rollback proof.
 
 ## Configuration and Security Baseline
 

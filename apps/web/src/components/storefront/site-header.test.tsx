@@ -10,7 +10,7 @@ import { SiteHeaderClient } from './site-header';
 const logoutAction = vi.fn();
 
 const emptyCart: Cart = {
-  currency: 'USD',
+  currency: 'EUR',
   distinctItemCount: 0,
   items: [],
   subtotalMinor: 0,

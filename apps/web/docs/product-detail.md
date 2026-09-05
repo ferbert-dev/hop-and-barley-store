@@ -6,8 +6,8 @@ there is no product-specific page code or copied template markup.
 
 ## Data and rendering contract
 
-- NestJS owns public visibility and returns only active USD products.
-- Unknown, inactive and non-USD slugs share one generic not-found result.
+- NestJS owns public visibility and returns only active EUR products.
+- Unknown, inactive and non-EUR slugs share one generic not-found result.
 - Exact stock stays private; the page receives only `in-stock` or
   `out-of-stock`.
 - Ordered JSON specifications are validated by the API, generated contract and

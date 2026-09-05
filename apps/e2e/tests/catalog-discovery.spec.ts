@@ -26,6 +26,7 @@ test('renders the ready catalog and applies URL-owned filters', async ({
     page.getByRole('img', { name: 'Close-up hop cones and green leaves' }),
   ).toBeVisible();
   await expect(page.getByRole('article')).toHaveCount(12);
+  await expect(page.getByText('€5.99', { exact: true }).first()).toBeVisible();
   await expect(
     page.getByRole('search', { name: 'Search products' }),
   ).toBeVisible();

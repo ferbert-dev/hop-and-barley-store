@@ -15,6 +15,7 @@ import styles from './product-detail.module.css';
 
 type ProductCartControlProps = Readonly<{
   availability: 'in-stock' | 'out-of-stock';
+  currency: string;
   productName: string;
   productSlug: string;
   priceMinor: number;
@@ -22,6 +23,7 @@ type ProductCartControlProps = Readonly<{
 }>;
 
 export function ProductCartControl({
+  currency,
   productName,
   productSlug,
   priceMinor,
@@ -66,6 +68,7 @@ export function ProductCartControl({
       ) : null}
       <AddToCartControl
         loading={loading}
+        currency={currency}
         productName={productName}
         productSlug={productSlug}
         priceMinor={priceMinor}
@@ -81,6 +84,7 @@ export function ProductCartControl({
 }
 
 function AddToCartControl({
+  currency,
   loading,
   productName,
   productSlug,
@@ -114,7 +118,7 @@ function AddToCartControl({
               ? 100_000
               : quantityMetadata.minimumOrderAmount
           }
-          currency={state.kind === 'ready' ? state.cart.currency : 'USD'}
+          currency={state.kind === 'ready' ? state.cart.currency : currency}
           disabled={loading || pending !== null}
           metadata={quantityMetadata}
           onSubmit={async (amount) => {

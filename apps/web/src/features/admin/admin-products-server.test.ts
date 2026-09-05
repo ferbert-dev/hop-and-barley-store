@@ -13,7 +13,7 @@ const product = {
   amountUnit: 'MILLIGRAM',
   category: { name: 'Hops', slug: 'hops' },
   createdAt: '2026-08-28T10:00:00.000Z',
-  currency: 'USD',
+  currency: 'EUR',
   description: 'Citrus and floral whole-cone hops.',
   id: '20000000-0000-4000-8000-000000000002',
   imagePath: '/assets/products/cascade-hops.webp',
@@ -31,7 +31,7 @@ const product = {
 const response = {
   items: [product],
   meta: {
-    currency: 'USD',
+    currency: 'EUR',
     facets: { categories: [{ name: 'Hops', slug: 'hops' }] },
     filters: {
       category: null,

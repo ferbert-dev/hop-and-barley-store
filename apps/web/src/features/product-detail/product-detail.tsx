@@ -57,7 +57,7 @@ export function ProductDetail({ product }: { product: ProductDetailProduct }) {
           <div className={styles.priceBlock}>
             <Price
               className={styles.price}
-              currency="USD"
+              currency={product.currency}
               minorUnits={product.priceMinor}
             />
             <span className={styles.qualifier}>{formatSaleUnit(product)}</span>
@@ -71,6 +71,7 @@ export function ProductDetail({ product }: { product: ProductDetailProduct }) {
             availability={product.availability}
             productName={product.name}
             productSlug={product.slug}
+            currency={product.currency}
             priceMinor={product.priceMinor}
             quantityMetadata={product}
           />

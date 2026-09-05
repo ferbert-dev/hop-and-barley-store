@@ -17,7 +17,7 @@ export type AdminProductSaleKind = (typeof ADMIN_PRODUCT_SALE_KINDS)[number];
 
 const CANONICAL_INTEGER = /^(?:0|[1-9]\d*)$/;
 const POSITIVE_CANONICAL_INTEGER = /^[1-9]\d*$/;
-const USD_DECIMAL = /^(?!0\.0{1,2}$)(?:0|[1-9]\d{0,7})\.\d{1,2}$/;
+const EUR_DECIMAL = /^(?!0\.0{1,2}$)(?:0|[1-9]\d{0,7})\.\d{1,2}$/;
 const ISO_INSTANT_WITH_ZONE = /(?:Z|[+-]\d{2}:\d{2})$/;
 
 export class AdminProductCreateCategoryDto {
@@ -64,16 +64,16 @@ export class AdminCreateProductBodyDto {
 
   @ApiProperty({
     description:
-      'Positive USD decimal string with one or two fractional digits; minor units must fit int32.',
+      'Positive EUR decimal string with one or two fractional digits; minor units must fit int32.',
     example: '5.99',
     maxLength: 11,
-    pattern: USD_DECIMAL.source,
+    pattern: EUR_DECIMAL.source,
     type: String,
   })
   @Transform(({ value }) => trimString(value))
   @IsString()
   @MaxLength(11)
-  @Matches(USD_DECIMAL)
+  @Matches(EUR_DECIMAL)
   price!: string;
 
   @ApiProperty({
@@ -208,8 +208,8 @@ export class AdminCreatedProductDto {
   @ApiProperty({ format: 'int32', minimum: 1, type: 'integer' })
   priceMinor!: number;
 
-  @ApiProperty({ enum: ['USD'], type: String })
-  currency!: 'USD';
+  @ApiProperty({ enum: ['EUR'], type: String })
+  currency!: 'EUR';
 
   @ApiProperty({ enum: ['per 100g', 'per package', 'per kit'], type: String })
   priceQualifier!: 'per 100g' | 'per package' | 'per kit';

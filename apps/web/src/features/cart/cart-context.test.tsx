@@ -19,7 +19,7 @@ const readyReadiness: CheckoutReadiness = {
 };
 
 const initialCart: Cart = {
-  currency: 'USD' as const,
+  currency: 'EUR' as const,
   distinctItemCount: 1,
   items: [
     {

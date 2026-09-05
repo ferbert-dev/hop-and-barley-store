@@ -41,7 +41,7 @@ export function PagedCatalogCard({
       name={product.name}
       price={
         <span className={styles.priceLine}>
-          <Price currency="USD" minorUnits={product.priceMinor} />
+          <Price currency={product.currency} minorUnits={product.priceMinor} />
           <span>{formatSaleUnit(product)}</span>
         </span>
       }
@@ -80,7 +80,9 @@ export function LegacyCatalogCard({
         )
       }
       name={product.name}
-      price={<Price currency="USD" minorUnits={product.priceMinor} />}
+      price={
+        <Price currency={product.currency} minorUnits={product.priceMinor} />
+      }
     />
   );
 }

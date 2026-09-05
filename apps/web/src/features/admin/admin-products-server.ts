@@ -89,7 +89,7 @@ function isAdminProduct(value: unknown): boolean {
     isShortString(value.description) &&
     isShortString(value.imagePath) &&
     isNonNegativeInteger(value.priceMinor) &&
-    value.currency === 'USD' &&
+    value.currency === 'EUR' &&
     isShortString(value.priceQualifier) &&
     isShortString(value.category.slug) &&
     isShortString(value.category.name) &&
@@ -114,7 +114,7 @@ function isMeta(value: Record<string, unknown>): boolean {
     typeof value.hasNextPage === 'boolean' &&
     typeof value.hasPreviousPage === 'boolean' &&
     isSort(value.sort) &&
-    value.currency === 'USD' &&
+    value.currency === 'EUR' &&
     isFilters(value.filters) &&
     isRecord(value.facets) &&
     Array.isArray(value.facets.categories) &&

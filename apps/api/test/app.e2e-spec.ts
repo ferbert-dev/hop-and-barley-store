@@ -71,7 +71,7 @@ jest.mock('./../src/database/prisma.service', () => ({
             ? Promise.resolve({
                 amountUnit: 'MILLIGRAM',
                 category: { name: 'Hops', slug: 'hops' },
-                currency: 'USD',
+                currency: 'EUR',
                 description: 'Bright whole-cone hops',
                 id: '20000000-0000-4000-8000-000000000002',
                 imagePath: '/assets/products/cascade-hops.webp',
@@ -106,7 +106,7 @@ jest.mock('./../src/database/prisma.service', () => ({
                   amountUnit: 'MILLIGRAM',
                   category: { name: 'Hops', slug: 'hops' },
                   createdAt: new Date('2026-08-01T10:00:00.000Z'),
-                  currency: 'USD',
+                  currency: 'EUR',
                   description: 'Bright whole-cone hops',
                   id: '20000000-0000-4000-8000-000000000002',
                   isActive: true,
@@ -121,7 +121,7 @@ jest.mock('./../src/database/prisma.service', () => ({
               : {
                   amountUnit: 'MILLIGRAM',
                   category: { name: 'Hops', slug: 'hops' },
-                  currency: 'USD',
+                  currency: 'EUR',
                   description: 'Bright whole-cone hops',
                   id: '20000000-0000-4000-8000-000000000002',
                   imagePath: '/assets/products/cascade-hops.webp',
@@ -1068,7 +1068,8 @@ describe('Platform API (e2e)', () => {
     expect(schemas.ProductDto.properties?.slug?.pattern).toBe(
       '^[a-z0-9]+(?:-[a-z0-9]+)*$',
     );
-    expect(schemas.ProductDto.properties?.currency?.enum).toEqual(['USD']);
+    expect(schemas.ProductDto.properties?.currency?.enum).toEqual(['EUR']);
+    expect(schemas.OrderDto.properties?.currency?.enum).toEqual(['EUR', 'USD']);
     expect(schemas.CatalogFiltersDto.properties?.minPriceMinor).toMatchObject({
       format: 'int32',
       maximum: 2_147_483_647,
@@ -1130,13 +1131,13 @@ describe('Platform API (e2e)', () => {
         {
           availability: 'in-stock',
           category: { name: 'Hops', slug: 'hops' },
-          currency: 'USD',
+          currency: 'EUR',
           name: 'Cascade Hops',
           slug: 'cascade-hops',
         },
       ],
       meta: {
-        currency: 'USD',
+        currency: 'EUR',
         facets: { categories: [{ name: 'Hops', slug: 'hops' }] },
         filters: {
           category: null,
@@ -1283,7 +1284,7 @@ describe('Platform API (e2e)', () => {
       amountUnit: 'MILLIGRAM',
       availability: 'in-stock',
       category: { name: 'Hops', slug: 'hops' },
-      currency: 'USD',
+      currency: 'EUR',
       description: 'Bright whole-cone hops',
       id: '20000000-0000-4000-8000-000000000002',
       imagePath: '/assets/products/cascade-hops.webp',

@@ -29,7 +29,7 @@ vi.mock('next/image', () => ({
 const product = {
   availability: 'in-stock' as const,
   category: { name: 'Hops', slug: 'hops' },
-  currency: 'USD' as const,
+  currency: 'EUR' as const,
   description: 'First paragraph.\n\nSecond paragraph.\n\nThird paragraph.',
   id: '20000000-0000-4000-8000-000000000001',
   imagePath: '/assets/products/citra-hops.webp',
@@ -54,7 +54,7 @@ const product = {
 };
 
 const emptyCart: Cart = {
-  currency: 'USD',
+  currency: 'EUR',
   distinctItemCount: 0,
   items: [],
   subtotalMinor: 0,
@@ -91,7 +91,7 @@ describe('ProductDetail', () => {
     renderProductDetail();
 
     expect(screen.getByRole('heading', { name: 'Citra Hops' })).toBeVisible();
-    expect(screen.getAllByText('US$5.99')).not.toHaveLength(0);
+    expect(screen.getAllByText('€5.99')).not.toHaveLength(0);
     expect(screen.getByText('per 100g')).toBeVisible();
     expect(screen.getByText('Viewing Citra Hops')).toHaveAttribute(
       'aria-live',

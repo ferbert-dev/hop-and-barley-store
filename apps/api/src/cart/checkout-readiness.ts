@@ -25,7 +25,7 @@ export function checkoutLineOutcome(
   if (
     !product ||
     !isPublicProductEligible(product, evaluatedAt) ||
-    product.currency !== 'USD'
+    product.currency !== 'EUR'
   ) {
     return 'product_unavailable';
   }

@@ -151,7 +151,7 @@ model Product {
   description        String
   priceMinor         Int
   priceQualifier     String                   @db.VarChar(64)
-  currency           String                   @default("USD") @db.VarChar(3)
+  currency           String                   @default("EUR") @db.VarChar(3)
   saleKind           SaleKind
   amountUnit         AmountUnit
   priceBasisAmount   Int

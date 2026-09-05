@@ -3,7 +3,7 @@
   "ticket": "R2",
   "agentRun": "https://app.notion.com/p/3bdd78850eab81d69677f7d24401fbcc",
   "correctionAgentRun": null,
-  "policyDigest": "sha256:fcc4012937e0de9aef415354eb7ea25427d81e6033aab2830a3c663339c0871a",
+  "policyDigest": "sha256:260abd41afa2b7f4ebb940d410438053a64c6fa3028da9c28d22d924323e9bfc",
   "rules": [
     {
       "id": "independent-required-checks",
@@ -403,7 +403,7 @@
     "baseline": {
       "categories": 5,
       "products": 12,
-      "currency": "USD",
+      "currency": "EUR",
       "transactionIsolation": "RepeatableRead",
       "publicRevalidateSeconds": 60,
       "requestTimeoutMilliseconds": 1000,

@@ -83,7 +83,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
         );
         return (
           fixture !== undefined &&
-          currency === 'USD' &&
+          currency === 'EUR' &&
           isActive &&
           saleKind === fixture.saleKind &&
           stockAmount === fixture.stockAmount
@@ -111,7 +111,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
       amountUnit: expected.amountUnit,
       availability: 'in-stock',
       category: { name: 'Hops', slug: 'hops' },
-      currency: 'USD',
+      currency: 'EUR',
       description: expected.description,
       id: expected.id,
       imagePath: expected.imagePath,
@@ -155,7 +155,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
     ]);
   });
 
-  it('returns the default 12-item USD envelope and product-backed base facets', async () => {
+  it('returns the default 12-item EUR envelope and product-backed base facets', async () => {
     const hops = catalogCategories.find(({ slug }) => slug === 'hops');
     if (!hops) throw new Error('Missing hops fixture');
 
@@ -191,9 +191,9 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
         }),
         productFixture({
           categoryId: '30000000-0000-4000-8000-000000000010',
-          currency: 'EUR',
+          currency: 'USD',
           id: '30000000-0000-4000-8000-000000000002',
-          slug: 'hidden-eur',
+          slug: 'hidden-usd',
         }),
         productFixture({
           categoryId: '30000000-0000-4000-8000-000000000011',
@@ -209,7 +209,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
 
       expect(body.items).toHaveLength(12);
       expect(body.meta).toMatchObject({
-        currency: 'USD',
+        currency: 'EUR',
         hasNextPage: false,
         hasPreviousPage: false,
         limit: 12,
@@ -218,9 +218,9 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
         totalItems: 12,
         totalPages: 1,
       });
-      expect(body.items.every(({ currency }) => currency === 'USD')).toBe(true);
+      expect(body.items.every(({ currency }) => currency === 'EUR')).toBe(true);
       expect(body.items.map(({ slug }) => slug)).not.toEqual(
-        expect.arrayContaining(['hidden-inactive', 'hidden-eur']),
+        expect.arrayContaining(['hidden-inactive', 'hidden-usd']),
       );
       expect(body.meta.facets.categories).toEqual(expectedCategoryFacets());
       expect(body.meta.facets.categories).not.toContainEqual({
@@ -233,7 +233,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
           { name: 'Excluded orphan', slug: 'excluded-orphan' },
         ]),
       );
-      for (const slug of ['hidden-inactive', 'hidden-eur', 'missing-product']) {
+      for (const slug of ['hidden-inactive', 'hidden-usd', 'missing-product']) {
         const hidden = await request(app.getHttpServer() as App)
           .get(`/api/v1/products/${slug}`)
           .expect(404);
@@ -247,7 +247,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
       await prisma.product.deleteMany({
         where: {
           slug: {
-            in: ['hidden-inactive', 'hidden-eur', 'hidden-inactive-category'],
+            in: ['hidden-inactive', 'hidden-usd', 'hidden-inactive-category'],
           },
         },
       });
@@ -442,7 +442,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
           [categoryId],
         );
         await postgres.query(
-          `INSERT INTO "Product" ("id", "name", "slug", "teaser", "description", "priceMinor", "priceQualifier", "currency", "saleKind", "amountUnit", "priceBasisAmount", "minimumOrderAmount", "orderStepAmount", "stockAmount", "isActive", "imagePath", "specifications", "categoryId", "updatedAt") VALUES ($1, 'Snapshot product', 'snapshot-product', 'Snapshot product', 'Snapshot product', 1, 'fixture', 'USD', 'PACKAGE', 'EACH', 1, 1, 1, 1, true, '/assets/products/snapshot-product.webp', '[]'::jsonb, $2, CURRENT_TIMESTAMP)`,
+          `INSERT INTO "Product" ("id", "name", "slug", "teaser", "description", "priceMinor", "priceQualifier", "currency", "saleKind", "amountUnit", "priceBasisAmount", "minimumOrderAmount", "orderStepAmount", "stockAmount", "isActive", "imagePath", "specifications", "categoryId", "updatedAt") VALUES ($1, 'Snapshot product', 'snapshot-product', 'Snapshot product', 'Snapshot product', 1, 'fixture', 'EUR', 'PACKAGE', 'EACH', 1, 1, 1, 1, true, '/assets/products/snapshot-product.webp', '[]'::jsonb, $2, CURRENT_TIMESTAMP)`,
           [productId, categoryId],
         );
       })();
@@ -538,7 +538,7 @@ describePostgres('C2 catalog discovery with PostgreSQL 17.6 (e2e)', () => {
   it('captures a parameterized catalog EXPLAIN plan without raw SQL in service', async () => {
     const explain = await postgres.query<{ 'QUERY PLAN': string }>(
       `EXPLAIN (FORMAT TEXT) SELECT "id" FROM "Product" WHERE "isActive" = true AND "currency" = $1 ORDER BY "name" ASC, "slug" ASC LIMIT $2`,
-      ['USD', 12],
+      ['EUR', 12],
     );
 
     expect(explain.rows.length).toBeGreaterThan(0);
@@ -604,7 +604,7 @@ function invalidProductInsert(
   const sequence = invalidProductSequence++;
   const values = {
     categoryId: '10000000-0000-4000-8000-000000000001',
-    currency: 'USD',
+    currency: 'EUR',
     description: 'Constraint fixture',
     id: `50000000-0000-4000-8000-${String(sequence).padStart(12, '0')}`,
     imagePath: '/assets/products/constraint-fixture.webp',
@@ -648,7 +648,7 @@ function productFixture(
 ): Prisma.ProductCreateManyInput {
   return {
     amountUnit: 'EACH',
-    currency: 'USD',
+    currency: 'EUR',
     description: 'Integration fixture for grounded hops discovery',
     imagePath: `/assets/products/${overrides.slug}.webp`,
     isActive: true,
