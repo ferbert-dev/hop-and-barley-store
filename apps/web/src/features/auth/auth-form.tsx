@@ -75,6 +75,9 @@ export function AuthForm({
   );
   const feedbackRef = useRef<HTMLDivElement>(null);
   const copy = formCopy[kind];
+  const returnQuery =
+    returnTo === '/' ? '' : `?next=${encodeURIComponent(returnTo)}`;
+  const alternateHref = `${copy.alternateHref}${returnQuery}`;
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -100,7 +103,7 @@ export function AuthForm({
         <h1>Check complete</h1>
         <p>If the details can be accepted, your account is ready.</p>
         <p>No account-existence details are disclosed here.</p>
-        <Button href="/login">Continue to sign in</Button>
+        <Button href={`/login${returnQuery}`}>Continue to sign in</Button>
       </section>
     );
   }
@@ -230,7 +233,7 @@ export function AuthForm({
 
       <p className={styles.alternate}>
         {copy.alternatePrompt}{' '}
-        <Link href={copy.alternateHref}>{copy.alternateLabel}</Link>
+        <Link href={alternateHref}>{copy.alternateLabel}</Link>
       </p>
     </section>
   );
