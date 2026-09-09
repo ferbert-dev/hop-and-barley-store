@@ -2,11 +2,15 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CHECKOUT_HANDOFF_KEY, storeCheckoutHandoff } from './checkout-handoff';
 import { CheckoutScreen } from './checkout-screen';
 
 const privateHeaders = { 'cache-control': 'private, no-store' };
 const response = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { headers: privateHeaders, status });
+  new Response(JSON.stringify(withQuote(body)), {
+    headers: privateHeaders,
+    status,
+  });
 
 afterEach(() => vi.unstubAllGlobals());
 beforeEach(() => window.sessionStorage.clear());
@@ -29,13 +33,11 @@ describe('CheckoutScreen', () => {
       screen.getByRole('link', { name: 'create an account' }),
     ).toHaveAttribute('href', '/register?next=%2Fcheckout');
     expect(screen.getByLabelText('Debit Card')).toBeChecked();
-    expect(
-      window.sessionStorage.getItem('hb-checkout-draft-handoff-v1'),
-    ).toBeNull();
+    expect(window.sessionStorage.getItem(CHECKOUT_HANDOFF_KEY)).toBeNull();
     await user.click(screen.getByRole('link', { name: 'Sign in' }));
-    expect(
-      window.sessionStorage.getItem('hb-checkout-draft-handoff-v1'),
-    ).toContain('stripe_debit_card');
+    expect(window.sessionStorage.getItem(CHECKOUT_HANDOFF_KEY)).not.toContain(
+      'stripe_debit_card',
+    );
     expect(
       screen.queryByRole('button', { name: 'Pay' }),
     ).not.toBeInTheDocument();
@@ -93,6 +95,10 @@ describe('CheckoutScreen', () => {
     expect(request.url).toBe('http://localhost:3001/api/v1/checkout/draft');
     expect(request.headers.get('idempotency-key')).toMatch(/^checkout-/u);
     expect(request.url).not.toContain('stripe');
+    expect(screen.getByText('Products')).toBeVisible();
+    expect(screen.getByText('€5.99')).toBeVisible();
+    expect(screen.getByText('€5.00')).toBeVisible();
+    expect(screen.getByText('€10.99')).toBeVisible();
   });
 
   it('adopts an unchanged session-only handoff draft after an auth ownership transition', async () => {
@@ -101,13 +107,10 @@ describe('CheckoutScreen', () => {
       delivery: { city: 'Berlin', countryCode: 'DE', street: 'Hopfenstraße' },
       email: 'brewer@example.com',
       fullName: 'Alex Brewer',
-      paymentMethod: 'stripe_debit_card',
+      paymentMethod: 'stripe_debit_card' as const,
       phoneNumber: '+4912345678',
     };
-    window.sessionStorage.setItem(
-      'hb-checkout-draft-handoff-v1',
-      JSON.stringify(handoff),
-    );
+    storeCheckoutHandoff(window.sessionStorage, handoff, null);
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(response(undefined, 401))
@@ -139,8 +142,98 @@ describe('CheckoutScreen', () => {
       'http://localhost:3001/api/v1/checkout/draft',
     );
     await expect(adoptionRequest.clone().json()).resolves.toEqual(handoff);
-    expect(
-      window.sessionStorage.getItem('hb-checkout-draft-handoff-v1'),
-    ).toBeNull();
+    expect(window.sessionStorage.getItem(CHECKOUT_HANDOFF_KEY)).toBeNull();
   });
+
+  it('clears a valid handoff if the ownership adoption save fails', async () => {
+    const handoff = {
+      delivery: { city: 'Berlin', countryCode: 'DE', street: 'Hopfenstraße' },
+      email: 'brewer@example.com',
+      fullName: 'Alex Brewer',
+      paymentMethod: 'stripe_debit_card' as const,
+      phoneNumber: '+4912345678',
+    };
+    storeCheckoutHandoff(window.sessionStorage, handoff, null);
+    const csrfToken = `v1.${'A'.repeat(43)}`;
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(response(undefined, 401))
+        .mockResolvedValueOnce(response({ csrfToken }))
+        .mockResolvedValueOnce(response(undefined, 503)),
+    );
+
+    render(<CheckoutScreen />);
+
+    await screen.findByRole('link', { name: 'Sign in' });
+    expect(window.sessionStorage.getItem(CHECKOUT_HANDOFF_KEY)).toBeNull();
+  });
+
+  it.each([
+    ['empty', 'Your cart is empty. Return to cart to add items.'],
+    [
+      'unavailable',
+      'We can’t quote this cart right now. Return to cart to review availability.',
+    ],
+  ] as const)(
+    'renders the server %s quote state',
+    async (quoteStatus, copy) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () =>
+          response({
+            currency: 'EUR',
+            delivery: {
+              additionalInfo: null,
+              administrativeArea: null,
+              apartmentUnit: null,
+              city: 'Berlin',
+              countryCode: 'DE',
+              floor: null,
+              houseNumber: null,
+              postalCode: '10115',
+              street: 'Hopfenstraße',
+            },
+            email: 'brewer@example.com',
+            expiresAt: null,
+            fullName: 'Alex Brewer',
+            itemSubtotalMinor: 0,
+            paymentMethod: 'stripe_debit_card',
+            phoneNumber: '+4912345678',
+            quoteStatus,
+            quotedAt: '2026-09-10T10:00:00.000Z',
+            shippingMinor: 0,
+            status: 'pre_payment',
+            totalMinor: 0,
+            updatedAt: '2026-09-10T10:00:00.000Z',
+          }),
+        ),
+      );
+
+      render(<CheckoutScreen />);
+
+      expect(await screen.findByText(copy)).toBeVisible();
+    },
+  );
 });
+
+function withQuote(body: unknown) {
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('status' in body) ||
+    body.status !== 'pre_payment'
+  ) {
+    return body;
+  }
+  return {
+    currency: 'EUR',
+    itemSubtotalMinor: 599,
+    quoteStatus: 'ready',
+    quotedAt: '2026-09-10T10:00:00.000Z',
+    shippingMinor: 500,
+    totalMinor: 1099,
+    ...body,
+  };
+}

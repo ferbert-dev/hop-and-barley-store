@@ -80,7 +80,7 @@ export class CheckoutController {
   @ApiCookieAuth('guestCheckoutCookie')
   @ApiOperation({
     description:
-      'Creates or updates a private pre-payment delivery/contact snapshot without reserving or decrementing stock. The first guest write issues a cookie-only 24-hour capability; later writes require it and never extend its absolute expiry. Guest payment selection is Stripe debit card only; this endpoint does not contact Stripe or create an order.',
+      'Creates or updates a private pre-payment delivery/contact snapshot and server-authoritative EUR quote without reserving or decrementing stock. The first guest write issues a cookie-only 24-hour capability; an exact same-cart idempotent retry may reissue a lost capability without extending expiry, while other later writes require it. Guest payment selection is Stripe debit card only; this endpoint does not contact Stripe or create an order.',
     summary: 'Save a private pre-payment checkout draft',
   })
   @ApiHeader({ name: 'Origin', required: true, schema: { type: 'string' } })
@@ -109,7 +109,7 @@ export class CheckoutController {
     headers: {
       'Set-Cookie': {
         description:
-          'Issued only when a guest draft is first created or safely restarted after expiry. The capability is never returned in JSON.',
+          'Issued when a guest draft is first created, safely recovered by an exact idempotent retry, or restarted after expiry. The capability is never returned in JSON.',
         schema: { type: 'string' },
       },
     },
@@ -124,7 +124,8 @@ export class CheckoutController {
     description: 'Idempotency key was reused with different canonical input',
   })
   @ApiUnprocessableEntityResponse({
-    description: 'Anonymous Cash on Delivery is unavailable',
+    description:
+      'Anonymous Cash on Delivery or a safe authoritative EUR quote is unavailable',
   })
   @ApiUnsupportedMediaTypeResponse({ description: 'JSON body required' })
   async saveDraft(
@@ -146,6 +147,7 @@ export class CheckoutController {
           this.cookieMode(),
           saved.issuedCapability.rawToken,
           saved.issuedCapability.expiresAt,
+          saved.issuedCapability.issuedAt,
         ),
       );
     }

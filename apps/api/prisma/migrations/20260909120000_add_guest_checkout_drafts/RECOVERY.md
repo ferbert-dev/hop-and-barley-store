@@ -19,3 +19,18 @@ must never delete carts or orders.
 Never edit this applied migration, reset PostgreSQL, use `db push`, delete a
 volume, make expired guest capabilities valid again, or copy capability digests
 into logs or responses.
+
+## Expired pre-payment data lifecycle
+
+The separately invoked checkout purge deletes only guest-owned `PRE_PAYMENT`
+drafts whose absolute capability expiry has passed and whose cart has no order.
+The draft foreign key cascades deletion to only its `CheckoutDraftRequest`
+response snapshots. Carts, cart items, users, products, inventory, reservations,
+orders, order items, and any draft on an order-associated cart are preserved.
+
+Operational rollback disables the purge command or its future external
+scheduler. There is no schema rollback. Rows already purged contained abandoned,
+expired pre-payment PII and are intentionally not recoverable; same-browser
+recovery is to restart checkout from the preserved cart. Validate the purge in
+a disposable database before scheduling it, and keep its output to aggregate
+counts rather than identifiers or personal data.

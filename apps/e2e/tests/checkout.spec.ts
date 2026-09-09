@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 const csrfToken = `v1.${'A'.repeat(43)}`;
+const handoffKey = 'hb-checkout-draft-handoff-v2';
 
 test.describe('O2G private checkout draft', () => {
   test('shows guest and auth entry, structured delivery fields, fixed shipping, and a draft save/reload', async ({
@@ -19,8 +20,11 @@ test.describe('O2G private checkout draft', () => {
     await expect(page.getByLabel('Full Name')).toBeVisible();
     await expect(page.getByLabel('Country (ISO code)')).toBeVisible();
     await expect(page.getByLabel('Delivery notes')).toBeVisible();
-    await expect(page.getByText('€5.00')).toBeVisible();
-    await expect(page.getByText('Confirmed later')).toBeVisible();
+    await expect(
+      page.getByText(
+        'Save your checkout details to receive the current order quote.',
+      ),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Pay' })).toHaveCount(0);
 
     await fillCheckoutDraft(page);
@@ -87,10 +91,82 @@ async function preserveDraftThroughSignIn(page: Page, cartMerge: string) {
   });
   expect(
     await page.evaluate(() =>
-      sessionStorage.getItem('hb-checkout-draft-handoff-v1'),
+      sessionStorage.getItem('hb-checkout-draft-handoff-v2'),
     ),
   ).toBeNull();
 }
+
+test.describe('O2G handoff cleanup', () => {
+  test('clears malformed and expired handoffs without reposting their PII', async ({
+    page,
+  }) => {
+    for (const value of [
+      '{not-json',
+      JSON.stringify({
+        draft: {
+          delivery: {
+            city: 'Berlin',
+            countryCode: 'DE',
+            street: 'Hopfenstraße',
+          },
+          email: 'brewer@example.com',
+          fullName: 'Alex Brewer',
+          phoneNumber: '+4912345678',
+        },
+        expiresAt: '2026-09-09T10:00:00.000Z',
+        issuedAt: '2026-09-08T10:00:00.000Z',
+        version: 2,
+      }),
+    ]) {
+      await page.addInitScript(
+        ({ key, stored }) => sessionStorage.setItem(key, stored),
+        { key: handoffKey, stored: value },
+      );
+      const api = await interceptCheckoutDraft(page);
+      await page.goto('/checkout');
+      await page
+        .getByLabel('Checkout')
+        .getByRole('link', { name: 'Sign in' })
+        .waitFor();
+      expect(
+        await page.evaluate((key) => sessionStorage.getItem(key), handoffKey),
+      ).toBeNull();
+      expect(api.posts).toBe(0);
+    }
+  });
+
+  test('clears handoff data if auth-transition adoption fails', async ({
+    page,
+  }) => {
+    const api = await interceptCheckoutDraft(page, {
+      failAdoption: true,
+      requireAdoption: true,
+    });
+    await interceptSuccessfulLogin(page, 'succeeded');
+    await page.goto('/checkout');
+    await fillCheckoutDraft(page);
+    await page.getByRole('button', { name: 'Save checkout details' }).click();
+    await expect(
+      page.getByText('Checkout details saved privately.'),
+    ).toBeVisible();
+    api.markAuthTransition();
+    await page
+      .getByLabel('Checkout')
+      .getByRole('link', { name: 'Sign in' })
+      .click();
+    await expect(page).toHaveURL(/\/login\?next=%2Fcheckout$/);
+    await page.getByLabel('Email').fill('brewer@example.com');
+    await page.getByLabel('Password', { exact: true }).fill('Abcdefghi1!x');
+    await page.getByRole('button', { name: 'Sign In' }).click();
+    await expect(page).toHaveURL(/\/checkout$/);
+    await expect
+      .poll(() =>
+        page.evaluate((key) => sessionStorage.getItem(key), handoffKey),
+      )
+      .toBeNull();
+    expect(api.posts).toBe(2);
+  });
+});
 
 async function interceptSuccessfulLogin(page: Page, cartMerge: string) {
   await page.route('**/api/v1/auth/login', async (route) => {
@@ -108,12 +184,13 @@ async function interceptSuccessfulLogin(page: Page, cartMerge: string) {
 
 async function interceptCheckoutDraft(
   page: Page,
-  options: Readonly<{ requireAdoption?: boolean }> = {},
+  options: Readonly<{ failAdoption?: boolean; requireAdoption?: boolean }> = {},
 ) {
   let saved: Record<string, unknown> | null = null;
   let authTransition = false;
   let awaitingAdoption = false;
   let adoptions = 0;
+  let posts = 0;
   await page.route('**/api/v1/cart/csrf', (route) =>
     fulfill(route, { csrfToken }),
   );
@@ -138,9 +215,14 @@ async function interceptCheckoutDraft(
       return;
     }
     saved = request.postDataJSON() as Record<string, unknown>;
+    posts += 1;
     if (awaitingAdoption) {
       awaitingAdoption = false;
       adoptions += 1;
+    }
+    if (options.failAdoption && adoptions === 1) {
+      await fulfill(route, undefined, 503);
+      return;
     }
     await fulfill(route, draftResponse(saved));
   });
@@ -151,6 +233,9 @@ async function interceptCheckoutDraft(
     get saved() {
       return saved;
     },
+    get posts() {
+      return posts;
+    },
     markAuthTransition() {
       authTransition = true;
     },
@@ -159,6 +244,8 @@ async function interceptCheckoutDraft(
 
 function draftResponse(saved: Record<string, unknown>) {
   return {
+    currency: 'EUR',
+    itemSubtotalMinor: 599,
     ...saved,
     delivery: {
       additionalInfo: null,
@@ -170,7 +257,11 @@ function draftResponse(saved: Record<string, unknown>) {
       ...(saved.delivery as Record<string, unknown>),
     },
     expiresAt: null,
+    quoteStatus: 'ready',
+    quotedAt: '2026-09-10T10:00:00.000Z',
     status: 'pre_payment',
+    shippingMinor: 500,
+    totalMinor: 1099,
     updatedAt: '2026-09-09T10:00:00.000Z',
   };
 }

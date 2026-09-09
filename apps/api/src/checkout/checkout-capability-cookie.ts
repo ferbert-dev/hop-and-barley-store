@@ -20,9 +20,19 @@ export function createCheckoutCapabilityCookie(
   mode: CheckoutCookieMode,
   token: string,
   expiresAt: Date,
+  issuedAt = new Date(
+    expiresAt.getTime() - CHECKOUT_CAPABILITY_MAX_AGE_SECONDS * 1_000,
+  ),
 ): string {
   const secure = mode === 'secure-https' ? '; Secure' : '';
-  return `${getCheckoutCapabilityCookieName(mode)}=${token}; Max-Age=${CHECKOUT_CAPABILITY_MAX_AGE_SECONDS}; Expires=${expiresAt.toUTCString()}; Path=/; HttpOnly${secure}; SameSite=Lax`;
+  const remainingSeconds = Math.max(
+    0,
+    Math.min(
+      CHECKOUT_CAPABILITY_MAX_AGE_SECONDS,
+      Math.ceil((expiresAt.getTime() - issuedAt.getTime()) / 1_000),
+    ),
+  );
+  return `${getCheckoutCapabilityCookieName(mode)}=${token}; Max-Age=${remainingSeconds}; Expires=${expiresAt.toUTCString()}; Path=/; HttpOnly${secure}; SameSite=Lax`;
 }
 
 export function readCheckoutCapabilityCookie(

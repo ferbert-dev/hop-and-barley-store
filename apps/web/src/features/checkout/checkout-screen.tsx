@@ -6,6 +6,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { Field } from '../../components/ui/field';
+import { Price } from '../../components/ui/price';
+import {
+  clearCheckoutHandoff,
+  readCheckoutHandoff,
+  storeCheckoutHandoff,
+} from './checkout-handoff';
 import {
   createBrowserCheckoutTransport,
   type CheckoutDraft,
@@ -42,7 +48,6 @@ const EMPTY_FORM: CheckoutForm = {
   postalCode: '',
   street: '',
 };
-const DRAFT_HANDOFF_KEY = 'hb-checkout-draft-handoff-v1';
 
 export function CheckoutScreen() {
   const [form, setForm] = useState<CheckoutForm>(EMPTY_FORM);
@@ -52,6 +57,8 @@ export function CheckoutScreen() {
   const [saveState, setSaveState] = useState<
     'idle' | 'saving' | 'saved' | 'unavailable'
   >('idle');
+  const [draftExpiresAt, setDraftExpiresAt] = useState<string | null>(null);
+  const [quote, setQuote] = useState<CheckoutDraft | null>(null);
   const idempotencyKey = useRef<string | null>(null);
 
   useEffect(() => {
@@ -61,12 +68,14 @@ export function CheckoutScreen() {
       (draft) => {
         if (!active) return;
         if (draft) {
-          clearStoredDraft();
+          clearCheckoutHandoff(window.sessionStorage);
           setForm(formFromDraft(draft));
+          setDraftExpiresAt(draft.expiresAt);
+          setQuote(draft);
           setLoadState('ready');
           return;
         }
-        const handoff = readStoredDraft();
+        const handoff = readCheckoutHandoff(window.sessionStorage);
         if (!handoff) {
           setLoadState('ready');
           return;
@@ -75,14 +84,22 @@ export function CheckoutScreen() {
         void transport.saveDraft(handoff, createIdempotencyKey()).then(
           (adopted) => {
             if (!active) return;
-            clearStoredDraft();
+            clearCheckoutHandoff(window.sessionStorage);
             setForm(formFromDraft(adopted));
+            setDraftExpiresAt(adopted.expiresAt);
+            setQuote(adopted);
             setLoadState('ready');
           },
-          () => active && setLoadState('ready'),
+          () => {
+            clearCheckoutHandoff(window.sessionStorage);
+            if (active) setLoadState('ready');
+          },
         );
       },
-      () => active && setLoadState('unavailable'),
+      () => {
+        clearCheckoutHandoff(window.sessionStorage);
+        if (active) setLoadState('unavailable');
+      },
     );
     return () => {
       active = false;
@@ -106,6 +123,8 @@ export function CheckoutScreen() {
           (idempotencyKey.current = createIdempotencyKey()),
       );
       setForm(formFromDraft(draft));
+      setDraftExpiresAt(draft.expiresAt);
+      setQuote(draft);
       setSaveState('saved');
     } catch {
       setSaveState('unavailable');
@@ -114,6 +133,12 @@ export function CheckoutScreen() {
 
   const returnTo = '/checkout';
   const authQuery = `?next=${encodeURIComponent(returnTo)}`;
+  const preserveForAuth = () =>
+    storeCheckoutHandoff(
+      window.sessionStorage,
+      toSaveDraft(form),
+      draftExpiresAt,
+    );
 
   if (loadState === 'loading') {
     return (
@@ -143,7 +168,12 @@ export function CheckoutScreen() {
           <p className={styles.eyebrow}>Secure checkout</p>
           <h1 id="checkout-title">Checkout</h1>
         </div>
-        <Link href="/cart">Return to cart</Link>
+        <Link
+          href="/cart"
+          onClick={() => clearCheckoutHandoff(window.sessionStorage)}
+        >
+          Return to cart
+        </Link>
       </div>
       <div className={styles.entry}>
         <div>
@@ -153,17 +183,11 @@ export function CheckoutScreen() {
           </p>
         </div>
         <p>
-          <Link
-            href={`/login${authQuery}`}
-            onClick={() => storeDraft(toSaveDraft(form))}
-          >
+          <Link href={`/login${authQuery}`} onClick={preserveForAuth}>
             Sign in
           </Link>{' '}
           or{' '}
-          <Link
-            href={`/register${authQuery}`}
-            onClick={() => storeDraft(toSaveDraft(form))}
-          >
+          <Link href={`/register${authQuery}`} onClick={preserveForAuth}>
             create an account
           </Link>{' '}
           to continue with this same cart and draft.
@@ -358,16 +382,7 @@ export function CheckoutScreen() {
           </Card>
           <Card>
             <h2>Order Summary</h2>
-            <dl className={styles.summaryDetails}>
-              <div>
-                <dt>Shipping</dt>
-                <dd>€5.00</dd>
-              </div>
-              <div>
-                <dt>Product subtotal and total</dt>
-                <dd>Confirmed later</dd>
-              </div>
-            </dl>
+            <CheckoutQuote quote={quote} />
             <p className={styles.muted}>
               This step only saves your private checkout draft.
             </p>
@@ -390,6 +405,54 @@ export function CheckoutScreen() {
         </aside>
       </form>
     </section>
+  );
+}
+
+function CheckoutQuote({ quote }: Readonly<{ quote: CheckoutDraft | null }>) {
+  if (quote === null) {
+    return (
+      <p className={styles.muted} role="status">
+        Save your checkout details to receive the current order quote.
+      </p>
+    );
+  }
+  if (quote.quoteStatus === 'empty') {
+    return (
+      <p role="status">Your cart is empty. Return to cart to add items.</p>
+    );
+  }
+  if (quote.quoteStatus === 'unavailable') {
+    return (
+      <p role="status">
+        We can’t quote this cart right now. Return to cart to review
+        availability.
+      </p>
+    );
+  }
+  return (
+    <dl className={styles.summaryDetails}>
+      <div>
+        <dt>Products</dt>
+        <dd>
+          <Price
+            currency={quote.currency}
+            minorUnits={quote.itemSubtotalMinor}
+          />
+        </dd>
+      </div>
+      <div>
+        <dt>Shipping</dt>
+        <dd>
+          <Price currency={quote.currency} minorUnits={quote.shippingMinor} />
+        </dd>
+      </div>
+      <div className={styles.quoteTotal}>
+        <dt>Total</dt>
+        <dd>
+          <Price currency={quote.currency} minorUnits={quote.totalMinor} />
+        </dd>
+      </div>
+    </dl>
   );
 }
 
@@ -433,35 +496,6 @@ function formFromDraft(draft: CheckoutDraft): CheckoutForm {
 
 function createIdempotencyKey() {
   return `checkout-${crypto.randomUUID()}`;
-}
-
-function storeDraft(draft: SaveCheckoutDraft) {
-  window.sessionStorage.setItem(DRAFT_HANDOFF_KEY, JSON.stringify(draft));
-}
-
-function clearStoredDraft() {
-  window.sessionStorage.removeItem(DRAFT_HANDOFF_KEY);
-}
-
-function readStoredDraft(): SaveCheckoutDraft | null {
-  try {
-    const raw = window.sessionStorage.getItem(DRAFT_HANDOFF_KEY);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (
-      typeof parsed !== 'object' ||
-      parsed === null ||
-      !('delivery' in parsed) ||
-      !('email' in parsed) ||
-      !('fullName' in parsed) ||
-      !('phoneNumber' in parsed) ||
-      !('paymentMethod' in parsed)
-    )
-      return null;
-    return parsed as SaveCheckoutDraft;
-  } catch {
-    return null;
-  }
 }
 
 function formFromSaveDraft(draft: SaveCheckoutDraft): CheckoutForm {

@@ -40,7 +40,8 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "prisma generate && prisma db seed",
     "generate:openapi": "prisma generate && node --import tsx scripts/generate-openapi.ts",
-    "admin:provision:local": "prisma generate && node --import tsx scripts/provision-local-admin.ts"
+    "admin:provision:local": "prisma generate && node --import tsx scripts/provision-local-admin.ts",
+    "checkout:purge-expired-drafts": "prisma generate && node --import tsx scripts/purge-expired-checkout-drafts.ts"
   },
   "dependencies": {
     "@hop-and-barley/auth-contract": "workspace:*",

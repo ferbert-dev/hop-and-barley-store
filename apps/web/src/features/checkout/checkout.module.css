@@ -104,6 +104,10 @@
   font-weight: 700;
   text-align: end;
 }
+.quoteTotal {
+  border-top: 1px solid var(--hb-color-border);
+  padding-top: var(--hb-space-3);
+}
 .muted {
   color: var(--hb-color-text-muted);
 }

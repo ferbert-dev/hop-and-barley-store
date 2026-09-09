@@ -204,6 +204,24 @@ export class CheckoutDraftDto {
   @ApiProperty({ type: () => CheckoutDraftDeliveryDto })
   delivery!: CheckoutDraftDeliveryDto;
 
+  @ApiProperty({ enum: ['EUR'], type: String })
+  currency!: 'EUR';
+
+  @ApiProperty({ format: 'int32', minimum: 0, type: 'integer' })
+  itemSubtotalMinor!: number;
+
+  @ApiProperty({ example: 500, format: 'int32', minimum: 0, type: 'integer' })
+  shippingMinor!: number;
+
+  @ApiProperty({ format: 'int32', minimum: 0, type: 'integer' })
+  totalMinor!: number;
+
+  @ApiProperty({ enum: ['ready', 'unavailable', 'empty'], type: String })
+  quoteStatus!: 'ready' | 'unavailable' | 'empty';
+
+  @ApiProperty({ format: 'date-time', type: String })
+  quotedAt!: string;
+
   @ApiProperty({ format: 'date-time', nullable: true, type: String })
   expiresAt!: string | null;
 

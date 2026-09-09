@@ -120,8 +120,21 @@ function isCheckoutDraft(value: unknown): value is CheckoutDraft {
     typeof value.email === 'string' &&
     typeof value.fullName === 'string' &&
     typeof value.phoneNumber === 'string' &&
-    isRecord(value.delivery)
+    isRecord(value.delivery) &&
+    value.currency === 'EUR' &&
+    isNonNegativeSafeInteger(value.itemSubtotalMinor) &&
+    isNonNegativeSafeInteger(value.shippingMinor) &&
+    isNonNegativeSafeInteger(value.totalMinor) &&
+    value.totalMinor === value.itemSubtotalMinor + value.shippingMinor &&
+    (value.quoteStatus === 'ready' ||
+      value.quoteStatus === 'unavailable' ||
+      value.quoteStatus === 'empty') &&
+    typeof value.quotedAt === 'string'
   );
+}
+
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && Number(value) >= 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -7,6 +7,10 @@ const directory = join(
 );
 const migration = readFileSync(join(directory, 'migration.sql'), 'utf8');
 const recovery = readFileSync(join(directory, 'RECOVERY.md'), 'utf8');
+const purge = readFileSync(
+  join(process.cwd(), 'src/checkout/checkout.service.ts'),
+  'utf8',
+);
 
 describe('O2G additive migration contract', () => {
   it('adds a mutually exclusive account or hashed guest owner', () => {
@@ -40,5 +44,17 @@ describe('O2G additive migration contract', () => {
     expect(recovery).toMatch(
       /Never edit this applied migration, reset PostgreSQL/i,
     );
+  });
+
+  it('limits lifecycle deletion to expired unassociated guest pre-payment drafts', () => {
+    expect(purge).toContain('FOR UPDATE SKIP LOCKED');
+    expect(purge).toContain(`draft."status" = 'PRE_PAYMENT'`);
+    expect(purge).toContain('draft."userId" IS NULL');
+    expect(purge).toContain('draft."guestCapabilityExpiresAt" <= ${cutoff}');
+    expect(purge).toContain('historical_order."cartId" = draft."cartId"');
+    expect(recovery).toMatch(
+      /cascades deletion to only its `CheckoutDraftRequest`/i,
+    );
+    expect(recovery).toMatch(/Carts, cart items, users, products, inventory/i);
   });
 });

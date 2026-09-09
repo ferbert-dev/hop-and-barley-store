@@ -6,6 +6,7 @@ import {
 } from './checkout-transport';
 
 const draft = {
+  currency: 'EUR' as const,
   delivery: {
     additionalInfo: null,
     administrativeArea: 'BE',
@@ -20,9 +21,14 @@ const draft = {
   email: 'brewer@example.com',
   expiresAt: '2026-09-10T10:00:00.000Z',
   fullName: 'Alex Brewer',
+  itemSubtotalMinor: 599,
   paymentMethod: 'stripe_debit_card' as const,
   phoneNumber: '+4912345678',
+  quoteStatus: 'ready' as const,
+  quotedAt: '2026-09-09T10:00:00.000Z',
+  shippingMinor: 500,
   status: 'pre_payment' as const,
+  totalMinor: 1099,
   updatedAt: '2026-09-09T10:00:00.000Z',
 };
 

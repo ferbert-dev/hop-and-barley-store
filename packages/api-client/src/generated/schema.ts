@@ -175,7 +175,7 @@ export interface paths {
         put?: never;
         /**
          * Save a private pre-payment checkout draft
-         * @description Creates or updates a private pre-payment delivery/contact snapshot without reserving or decrementing stock. The first guest write issues a cookie-only 24-hour capability; later writes require it and never extend its absolute expiry. Guest payment selection is Stripe debit card only; this endpoint does not contact Stripe or create an order.
+         * @description Creates or updates a private pre-payment delivery/contact snapshot and server-authoritative EUR quote without reserving or decrementing stock. The first guest write issues a cookie-only 24-hour capability; an exact same-cart idempotent retry may reissue a lost capability without extending expiry, while other later writes require it. Guest payment selection is Stripe debit card only; this endpoint does not contact Stripe or create an order.
          */
         post: operations["CheckoutController_saveDraft"];
         delete?: never;
@@ -656,6 +656,21 @@ export interface components {
             fullName: string;
             phoneNumber: string;
             delivery: components["schemas"]["CheckoutDraftDeliveryDto"];
+            /** @enum {string} */
+            currency: "EUR";
+            /** Format: int32 */
+            itemSubtotalMinor: number;
+            /**
+             * Format: int32
+             * @example 500
+             */
+            shippingMinor: number;
+            /** Format: int32 */
+            totalMinor: number;
+            /** @enum {string} */
+            quoteStatus: "ready" | "unavailable" | "empty";
+            /** Format: date-time */
+            quotedAt: string;
             /** Format: date-time */
             expiresAt: string | null;
             /** Format: date-time */
@@ -1661,7 +1676,7 @@ export interface operations {
         responses: {
             200: {
                 headers: {
-                    /** @description Issued only when a guest draft is first created or safely restarted after expiry. The capability is never returned in JSON. */
+                    /** @description Issued when a guest draft is first created, safely recovered by an exact idempotent retry, or restarted after expiry. The capability is never returned in JSON. */
                     "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
@@ -1704,7 +1719,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Anonymous Cash on Delivery is unavailable */
+            /** @description Anonymous Cash on Delivery or a safe authoritative EUR quote is unavailable */
             422: {
                 headers: {
                     [name: string]: unknown;
