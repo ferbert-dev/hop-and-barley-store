@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { CartModule } from './cart/cart.module';
+import { CheckoutModule } from './checkout/checkout.module';
 import { validateEnvironment } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module';
     HealthModule,
     CatalogModule,
     CartModule,
+    CheckoutModule,
     AuthModule,
     ProductAssetsModule,
     AdminModule,

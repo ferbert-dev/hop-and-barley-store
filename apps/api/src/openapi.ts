@@ -6,6 +6,7 @@ import {
   type AuthCookieMode,
 } from './auth/session/session-cookie';
 import { getCartCookieName, type CartCookieMode } from './cart/cart-cookie';
+import { getCheckoutCapabilityCookieName } from './checkout/checkout-capability-cookie';
 
 export function configureOpenApi(app: INestApplication) {
   const mode = app
@@ -16,6 +17,7 @@ export function configureOpenApi(app: INestApplication) {
     .get(ConfigService)
     .getOrThrow<CartCookieMode>('CART_COOKIE_MODE');
   const cartCookieName = getCartCookieName(cartMode);
+  const checkoutCookieName = getCheckoutCapabilityCookieName(cartMode);
   const config = new DocumentBuilder()
     .setTitle('Hop & Barley API')
     .setDescription('API for the Hop & Barley ecommerce platform')
@@ -39,6 +41,17 @@ export function configureOpenApi(app: INestApplication) {
         type: 'apiKey',
       },
       'cartCookie',
+    )
+    .addCookieAuth(
+      checkoutCookieName,
+      {
+        description:
+          'Host-only cookie for the private guest pre-payment draft. Only its SHA-256 digest is persisted; the raw capability never appears in a URL or JSON response.',
+        in: 'cookie',
+        name: checkoutCookieName,
+        type: 'apiKey',
+      },
+      'guestCheckoutCookie',
     )
     .build();
   const document = SwaggerModule.createDocument(app, config);
