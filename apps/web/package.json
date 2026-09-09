@@ -15,7 +15,7 @@
     "@hop-and-barley/api-client": "workspace:*",
     "@hop-and-barley/auth-contract": "workspace:*",
     "@phosphor-icons/react": "2.1.10",
-    "next": "16.3.1",
+    "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "0.0.1"
@@ -31,7 +31,7 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "6.0.5",
     "eslint": "^9",
-    "eslint-config-next": "16.3.1",
+    "eslint-config-next": "16.3.4",
     "jsdom": "30.0.1",
     "tailwindcss": "^4",
     "typescript": "^5",
