@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CartProvider, useCart } from '../../features/cart/cart-context';
 import type { Cart, CartTransport } from '../../features/cart/cart-transport';
+import { CHECKOUT_HANDOFF_KEY } from '../../features/checkout/checkout-handoff';
 import { SiteHeaderClient } from './site-header';
 
 const logoutAction = vi.fn();
@@ -82,6 +83,9 @@ describe('SiteHeader', () => {
   beforeEach(() => {
     pathname = '/';
     mediaQueryListeners = new Set();
+    logoutAction.mockReset();
+    logoutAction.mockResolvedValue({ status: 'accepted' });
+    window.sessionStorage.clear();
     installMatchMedia();
   });
 
@@ -324,6 +328,21 @@ describe('SiteHeader', () => {
     expect(
       screen.queryByRole('link', { name: 'Product Management' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('clears checkout handoff data when signing out', async () => {
+    window.sessionStorage.setItem(
+      CHECKOUT_HANDOFF_KEY,
+      'private checkout data',
+    );
+    const user = userEvent.setup();
+    render(
+      <SiteHeader sessionState={{ isAdmin: false, kind: 'authenticated' }} />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(window.sessionStorage.getItem(CHECKOUT_HANDOFF_KEY)).toBeNull();
   });
 
   it('shows Product Management only for a Nest-verified admin session', () => {

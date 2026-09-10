@@ -170,6 +170,39 @@ describe('CheckoutScreen', () => {
     expect(window.sessionStorage.getItem(CHECKOUT_HANDOFF_KEY)).toBeNull();
   });
 
+  it('clears an adopted handoff even if the checkout unmounts before the save resolves', async () => {
+    const handoff = {
+      delivery: { city: 'Berlin', countryCode: 'DE', street: 'Hopfenstraße' },
+      email: 'previous@example.com',
+      fullName: 'Previous Customer',
+      paymentMethod: 'stripe_debit_card' as const,
+      phoneNumber: '+4912345678',
+    };
+    storeCheckoutHandoff(window.sessionStorage, handoff, null);
+    const csrfToken = `v1.${'A'.repeat(43)}`;
+    let resolveAdoption!: (value: Response) => void;
+    const adoption = new Promise<Response>((resolve) => {
+      resolveAdoption = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(response(undefined, 401))
+        .mockResolvedValueOnce(response({ csrfToken }))
+        .mockReturnValueOnce(adoption),
+    );
+
+    const checkout = render(<CheckoutScreen />);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    checkout.unmount();
+    resolveAdoption(response({ ...handoff, status: 'pre_payment' }));
+
+    await waitFor(() =>
+      expect(window.sessionStorage.getItem(CHECKOUT_HANDOFF_KEY)).toBeNull(),
+    );
+  });
+
   it.each([
     ['empty', 'Your cart is empty. Return to cart to add items.'],
     [
@@ -236,6 +269,34 @@ describe('CheckoutScreen', () => {
     expect(screen.getByLabelText('Postal code')).toHaveValue('10115');
     expect(screen.getByLabelText('Email')).toBeEnabled();
   });
+
+  it.each([
+    ['Spain', 'ES'],
+    [' es ', 'ES'],
+    ['Atlantis', ''],
+  ])(
+    'normalizes profile country %s to an editable checkout code',
+    async (country, expectedCode) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => response(undefined, 404)),
+      );
+      render(
+        <CheckoutScreen
+          initialProfile={{
+            ...populatedProfile,
+            primaryAddress: { ...populatedProfile.primaryAddress, country },
+          }}
+        />,
+      );
+
+      await screen.findByText('Checkout with your account');
+      expect(screen.getByLabelText('Country (ISO code)')).toHaveValue(
+        expectedCode,
+      );
+      expect(fetch).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it.each([
     [

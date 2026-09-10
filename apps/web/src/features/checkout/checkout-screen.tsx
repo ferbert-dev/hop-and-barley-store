@@ -90,8 +90,8 @@ export function CheckoutScreen({
         setForm(formFromSaveDraft(handoff));
         void transport.saveDraft(handoff, createIdempotencyKey()).then(
           (adopted) => {
-            if (!active) return;
             clearCheckoutHandoff(window.sessionStorage);
+            if (!active) return;
             setForm(formFromDraft(adopted));
             setDraftExpiresAt(adopted.expiresAt);
             setQuote(adopted);
@@ -517,7 +517,7 @@ function formFromProfile(profile: CheckoutProfile): CheckoutForm {
     administrativeArea: '',
     apartmentUnit: address?.apartmentUnit ?? '',
     city: address?.city ?? '',
-    countryCode: address?.country ?? 'DE',
+    countryCode: normalizeProfileCountry(address?.country),
     email: profile.email,
     floor: address?.floor ?? '',
     fullName: profile.profile?.fullName ?? '',
@@ -526,6 +526,28 @@ function formFromProfile(profile: CheckoutProfile): CheckoutForm {
     postalCode: address?.postalCode ?? '',
     street: address?.street ?? '',
   };
+}
+
+const PROFILE_COUNTRY_CODES: Readonly<Record<string, string>> = {
+  deutschland: 'DE',
+  espana: 'ES',
+  españa: 'ES',
+  france: 'FR',
+  germany: 'DE',
+  italy: 'IT',
+  netherlands: 'NL',
+  spain: 'ES',
+  'united kingdom': 'GB',
+  'united states': 'US',
+  'united states of america': 'US',
+  usa: 'US',
+};
+
+function normalizeProfileCountry(country: string | null | undefined) {
+  const normalized = country?.trim();
+  if (!normalized) return '';
+  if (/^[a-z]{2}$/iu.test(normalized)) return normalized.toUpperCase();
+  return PROFILE_COUNTRY_CODES[normalized.toLocaleLowerCase('en-US')] ?? '';
 }
 
 function createIdempotencyKey() {
