@@ -70,7 +70,7 @@ describe('checkout draft browser transport', () => {
   });
 
   it('saves through the generated route with fresh CSRF, origin and idempotency headers', async () => {
-    const csrfToken = `v1.${'A'.repeat(43)}`;
+    const csrfToken = `ci-v1.${'A'.repeat(43)}`;
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(response({ csrfToken }))

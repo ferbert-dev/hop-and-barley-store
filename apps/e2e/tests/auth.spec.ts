@@ -267,6 +267,57 @@ test.describe('connected local authentication journey', () => {
     ).toBe(false);
   });
 
+  test('preserves and adopts a real guest checkout draft through account creation without API interception', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    const email = `o2g-handoff-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
+    const credential = `A1!a${Date.now()}${Math.random().toString(36).slice(2)}`;
+
+    await page.goto('/product/citra-hops');
+    await page.getByRole('button', { name: 'Add Citra Hops to Cart' }).click();
+    await page.getByRole('button', { name: 'Continue shopping' }).click();
+
+    await page.goto('/checkout');
+    await page.getByLabel('Full Name').fill('Guest To Account');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Phone number').fill('+4912345678');
+    await page.getByLabel('Street').fill('Hopfenstraße');
+    await page.getByLabel('City').fill('Berlin');
+    await page.getByLabel('Postal code').fill('10115');
+    await page.getByRole('button', { name: 'Save checkout details' }).click();
+    await expect(
+      page.getByText('Checkout details saved privately.'),
+    ).toBeVisible();
+
+    await page.getByRole('link', { name: 'create an account' }).click();
+    await expect(page).toHaveURL(/\/register\?next=%2Fcheckout$/);
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password', { exact: true }).fill(credential);
+    await page.getByLabel('Confirm Password').fill(credential);
+    await page.getByRole('button', { name: 'Register' }).click();
+    await page.getByRole('link', { name: 'Continue to sign in' }).click();
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password', { exact: true }).fill(credential);
+
+    const adopted = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/v1/checkout/draft') &&
+        response.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: 'Sign In' }).click();
+    await expect(page).toHaveURL(/\/checkout$/);
+    expect((await adopted).ok()).toBe(true);
+    await expect(page.getByLabel('Full Name')).toHaveValue('Guest To Account');
+    await expect(page.getByLabel('Email')).toHaveValue(email);
+    await expect(page.getByLabel('Street')).toHaveValue('Hopfenstraße');
+    expect(
+      await page.evaluate(() =>
+        sessionStorage.getItem('hb-checkout-draft-handoff-v2'),
+      ),
+    ).toBeNull();
+  });
+
   test('reflows access screens and honours reduced motion without serious Axe findings', async ({
     page,
   }) => {

@@ -1,4 +1,4 @@
-import type { INestApplication } from '@nestjs/common';
+import { UnauthorizedException, type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Client } from 'pg';
 import request from 'supertest';
@@ -6,9 +6,13 @@ import type { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { configureAppRouting } from '../src/app-routing';
 import { configureAppValidation } from '../src/app-validation';
+import { hashCartToken } from '../src/cart/cart-token';
 import { hashCheckoutCapability } from '../src/checkout/checkout-capability-token';
 import { CheckoutService } from '../src/checkout/checkout.service';
-import type { CheckoutDraftDto } from '../src/checkout/dto/checkout-draft.dto';
+import type {
+  CheckoutDraftDto,
+  SaveCheckoutDraftDto,
+} from '../src/checkout/dto/checkout-draft.dto';
 import { PrismaService } from '../src/database/prisma.service';
 import { CheckoutPaymentMethod } from '../src/orders/dto/create-order.dto';
 
@@ -263,6 +267,146 @@ describePostgres(
         quotedAt: currentBody.quotedAt,
       });
       expect(typeof currentBody.quotedAt).toBe('string');
+    });
+
+    it('denies cross-guest capability and idempotency replay without disclosing or mutating either draft', async () => {
+      const sourceInput = guestDraft(
+        'source-guest@example.test',
+        'Source Guest',
+        'مصدر',
+      );
+      const targetInput = guestDraft(
+        'target-guest@example.test',
+        'Target Guest',
+        'هدف',
+      );
+      const source = await createGuestDraft(
+        'cross-guest-source-0001',
+        sourceInput,
+      );
+      const target = await createGuestDraft(
+        'cross-guest-target-0001',
+        targetInput,
+      );
+      const before = await checkoutPersistenceSnapshot();
+
+      const deniedWrite = await request(app.getHttpServer() as App)
+        .post('/api/v1/checkout/draft')
+        .set({
+          ...target.access.mutationHeaders,
+          Cookie: `${target.access.cartCookie}; ${source.checkoutCookie}`,
+        })
+        .set('Idempotency-Key', source.idempotencyKey)
+        .send(sourceInput)
+        .expect(401);
+      expectUnauthorizedWithoutPii(deniedWrite.body, [
+        sourceInput.email,
+        sourceInput.fullName,
+        sourceInput.delivery.city,
+        targetInput.email,
+        targetInput.fullName,
+        targetInput.delivery.city,
+      ]);
+
+      const deniedRead = await request(app.getHttpServer() as App)
+        .get('/api/v1/checkout/draft')
+        .set('Cookie', `${target.access.cartCookie}; ${source.checkoutCookie}`)
+        .expect(401);
+      expectUnauthorizedWithoutPii(deniedRead.body, [
+        sourceInput.email,
+        sourceInput.fullName,
+        targetInput.email,
+        targetInput.fullName,
+      ]);
+      expect(await checkoutPersistenceSnapshot()).toEqual(before);
+    });
+
+    it('denies guest capability and idempotency replay against an account-owned draft without mutation', async () => {
+      const guestInput = guestDraft(
+        'guest-source@example.test',
+        'Guest Source',
+        'أبوظبي',
+      );
+      const accountInput = guestDraft(
+        'account-target@example.test',
+        'Account Target',
+        'Berlin',
+      );
+      const guest = await createGuestDraft(
+        'guest-to-account-source-0001',
+        guestInput,
+      );
+      const account = await createAccountDraft(
+        'guest-to-account-target',
+        'guest-to-account-target-0001',
+        accountInput,
+      );
+      const before = await checkoutPersistenceSnapshot();
+
+      const rejection = await captureUnauthorized(() =>
+        checkout.saveDraft(
+          {
+            cartId: account.cartId,
+            expiresAt: guest.access.expiresAt,
+            kind: 'guest',
+            rawToken: guest.access.rawCartToken,
+          },
+          guest.rawCheckoutCapability,
+          guest.idempotencyKey,
+          guestInput,
+        ),
+      );
+      expectUnauthorizedWithoutPii(rejection, [
+        guestInput.email,
+        guestInput.fullName,
+        accountInput.email,
+        accountInput.fullName,
+      ]);
+      expect(await checkoutPersistenceSnapshot()).toEqual(before);
+    });
+
+    it('denies account owner and idempotency replay against a guest-owned draft without mutation', async () => {
+      const accountInput = guestDraft(
+        'account-source@example.test',
+        'Account Source',
+        'Hamburg',
+      );
+      const guestInput = guestDraft(
+        'guest-target@example.test',
+        'Guest Target',
+        'الشارقة',
+      );
+      const account = await createAccountDraft(
+        'account-to-guest-source',
+        'account-to-guest-source-0001',
+        accountInput,
+      );
+      const guest = await createGuestDraft(
+        'account-to-guest-target-0001',
+        guestInput,
+      );
+      const before = await checkoutPersistenceSnapshot();
+
+      const rejection = await captureUnauthorized(() =>
+        checkout.saveDraft(
+          {
+            cartId: guest.access.cartId,
+            kind: 'account',
+            rawToken: account.rawSessionToken,
+            userId: account.userId,
+          },
+          null,
+          account.idempotencyKey,
+          accountInput,
+        ),
+      );
+      expectUnauthorizedWithoutPii(rejection, [
+        accountInput.email,
+        accountInput.fullName,
+        guestInput.email,
+        guestInput.fullName,
+      ]);
+      expect(await checkoutPersistenceSnapshot()).toEqual(before);
     });
 
     it('replays the original POST quote while GET reports current canonical availability and price', async () => {
@@ -606,18 +750,98 @@ describePostgres(
         .get('/api/v1/cart/csrf')
         .set('Cookie', cartCookie)
         .expect(200);
+      const rawCartToken = cartCookie.slice(cartCookie.indexOf('=') + 1);
       const cart = await prisma.cart.findFirstOrThrow({
-        orderBy: { createdAt: 'desc' },
+        where: {
+          tokenDigest: Uint8Array.from(hashCartToken(rawCartToken)),
+          userId: null,
+        },
       });
       return {
         cartCookie,
         cartId: cart.id,
+        expiresAt: cart.expiresAt,
+        rawCartToken,
         mutationHeaders: {
           Cookie: cartCookie,
           Origin: 'http://localhost:3000',
           'X-CSRF-Token': (csrfResponse.body as { csrfToken: string })
             .csrfToken,
         },
+      };
+    }
+
+    async function createGuestDraft(
+      idempotencyKey: string,
+      input: SaveCheckoutDraftDto,
+    ) {
+      const access = await createGuestCart();
+      const response = await request(app.getHttpServer() as App)
+        .post('/api/v1/checkout/draft')
+        .set(access.mutationHeaders)
+        .set('Idempotency-Key', idempotencyKey)
+        .send(input)
+        .expect(200);
+      const checkoutCookie = requireCookie(
+        response.headers['set-cookie'],
+        'hb_guest_checkout',
+      );
+      return {
+        access,
+        checkoutCookie,
+        idempotencyKey,
+        rawCheckoutCapability: checkoutCookie.slice(
+          checkoutCookie.indexOf('=') + 1,
+        ),
+      };
+    }
+
+    async function createAccountDraft(
+      identity: string,
+      idempotencyKey: string,
+      input: SaveCheckoutDraftDto,
+    ) {
+      const user = await prisma.user.create({
+        data: {
+          email: `${identity}@example.test`,
+          normalizedEmail: `${identity}@example.test`,
+        },
+      });
+      const rawSessionToken = 'S'.repeat(43);
+      const cart = await prisma.cart.create({
+        data: {
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000),
+          tokenDigest: Uint8Array.from(hashCartToken(rawSessionToken)),
+          userId: user.id,
+        },
+      });
+      await checkout.saveDraft(
+        {
+          cartId: cart.id,
+          kind: 'account',
+          rawToken: rawSessionToken,
+          userId: user.id,
+        },
+        null,
+        idempotencyKey,
+        input,
+      );
+      return {
+        cartId: cart.id,
+        idempotencyKey,
+        rawSessionToken,
+        userId: user.id,
+      };
+    }
+
+    async function checkoutPersistenceSnapshot() {
+      return {
+        drafts: await prisma.checkoutDraft.findMany({
+          orderBy: { id: 'asc' },
+        }),
+        requests: await prisma.checkoutDraftRequest.findMany({
+          orderBy: { id: 'asc' },
+        }),
       };
     }
 
@@ -630,17 +854,49 @@ describePostgres(
 );
 
 function aeDraft() {
+  return guestDraft('Ada@Example.COM', 'آدا برور', 'دبي');
+}
+
+function guestDraft(
+  email: string,
+  fullName: string,
+  city: string,
+): SaveCheckoutDraftDto {
   return {
     delivery: {
-      city: 'دبي',
+      city,
       countryCode: 'AE',
       street: 'شارع الشيخ زايد',
     },
-    email: 'Ada@Example.COM',
-    fullName: 'آدا برور',
+    email,
+    fullName,
     paymentMethod: CheckoutPaymentMethod.STRIPE_DEBIT_CARD,
     phoneNumber: '+971 50 123 4567',
   };
+}
+
+async function captureUnauthorized(
+  operation: () => Promise<unknown>,
+): Promise<string | object> {
+  let caught: unknown;
+  try {
+    await operation();
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(UnauthorizedException);
+  return (caught as UnauthorizedException).getResponse();
+}
+
+function expectUnauthorizedWithoutPii(
+  response: unknown,
+  privateValues: readonly string[],
+): void {
+  expect(response).toEqual({ status: 'unauthorized' });
+  const serialized = JSON.stringify(response).toLowerCase();
+  for (const privateValue of privateValues) {
+    expect(serialized).not.toContain(privateValue.toLowerCase());
+  }
 }
 
 function requireCookie(

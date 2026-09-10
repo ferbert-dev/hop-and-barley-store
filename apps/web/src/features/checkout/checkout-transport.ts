@@ -107,7 +107,7 @@ function isCsrfToken(value: unknown): value is { csrfToken: string } {
   return (
     isRecord(value) &&
     typeof value.csrfToken === 'string' &&
-    /^v1\.[A-Za-z0-9_-]{43}$/u.test(value.csrfToken)
+    /^[A-Za-z0-9_-]{1,16}\.[A-Za-z0-9_-]{43}$/u.test(value.csrfToken)
   );
 }
 

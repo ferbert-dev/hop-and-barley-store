@@ -216,7 +216,74 @@ describe('CheckoutScreen', () => {
       expect(await screen.findByText(copy)).toBeVisible();
     },
   );
+
+  it('prefills an editable checkout form from a populated authenticated profile only when no draft exists', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response(undefined, 404)),
+    );
+    render(<CheckoutScreen initialProfile={populatedProfile} />);
+
+    await screen.findByText('Checkout with your account');
+    expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
+    expect(
+      screen.queryByRole('link', { name: 'create an account' }),
+    ).toBeNull();
+    expect(screen.getByLabelText('Full Name')).toHaveValue('Alex Brewer');
+    expect(screen.getByLabelText('Email')).toHaveValue('brewer@example.com');
+    expect(screen.getByLabelText('Phone number')).toHaveValue('+4912345678');
+    expect(screen.getByLabelText('Street')).toHaveValue('Hopfenstraße');
+    expect(screen.getByLabelText('Postal code')).toHaveValue('10115');
+    expect(screen.getByLabelText('Email')).toBeEnabled();
+  });
+
+  it.each([
+    [
+      'partial',
+      {
+        ...populatedProfile,
+        primaryAddress: null,
+        profile: { avatar: null, fullName: 'Alex Brewer', phone: null },
+      },
+      '',
+    ],
+    ['absent', null, ''],
+  ] as const)(
+    'uses available fields and leaves missing fields editable for a %s profile',
+    async (_state, initialProfile, expectedPhone) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => response(undefined, 404)),
+      );
+      render(<CheckoutScreen initialProfile={initialProfile} />);
+
+      if (initialProfile) {
+        await screen.findByText('Checkout with your account');
+      } else {
+        await screen.findByRole('link', { name: 'Sign in' });
+      }
+      expect(screen.getByLabelText('Phone number')).toHaveValue(expectedPhone);
+      expect(screen.getByLabelText('Street')).toHaveValue('');
+      expect(screen.getByLabelText('Street')).toBeEnabled();
+    },
+  );
 });
+
+const populatedProfile = {
+  email: 'brewer@example.com',
+  primaryAddress: {
+    additionalInfo: 'Use side door',
+    apartmentUnit: '2B',
+    city: 'Berlin',
+    country: 'DE',
+    floor: '2',
+    houseNumber: '4',
+    postalCode: '10115',
+    street: 'Hopfenstraße',
+  },
+  profile: { avatar: null, fullName: 'Alex Brewer', phone: '+4912345678' },
+  role: 'CUSTOMER' as const,
+};
 
 function withQuote(body: unknown) {
   if (

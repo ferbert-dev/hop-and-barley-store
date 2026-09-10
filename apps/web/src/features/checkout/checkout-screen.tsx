@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
+import type { components } from '@hop-and-barley/api-client';
+
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { Field } from '../../components/ui/field';
@@ -49,7 +51,11 @@ const EMPTY_FORM: CheckoutForm = {
   street: '',
 };
 
-export function CheckoutScreen() {
+type CheckoutProfile = components['schemas']['CurrentUserProfileDto'];
+
+export function CheckoutScreen({
+  initialProfile = null,
+}: Readonly<{ initialProfile?: CheckoutProfile | null }>) {
   const [form, setForm] = useState<CheckoutForm>(EMPTY_FORM);
   const [loadState, setLoadState] = useState<
     'loading' | 'ready' | 'unavailable'
@@ -77,6 +83,7 @@ export function CheckoutScreen() {
         }
         const handoff = readCheckoutHandoff(window.sessionStorage);
         if (!handoff) {
+          if (initialProfile) setForm(formFromProfile(initialProfile));
           setLoadState('ready');
           return;
         }
@@ -104,7 +111,7 @@ export function CheckoutScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialProfile]);
 
   const setValue = (name: keyof CheckoutForm, value: string) => {
     idempotencyKey.current = null;
@@ -133,6 +140,7 @@ export function CheckoutScreen() {
 
   const returnTo = '/checkout';
   const authQuery = `?next=${encodeURIComponent(returnTo)}`;
+  const accountCheckout = initialProfile !== null;
   const preserveForAuth = () =>
     storeCheckoutHandoff(
       window.sessionStorage,
@@ -177,21 +185,29 @@ export function CheckoutScreen() {
       </div>
       <div className={styles.entry}>
         <div>
-          <strong>Checkout as a guest</strong>
+          <strong>
+            {accountCheckout
+              ? 'Checkout with your account'
+              : 'Checkout as a guest'}
+          </strong>
           <p>
-            Your contact and delivery details are saved privately for this cart.
+            {accountCheckout
+              ? 'Your account details are used as an editable checkout prefill.'
+              : 'Your contact and delivery details are saved privately for this cart.'}
           </p>
         </div>
-        <p>
-          <Link href={`/login${authQuery}`} onClick={preserveForAuth}>
-            Sign in
-          </Link>{' '}
-          or{' '}
-          <Link href={`/register${authQuery}`} onClick={preserveForAuth}>
-            create an account
-          </Link>{' '}
-          to continue with this same cart and draft.
-        </p>
+        {accountCheckout ? null : (
+          <p>
+            <Link href={`/login${authQuery}`} onClick={preserveForAuth}>
+              Sign in
+            </Link>{' '}
+            or{' '}
+            <Link href={`/register${authQuery}`} onClick={preserveForAuth}>
+              create an account
+            </Link>{' '}
+            to continue with this same cart and draft.
+          </p>
+        )}
       </div>
       <form className={styles.layout} onSubmit={save}>
         <Card className={styles.formCard}>
@@ -491,6 +507,24 @@ function formFromDraft(draft: CheckoutDraft): CheckoutForm {
     phoneNumber: draft.phoneNumber,
     postalCode: draft.delivery.postalCode ?? '',
     street: draft.delivery.street,
+  };
+}
+
+function formFromProfile(profile: CheckoutProfile): CheckoutForm {
+  const address = profile.primaryAddress;
+  return {
+    additionalInfo: address?.additionalInfo ?? '',
+    administrativeArea: '',
+    apartmentUnit: address?.apartmentUnit ?? '',
+    city: address?.city ?? '',
+    countryCode: address?.country ?? 'DE',
+    email: profile.email,
+    floor: address?.floor ?? '',
+    fullName: profile.profile?.fullName ?? '',
+    houseNumber: address?.houseNumber ?? '',
+    phoneNumber: profile.profile?.phone ?? '',
+    postalCode: address?.postalCode ?? '',
+    street: address?.street ?? '',
   };
 }
 
