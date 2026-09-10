@@ -142,4 +142,41 @@ describe('auth environment validation', () => {
       }),
     ).toThrow(/PRODUCT_ASSET_STORAGE_PATH/);
   });
+
+  it('fails closed unless the complete test-only Stripe contract is configured', () => {
+    expect(() =>
+      validateEnvironment({ ...BASE, STRIPE_PAYMENTS_ENABLED: true }),
+    ).toThrow(/Stripe Sandbox configuration is incomplete/);
+    expect(() =>
+      validateEnvironment({
+        ...BASE,
+        STRIPE_PAYMENTS_ENABLED: true,
+        STRIPE_SANDBOX_SECRET_KEY: 'sk_live_1234567890123456',
+      }),
+    ).toThrow(/STRIPE_SANDBOX_SECRET_KEY/);
+
+    expect(
+      validateEnvironment({
+        ...BASE,
+        STRIPE_CHECKOUT_CANCEL_URL: 'http://localhost:3000/checkout/cancel',
+        STRIPE_CHECKOUT_SUCCESS_URL: 'http://localhost:3000/checkout/success',
+        STRIPE_PAYMENT_METHOD_CONFIGURATION_ID: 'pmc_cardonly123',
+        STRIPE_PAYMENTS_ENABLED: true,
+        STRIPE_SANDBOX_SECRET_KEY: 'sk_test_1234567890123456',
+        STRIPE_SANDBOX_WEBHOOK_SECRET: 'whsec_1234567890123456',
+      }),
+    ).toMatchObject({ STRIPE_PAYMENTS_ENABLED: true });
+
+    expect(() =>
+      validateEnvironment({
+        ...BASE,
+        STRIPE_CHECKOUT_CANCEL_URL: 'https://shop.example.test/cancel',
+        STRIPE_CHECKOUT_SUCCESS_URL: 'https://shop.example.test/success',
+        STRIPE_PAYMENT_METHOD_CONFIGURATION_ID: 'pmc_cardonly123',
+        STRIPE_PAYMENTS_ENABLED: true,
+        STRIPE_SANDBOX_SECRET_KEY: 'sk_test_1234567890123456',
+        STRIPE_SANDBOX_WEBHOOK_SECRET: 'whsec_1234567890123456',
+      }),
+    ).toThrow(/return origins must be included in CORS_ORIGINS/);
+  });
 });

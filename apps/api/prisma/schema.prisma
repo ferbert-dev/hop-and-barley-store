@@ -75,6 +75,26 @@ enum PaymentAttemptStatus {
   CANCELLED
 }
 
+enum PaymentAllocationStatus {
+  ALLOCATED
+  CAPTURE_REQUESTED
+  RECONCILIATION_REQUIRED
+  CAPTURED
+  RELEASED
+}
+
+enum PaymentAllocationReleaseReason {
+  PAYMENT_FAILED
+  PAYMENT_CANCELLED
+  AUTHORIZATION_EXPIRED
+  STOCK_UNAVAILABLE
+}
+
+enum StripeWebhookDisposition {
+  PROCESSED
+  IGNORED
+}
+
 enum SaleKind {
   WEIGHT
   PACKAGE
@@ -223,7 +243,7 @@ model Cart {
   updatedAt     DateTime          @updatedAt
   items         CartItem[]
   reservations  CartReservation[]
-  order         Order?
+  orders        Order[]
   checkoutDraft CheckoutDraft?
 
   @@index([expiresAt], map: "Cart_expiresAt_idx")
@@ -277,8 +297,8 @@ model CartReservation {
 
 model Order {
   id                       String                      @id(map: "Order_pkey") @default(uuid()) @db.Uuid
-  userId                   String                      @db.Uuid
-  cartId                   String                      @unique(map: "Order_cartId_key") @db.Uuid
+  userId                   String?                     @db.Uuid
+  cartId                   String                      @db.Uuid
   idempotencyKey           String                      @db.VarChar(128)
   requestHash              Bytes
   status                   OrderStatus
@@ -302,11 +322,12 @@ model Order {
   paidAt                   DateTime?
   createdAt                DateTime                    @default(now())
   updatedAt                DateTime                    @updatedAt
-  user                     User                        @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Order_userId_fkey")
+  user                     User?                       @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Order_userId_fkey")
   cart                     Cart                        @relation(fields: [cartId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Order_cartId_fkey")
   items                    OrderItem[]
   reservations             CartReservation[]
   paymentAttempt           PaymentAttempt?             @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Order_paymentAttemptId_fkey")
+  paymentAllocation        PaymentAllocation?
   consumedDiscountClaim    FirstPurchaseDiscountClaim? @relation("ConsumedDiscountOrder")
 
   @@unique([userId, idempotencyKey], map: "Order_userId_idempotencyKey_key")
@@ -377,6 +398,8 @@ model PaymentAttempt {
   floor                    String?                     @db.VarChar(32)
   additionalInfo           String?                     @db.VarChar(500)
   providerPaymentReference String?                     @unique(map: "PaymentAttempt_providerPaymentReference_key") @db.VarChar(255)
+  providerSessionId        String?                     @unique(map: "PaymentAttempt_providerSessionId_key") @db.VarChar(255)
+  providerSessionExpiresAt DateTime?                   @db.Timestamptz(3)
   pendingAt                DateTime?                   @db.Timestamptz(3)
   reconciliationRequiredAt DateTime?                   @db.Timestamptz(3)
   succeededAt              DateTime?                   @db.Timestamptz(3)
@@ -389,11 +412,49 @@ model PaymentAttempt {
   firstPurchaseClaim       FirstPurchaseDiscountClaim?
   order                    Order?
   items                    PaymentAttemptItem[]
+  allocation               PaymentAllocation?
+  stripeWebhookReceipts    StripeWebhookReceipt[]
 
   @@unique([checkoutDraftId, idempotencyKey], map: "PaymentAttempt_draftId_idempotencyKey_key")
   @@unique([id, userId], map: "PaymentAttempt_id_userId_key")
   @@index([userId, status, createdAt], map: "PaymentAttempt_userId_status_createdAt_idx")
   @@index([status, updatedAt], map: "PaymentAttempt_status_updatedAt_idx")
+}
+
+model PaymentAllocation {
+  id                       String                          @id(map: "PaymentAllocation_pkey") @default(uuid()) @db.Uuid
+  paymentAttemptId         String                          @unique(map: "PaymentAllocation_paymentAttemptId_key") @db.Uuid
+  orderId                  String                          @unique(map: "PaymentAllocation_orderId_key") @db.Uuid
+  providerPaymentReference String                          @unique(map: "PaymentAllocation_providerPaymentReference_key") @db.VarChar(255)
+  status                   PaymentAllocationStatus         @default(ALLOCATED)
+  authorizedAt             DateTime                        @db.Timestamptz(3)
+  captureRequestedAt       DateTime?                       @db.Timestamptz(3)
+  capturedAt               DateTime?                       @db.Timestamptz(3)
+  releasedAt               DateTime?                       @db.Timestamptz(3)
+  releaseReason            PaymentAllocationReleaseReason?
+  createdAt                DateTime                        @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime                        @updatedAt @db.Timestamptz(3)
+  paymentAttempt           PaymentAttempt                  @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "PaymentAllocation_paymentAttemptId_fkey")
+  order                    Order                           @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "PaymentAllocation_orderId_fkey")
+
+  @@index([status, updatedAt], map: "PaymentAllocation_status_updatedAt_idx")
+}
+
+model StripeWebhookReceipt {
+  providerEventId   String                   @id(map: "StripeWebhookReceipt_pkey") @db.VarChar(255)
+  paymentAttemptId  String?                  @db.Uuid
+  providerObjectId  String                   @db.VarChar(255)
+  eventType         String                   @db.VarChar(120)
+  livemode          Boolean
+  payloadHash       Bytes
+  providerCreatedAt DateTime                 @db.Timestamptz(3)
+  disposition       StripeWebhookDisposition
+  receivedAt        DateTime                 @db.Timestamptz(3)
+  processedAt       DateTime                 @db.Timestamptz(3)
+  paymentAttempt    PaymentAttempt?          @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "StripeWebhookReceipt_paymentAttemptId_fkey")
+
+  @@index([paymentAttemptId, providerCreatedAt], map: "StripeWebhookReceipt_attemptId_createdAt_idx")
+  @@index([eventType, providerCreatedAt], map: "StripeWebhookReceipt_type_createdAt_idx")
 }
 
 model PaymentAttemptItem {

@@ -188,6 +188,19 @@ void cartDelete;
 void cartClear;
 void checkoutReadiness;
 
+const reconcileStripePayment = configuredClient.POST(
+  '/api/v1/payments/stripe/reconcile',
+  {
+    params: {
+      header: {
+        Origin: 'http://localhost:3000',
+        'X-CSRF-Token': `cart-v1.${'A'.repeat(43)}`,
+      },
+    },
+  },
+);
+void reconcileStripePayment;
+
 const createOrder = configuredClient.POST('/api/v1/orders', {
   body: {
     city: 'Portland',

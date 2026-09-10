@@ -36,6 +36,32 @@ const schema = Joi.object({
   REGISTRATION_ORIGIN: Joi.string()
     .custom(validateExactOriginList)
     .default('http://localhost:3000'),
+  STRIPE_API_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(1_000)
+    .max(30_000)
+    .default(10_000),
+  STRIPE_CHECKOUT_CANCEL_URL: Joi.string()
+    .empty('')
+    .uri({ scheme: ['http', 'https'] })
+    .optional(),
+  STRIPE_CHECKOUT_SUCCESS_URL: Joi.string()
+    .empty('')
+    .uri({ scheme: ['http', 'https'] })
+    .optional(),
+  STRIPE_PAYMENT_METHOD_CONFIGURATION_ID: Joi.string()
+    .empty('')
+    .pattern(/^pmc_[A-Za-z0-9_]{8,}$/)
+    .optional(),
+  STRIPE_PAYMENTS_ENABLED: Joi.boolean().default(false),
+  STRIPE_SANDBOX_SECRET_KEY: Joi.string()
+    .empty('')
+    .pattern(/^(?:rk|sk)_test_[A-Za-z0-9_]{16,}$/)
+    .optional(),
+  STRIPE_SANDBOX_WEBHOOK_SECRET: Joi.string()
+    .empty('')
+    .pattern(/^whsec_[A-Za-z0-9_]{16,}$/)
+    .optional(),
 }).unknown(true);
 
 export function validateEnvironment(config: Record<string, unknown>) {
@@ -104,6 +130,30 @@ export function validateEnvironment(config: Record<string, unknown>) {
     throw new Error(
       'Environment validation failed: CORS_ORIGINS must include every AUTH_ORIGIN, CART_ORIGIN and REGISTRATION_ORIGIN',
     );
+  }
+
+  if (value.STRIPE_PAYMENTS_ENABLED) {
+    const requiredStripeValues = [
+      'STRIPE_SANDBOX_SECRET_KEY',
+      'STRIPE_SANDBOX_WEBHOOK_SECRET',
+      'STRIPE_PAYMENT_METHOD_CONFIGURATION_ID',
+      'STRIPE_CHECKOUT_SUCCESS_URL',
+      'STRIPE_CHECKOUT_CANCEL_URL',
+    ];
+    if (requiredStripeValues.some((key) => !value[key])) {
+      throw new Error(
+        'Environment validation failed: Stripe Sandbox configuration is incomplete',
+      );
+    }
+    const checkoutOrigins = [
+      value.STRIPE_CHECKOUT_SUCCESS_URL,
+      value.STRIPE_CHECKOUT_CANCEL_URL,
+    ].map((url) => new URL(url as string).origin);
+    if (checkoutOrigins.some((origin) => !corsOrigins.has(origin))) {
+      throw new Error(
+        'Environment validation failed: Stripe checkout return origins must be included in CORS_ORIGINS',
+      );
+    }
   }
 
   return value;

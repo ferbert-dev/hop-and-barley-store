@@ -15,6 +15,7 @@ import {
   calculateCheckoutPricing,
   FIRST_PURCHASE_DISCOUNT_POLICY_VERSION,
 } from '../checkout/checkout-pricing';
+import { verifyCheckoutCapability } from '../checkout/checkout-capability-token';
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
 
@@ -31,7 +32,9 @@ export type PaymentAttemptPrincipal =
   Readonly<{ kind: 'account'; userId: string }> | Readonly<{ kind: 'guest' }>;
 
 export type PreparePaymentAttempt = Readonly<{
+  cartId: string;
   checkoutDraftId: string;
+  rawGuestCapability: string | null;
   idempotencyKey: string;
   principal: PaymentAttemptPrincipal;
 }>;
@@ -85,6 +88,8 @@ const draftSelect = {
   email: true,
   floor: true,
   fullName: true,
+  guestCapabilityDigest: true,
+  guestCapabilityExpiresAt: true,
   houseNumber: true,
   id: true,
   paymentMethod: true,
@@ -138,7 +143,7 @@ export class PaymentAttemptService {
         select: { cartId: true, userId: true, version: true },
         where: { id: input.checkoutDraftId },
       });
-      if (!initialDraft) unauthorized();
+      if (!initialDraft || initialDraft.cartId !== input.cartId) unauthorized();
       if (input.principal.kind === 'account') {
         await lockActiveUser(transaction, input.principal.userId);
       }
@@ -152,6 +157,17 @@ export class PaymentAttemptService {
       if (!draft || draft.status !== 'PRE_PAYMENT') unauthorized();
       requirePrincipal(draft.userId, input.principal);
       requirePrincipal(lockedCart.userId, input.principal);
+      if (
+        input.principal.kind === 'guest' &&
+        !verifyCheckoutCapability(
+          input.rawGuestCapability,
+          draft.guestCapabilityDigest,
+          draft.guestCapabilityExpiresAt,
+          requestedNow,
+        )
+      ) {
+        unauthorized();
+      }
       if (draft.paymentMethod !== 'STRIPE_DEBIT_CARD') attemptUnavailable();
       const requestHash = fingerprintAttemptRequest(
         draft.id,
@@ -307,6 +323,12 @@ export class PaymentAttemptService {
       ) {
         throw new ConflictException(ATTEMPT_UNAVAILABLE);
       }
+      if (
+        attempt.providerPaymentReference === reference &&
+        attempt.status === 'PENDING'
+      ) {
+        return;
+      }
       const updated = await transaction.paymentAttempt.updateMany({
         data: {
           pendingAt: occurredAt,
@@ -315,7 +337,59 @@ export class PaymentAttemptService {
         },
         where: {
           id: attemptId,
-          status: { in: ['PREPARED', 'RECONCILIATION_REQUIRED'] },
+          status: { in: ['PREPARED', 'PENDING', 'RECONCILIATION_REQUIRED'] },
+        },
+      });
+      if (updated.count !== 1) throw new ConflictException(ATTEMPT_UNAVAILABLE);
+    });
+  }
+
+  async markProviderSessionCreated(
+    attemptId: string,
+    providerSessionId: string,
+    providerSessionExpiresAt: Date,
+    occurredAt = new Date(),
+  ): Promise<void> {
+    const sessionId = providerSessionId.trim();
+    if (!sessionId) {
+      throw new RangeError('Provider session reference is required');
+    }
+    await runCartSerializable(this.prisma, async (transaction) => {
+      await lockAttempt(transaction, attemptId);
+      const stored = await transaction.paymentAttempt.findUniqueOrThrow({
+        select: {
+          pendingAt: true,
+          providerPaymentReference: true,
+          providerSessionExpiresAt: true,
+          providerSessionId: true,
+          status: true,
+        },
+        where: { id: attemptId },
+      });
+      const exactSession =
+        stored.providerSessionId === sessionId &&
+        stored.providerSessionExpiresAt?.getTime() ===
+          providerSessionExpiresAt.getTime();
+      if (stored.providerSessionId !== null && !exactSession) {
+        throw new ConflictException(ATTEMPT_UNAVAILABLE);
+      }
+      if (
+        stored.providerSessionId === null &&
+        stored.providerSessionExpiresAt
+      ) {
+        throw new ConflictException(ATTEMPT_UNAVAILABLE);
+      }
+      const updated = await transaction.paymentAttempt.updateMany({
+        data: {
+          pendingAt: stored.pendingAt ?? occurredAt,
+          providerSessionExpiresAt,
+          providerSessionId: sessionId,
+          reconciliationRequiredAt: null,
+          status: 'PENDING',
+        },
+        where: {
+          id: attemptId,
+          status: { in: ['PREPARED', 'PENDING', 'RECONCILIATION_REQUIRED'] },
         },
       });
       if (updated.count !== 1) throw new ConflictException(ATTEMPT_UNAVAILABLE);
@@ -350,43 +424,57 @@ export class PaymentAttemptService {
     occurredAt = new Date(),
   ): Promise<void> {
     await runCartSerializable(this.prisma, async (transaction) => {
-      const attempt = await lockAttempt(transaction, attemptId);
-      if (
-        attempt.status === 'SUCCEEDED' ||
-        attempt.status === 'DEFINITIVELY_FAILED' ||
-        attempt.status === 'CANCELLED'
-      ) {
-        if (
-          (outcome === 'failed' && attempt.status === 'DEFINITIVELY_FAILED') ||
-          (outcome === 'cancelled_unpaid' && attempt.status === 'CANCELLED')
-        ) {
-          return;
-        }
-        throw new ConflictException(ATTEMPT_UNAVAILABLE);
-      }
-      await transaction.paymentAttempt.update({
-        data:
-          outcome === 'failed'
-            ? {
-                definitivelyFailedAt: occurredAt,
-                status: 'DEFINITIVELY_FAILED',
-              }
-            : { cancelledAt: occurredAt, status: 'CANCELLED' },
-        where: { id: attemptId },
-      });
-      await transaction.firstPurchaseDiscountClaim.updateMany({
-        data: {
-          releaseReason:
-            outcome === 'failed'
-              ? 'DEFINITIVE_PAYMENT_FAILED'
-              : 'DEFINITIVE_PAYMENT_CANCELLED_UNPAID',
-          releasedAt: occurredAt,
-          status: 'RELEASED',
-        },
-        where: { paymentAttemptId: attemptId, status: 'CLAIMED' },
-      });
+      await releasePaymentAttemptDefinitiveOutcome(
+        transaction,
+        attemptId,
+        outcome,
+        occurredAt,
+      );
     });
   }
+}
+
+export async function releasePaymentAttemptDefinitiveOutcome(
+  transaction: Prisma.TransactionClient,
+  attemptId: string,
+  outcome: 'cancelled_unpaid' | 'failed',
+  occurredAt: Date,
+): Promise<void> {
+  const attempt = await lockAttempt(transaction, attemptId);
+  if (
+    attempt.status === 'SUCCEEDED' ||
+    attempt.status === 'DEFINITIVELY_FAILED' ||
+    attempt.status === 'CANCELLED'
+  ) {
+    if (
+      (outcome === 'failed' && attempt.status === 'DEFINITIVELY_FAILED') ||
+      (outcome === 'cancelled_unpaid' && attempt.status === 'CANCELLED')
+    ) {
+      return;
+    }
+    throw new ConflictException(ATTEMPT_UNAVAILABLE);
+  }
+  await transaction.paymentAttempt.update({
+    data:
+      outcome === 'failed'
+        ? {
+            definitivelyFailedAt: occurredAt,
+            status: 'DEFINITIVELY_FAILED',
+          }
+        : { cancelledAt: occurredAt, status: 'CANCELLED' },
+    where: { id: attemptId },
+  });
+  await transaction.firstPurchaseDiscountClaim.updateMany({
+    data: {
+      releaseReason:
+        outcome === 'failed'
+          ? 'DEFINITIVE_PAYMENT_FAILED'
+          : 'DEFINITIVE_PAYMENT_CANCELLED_UNPAID',
+      releasedAt: occurredAt,
+      status: 'RELEASED',
+    },
+    where: { paymentAttemptId: attemptId, status: 'CLAIMED' },
+  });
 }
 
 export async function markPaymentAttemptSucceeded(
@@ -531,7 +619,7 @@ function successfulOrderMatchesAttempt(
     shippingMinor: number;
     status: string;
     totalMinor: number;
-    userId: string;
+    userId: string | null;
   }>,
   attempt: Readonly<{
     currency: string;
