@@ -212,14 +212,18 @@ export class CartService {
             select: {
               expiresAt: true,
               id: true,
-              order: { select: { id: true } },
+              orders: {
+                select: { id: true },
+                take: 1,
+                where: { status: { not: 'CANCELLED' } },
+              },
             },
             where: { tokenDigest: guestDigest, userId: null },
           })
         : null;
       const activeGuest =
         guest &&
-        guest.order === null &&
+        guest.orders.length === 0 &&
         guest.expiresAt.getTime() > requestedNow.getTime()
           ? guest
           : null;

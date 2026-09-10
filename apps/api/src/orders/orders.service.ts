@@ -145,9 +145,9 @@ export class OrdersService {
           context.cartId,
           context.userId,
         );
-        const byCart = await transaction.order.findUnique({
+        const byCart = await transaction.order.findFirst({
           select: orderSelect,
-          where: { cartId: context.cartId },
+          where: { cartId: context.cartId, status: { not: 'CANCELLED' } },
         });
         if (byCart) return sameOutcome(byCart, requestHash);
 

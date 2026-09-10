@@ -1,4 +1,4 @@
-import { createHash, createHmac } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
 const CHECKOUT_CAPABILITY_BYTES = 32;
 const CHECKOUT_CAPABILITY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
@@ -33,6 +33,20 @@ export function parseCheckoutCapability(candidate: unknown): string | null {
     : null;
 }
 
-export function hashCheckoutCapability(token: string): Buffer {
-  return createHash('sha256').update(token, 'ascii').digest();
+export function hashCheckoutCapability(token: string): Uint8Array<ArrayBuffer> {
+  return Uint8Array.from(createHash('sha256').update(token, 'ascii').digest());
+}
+
+export function verifyCheckoutCapability(
+  rawToken: string | null,
+  storedDigest: Uint8Array | null,
+  expiresAt: Date | null,
+  requestedNow: Date,
+): boolean {
+  if (!rawToken || !storedDigest || !expiresAt || expiresAt <= requestedNow) {
+    return false;
+  }
+  const stored = Buffer.from(storedDigest);
+  const supplied = hashCheckoutCapability(rawToken);
+  return stored.length === supplied.length && timingSafeEqual(stored, supplied);
 }

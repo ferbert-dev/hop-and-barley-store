@@ -19,6 +19,7 @@ import { CheckoutPaymentMethod } from '../orders/dto/create-order.dto';
 import {
   deriveCheckoutCapability,
   hashCheckoutCapability,
+  verifyCheckoutCapability,
 } from './checkout-capability-token';
 import { calculateCheckoutPricing } from './checkout-pricing';
 import type {
@@ -463,18 +464,15 @@ function hasGuestDraftAccess(
   rawGuestCapability: string | null,
   requestedNow: Date,
 ): boolean {
-  if (
-    draft.userId !== null ||
-    !rawGuestCapability ||
-    !draft.guestCapabilityDigest ||
-    !draft.guestCapabilityExpiresAt ||
-    draft.guestCapabilityExpiresAt.getTime() <= requestedNow.getTime()
-  ) {
-    return false;
-  }
-  const stored = Buffer.from(draft.guestCapabilityDigest);
-  const supplied = hashCheckoutCapability(rawGuestCapability);
-  return stored.length === supplied.length && timingSafeEqual(stored, supplied);
+  return (
+    draft.userId === null &&
+    verifyCheckoutCapability(
+      rawGuestCapability,
+      draft.guestCapabilityDigest,
+      draft.guestCapabilityExpiresAt,
+      requestedNow,
+    )
+  );
 }
 
 function deriveStoredCheckoutCapability(

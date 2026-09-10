@@ -2,6 +2,7 @@ import { ConflictException, type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 import { CheckoutService } from '../src/checkout/checkout.service';
+import { hashCheckoutCapability } from '../src/checkout/checkout-capability-token';
 import { CheckoutPaymentMethod } from '../src/orders/dto/create-order.dto';
 import { PrismaService } from '../src/database/prisma.service';
 import type { Prisma } from '../src/generated/prisma/client';
@@ -37,6 +38,8 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
   beforeEach(async () => {
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
+        "StripeWebhookReceipt",
+        "PaymentAllocation",
         "FirstPurchaseDiscountClaim",
         "OrderItem",
         "Order",
@@ -68,9 +71,11 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
     const fixture = await createDraft('eligible', 'account');
     const stockBefore = await productStock();
     const attempt = await attempts.prepare({
+      cartId: fixture.cartId,
       checkoutDraftId: fixture.draftId,
       idempotencyKey: 'o2d-eligible-attempt-0001',
       principal: { kind: 'account', userId: fixture.userId! },
+      rawGuestCapability: null,
     });
 
     expect(attempt).toMatchObject({
@@ -229,9 +234,11 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
   it('never discounts guests or accounts with a completed paid purchase', async () => {
     const guest = await createDraft('guest', 'guest');
     const guestAttempt = await attempts.prepare({
+      cartId: guest.cartId,
       checkoutDraftId: guest.draftId,
       idempotencyKey: 'o2d-guest-attempt-0001',
       principal: { kind: 'guest' },
+      rawGuestCapability: guest.rawGuestCapability,
     });
     expect(guestAttempt).toMatchObject({
       discountBasisPoints: 0,
@@ -244,9 +251,11 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
     const returning = await createDraft('returning', 'account');
     await createHistoricalPaidOrder(returning.userId!);
     const returningAttempt = await attempts.prepare({
+      cartId: returning.cartId,
       checkoutDraftId: returning.draftId,
       idempotencyKey: 'o2d-returning-attempt-0001',
       principal: { kind: 'account', userId: returning.userId! },
+      rawGuestCapability: null,
     });
     expect(returningAttempt).toMatchObject({
       discountBasisPoints: 0,
@@ -260,9 +269,11 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
   it('replays one immutable attempt and rejects a changed draft under the same key', async () => {
     const fixture = await createDraft('replay', 'account');
     const input = {
+      cartId: fixture.cartId,
       checkoutDraftId: fixture.draftId,
       idempotencyKey: 'o2d-replay-attempt-0001',
       principal: { kind: 'account' as const, userId: fixture.userId! },
+      rawGuestCapability: null,
     };
     const first = await attempts.prepare(input);
     await prisma.product.update({
@@ -379,9 +390,11 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
     const fixture = await createDraft('concurrent', 'account');
     const prepare = (idempotencyKey: string) =>
       attempts.prepare({
+        cartId: fixture.cartId,
         checkoutDraftId: fixture.draftId,
         idempotencyKey,
         principal: { kind: 'account', userId: fixture.userId! },
+        rawGuestCapability: null,
       });
     const outcomes = await Promise.allSettled([
       prepare('o2d-concurrent-attempt-0001'),
@@ -464,9 +477,11 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
   it('releases only a definitive unpaid outcome and permits a later claim', async () => {
     const fixture = await createDraft('release', 'account');
     const first = await attempts.prepare({
+      cartId: fixture.cartId,
       checkoutDraftId: fixture.draftId,
       idempotencyKey: 'o2d-release-attempt-0001',
       principal: { kind: 'account', userId: fixture.userId! },
+      rawGuestCapability: null,
     });
     await attempts.releaseDefinitiveOutcome(first.id, 'failed');
     expect(
@@ -479,9 +494,11 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
     });
 
     const second = await attempts.prepare({
+      cartId: fixture.cartId,
       checkoutDraftId: fixture.draftId,
       idempotencyKey: 'o2d-release-attempt-0002',
       principal: { kind: 'account', userId: fixture.userId! },
+      rawGuestCapability: null,
     });
     expect(second.discountKind).toBe('FIRST_PURCHASE');
     expect(await prisma.firstPurchaseDiscountClaim.count()).toBe(2);
@@ -490,9 +507,11 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
   it('serializes competing definitive outcomes and keeps one matching terminal pair', async () => {
     const fixture = await createDraft('terminal-race', 'account');
     const attempt = await attempts.prepare({
+      cartId: fixture.cartId,
       checkoutDraftId: fixture.draftId,
       idempotencyKey: 'o2d-terminal-race-attempt-0001',
       principal: { kind: 'account', userId: fixture.userId! },
+      rawGuestCapability: null,
     });
     const outcomes = await Promise.allSettled([
       attempts.releaseDefinitiveOutcome(attempt.id, 'failed'),
@@ -533,9 +552,11 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
   it('consumes a successful exact-match order once even if the account becomes disabled', async () => {
     const fixture = await createDraft('success', 'account');
     const attempt = await attempts.prepare({
+      cartId: fixture.cartId,
       checkoutDraftId: fixture.draftId,
       idempotencyKey: 'o2d-success-attempt-0001',
       principal: { kind: 'account', userId: fixture.userId! },
+      rawGuestCapability: null,
     });
     await attempts.markPending(attempt.id, 'provider-o2d-success-0001');
     const order = await settlePaidOrderForAttempt(
@@ -574,21 +595,23 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
         data: { providerPaymentReference: 'provider-replacement-0001' },
         where: { id: order.id },
       }),
-    ).rejects.toThrow(/requires its exact paid order/i);
+    ).rejects.toThrow(/exact immutable order snapshot/i);
     await expect(
       prisma.orderItem.update({
         data: { productName: 'Changed settled item' },
         where: { id: (await prisma.orderItem.findFirstOrThrow()).id },
       }),
-    ).rejects.toThrow(/requires its exact paid order/i);
+    ).rejects.toThrow(/exact immutable order snapshot/i);
   });
 
   it('rejects success when the paid order has a different provider reference', async () => {
     const fixture = await createDraft('provider-mismatch', 'account');
     const attempt = await attempts.prepare({
+      cartId: fixture.cartId,
       checkoutDraftId: fixture.draftId,
       idempotencyKey: 'o2d-provider-mismatch-attempt-0001',
       principal: { kind: 'account', userId: fixture.userId! },
+      rawGuestCapability: null,
     });
     await attempts.markPending(attempt.id, 'provider-expected-0001');
     await expect(
@@ -611,9 +634,11 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
   it('rejects success when paid order items differ from the sealed attempt', async () => {
     const fixture = await createDraft('item-mismatch', 'account');
     const attempt = await attempts.prepare({
+      cartId: fixture.cartId,
       checkoutDraftId: fixture.draftId,
       idempotencyKey: 'o2d-item-mismatch-attempt-0001',
       principal: { kind: 'account', userId: fixture.userId! },
+      rawGuestCapability: null,
     });
     await attempts.markPending(attempt.id, 'provider-item-mismatch-0001');
     const mismatchedItems = attempt.items.map((item) => ({
@@ -651,11 +676,31 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
         providerPaymentReference,
         items,
       );
+      const occurredAt = new Date();
+      await transaction.paymentAllocation.create({
+        data: {
+          authorizedAt: occurredAt,
+          orderId: order.id,
+          paymentAttemptId: attempt.id,
+          providerPaymentReference,
+        },
+      });
+      await transaction.paymentAllocation.update({
+        data: {
+          captureRequestedAt: occurredAt,
+          status: 'CAPTURE_REQUESTED',
+        },
+        where: { paymentAttemptId: attempt.id },
+      });
+      await transaction.paymentAllocation.update({
+        data: { capturedAt: occurredAt, status: 'CAPTURED' },
+        where: { paymentAttemptId: attempt.id },
+      });
       await markPaymentAttemptSucceeded(
         transaction,
         attempt.id,
         order.id,
-        new Date(),
+        occurredAt,
       );
       return order;
     });
@@ -784,6 +829,10 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
 
   async function createDraft(identity: string, kind: 'account' | 'guest') {
     fixtureSequence += 1;
+    const rawGuestCapability =
+      kind === 'guest'
+        ? Buffer.alloc(32, fixtureSequence).toString('base64url')
+        : null;
     const user =
       kind === 'account'
         ? await prisma.user.create({
@@ -815,7 +864,9 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
         email: user?.email ?? `${identity}-${fixtureSequence}@example.test`,
         fullName: 'O2D Customer',
         guestCapabilityDigest:
-          kind === 'guest' ? Uint8Array.from(Buffer.alloc(32, 0x77)) : null,
+          rawGuestCapability !== null
+            ? hashCheckoutCapability(rawGuestCapability)
+            : null,
         guestCapabilityExpiresAt:
           kind === 'guest'
             ? new Date(createdAt.getTime() + 24 * 60 * 60 * 1_000)
@@ -828,7 +879,12 @@ describePostgres('O2D discount claims with disposable PostgreSQL', () => {
         ...(kind === 'guest' ? { createdAt } : {}),
       },
     });
-    return { cartId: cart.id, draftId: draft.id, userId: user?.id ?? null };
+    return {
+      cartId: cart.id,
+      draftId: draft.id,
+      rawGuestCapability,
+      userId: user?.id ?? null,
+    };
   }
 
   async function createHistoricalPaidOrder(userId: string): Promise<void> {
