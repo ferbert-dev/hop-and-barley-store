@@ -9,6 +9,10 @@ import {
   addMoneyMinor,
   calculateLineTotalMinor,
 } from '../catalog/product-amount';
+import {
+  calculateCheckoutPricing,
+  type CheckoutPricing,
+} from '../checkout/checkout-pricing';
 import { checkoutLineOutcome } from '../cart/checkout-readiness';
 import type { CheckoutReadinessLineDto } from '../cart/dto/cart-response.dto';
 import { PrismaService } from '../database/prisma.service';
@@ -20,7 +24,6 @@ import {
 import type { OrderDto } from './dto/order-response.dto';
 import { runOrderSerializable } from './order-transaction';
 
-const SHIPPING_MINOR = 500;
 const PAYMENT_UNAVAILABLE = Object.freeze({
   status: 'payment-unavailable' as const,
 });
@@ -32,6 +35,10 @@ const UNAUTHORIZED = Object.freeze({ status: 'unauthorized' as const });
 const orderSelect = {
   city: true,
   currency: true,
+  discountBasisPoints: true,
+  discountKind: true,
+  discountMinor: true,
+  discountPolicyVersion: true,
   fullName: true,
   id: true,
   itemSubtotalMinor: true,
@@ -204,6 +211,7 @@ export class OrdersService {
           ),
         }));
         let itemSubtotalMinor = 0;
+        let pricing: CheckoutPricing;
         try {
           for (const line of pricedLines) {
             itemSubtotalMinor = addMoneyMinor(
@@ -211,7 +219,7 @@ export class OrdersService {
               line.lineTotalMinor,
             );
           }
-          addMoneyMinor(itemSubtotalMinor, SHIPPING_MINOR);
+          pricing = calculateCheckoutPricing(itemSubtotalMinor, false);
         } catch {
           allocationUnavailable(
             now,
@@ -247,6 +255,10 @@ export class OrdersService {
             cartId: context.cartId,
             city: checkout.city,
             currency: 'EUR',
+            discountBasisPoints: pricing.discountBasisPoints,
+            discountKind: 'NONE',
+            discountMinor: pricing.discountMinor,
+            discountPolicyVersion: pricing.discountPolicyVersion,
             fullName: checkout.fullName,
             idempotencyKey: context.idempotencyKey,
             itemSubtotalMinor,
@@ -272,9 +284,9 @@ export class OrdersService {
             providerPaymentReference: null,
             requestHash,
             shippingAddress: checkout.shippingAddress,
-            shippingMinor: SHIPPING_MINOR,
+            shippingMinor: pricing.shippingMinor,
             status: 'PLACED',
-            totalMinor: itemSubtotalMinor + SHIPPING_MINOR,
+            totalMinor: pricing.totalMinor,
             userId: context.userId,
           },
           select: orderSelect,
@@ -457,6 +469,11 @@ function allocationUnavailable(
 function toOrderDto(order: StoredOrder): OrderDto {
   return {
     currency: requireOrderCurrency(order.currency),
+    discountBasisPoints: order.discountBasisPoints,
+    discountKind:
+      order.discountKind === 'FIRST_PURCHASE' ? 'first_purchase' : 'none',
+    discountMinor: order.discountMinor,
+    discountPolicyVersion: order.discountPolicyVersion,
     id: order.id,
     itemSubtotalMinor: order.itemSubtotalMinor,
     items: order.items,

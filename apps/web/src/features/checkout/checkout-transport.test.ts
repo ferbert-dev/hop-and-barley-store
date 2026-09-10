@@ -21,6 +21,9 @@ const draft = {
   email: 'brewer@example.com',
   expiresAt: '2026-09-10T10:00:00.000Z',
   fullName: 'Alex Brewer',
+  discountBasisPoints: 0,
+  discountMinor: 0,
+  discountPolicyVersion: 'no-discount-v1',
   itemSubtotalMinor: 599,
   paymentMethod: 'stripe_debit_card' as const,
   phoneNumber: '+4912345678',
@@ -108,6 +111,16 @@ describe('checkout draft browser transport', () => {
       vi.fn(async () => new Response(JSON.stringify(draft), { status: 200 })),
     );
 
+    await expect(
+      createBrowserCheckoutTransport().loadDraft(),
+    ).rejects.toBeInstanceOf(CheckoutTransportError);
+  });
+
+  it('rejects a tampered discount snapshot', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response({ ...draft, discountMinor: 100 })),
+    );
     await expect(
       createBrowserCheckoutTransport().loadDraft(),
     ).rejects.toBeInstanceOf(CheckoutTransportError);

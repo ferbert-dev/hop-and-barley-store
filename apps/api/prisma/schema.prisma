@@ -50,6 +50,31 @@ enum CheckoutDraftStatus {
   PRE_PAYMENT
 }
 
+enum DiscountClaimStatus {
+  CLAIMED
+  CONSUMED
+  RELEASED
+}
+
+enum DiscountClaimReleaseReason {
+  DEFINITIVE_PAYMENT_FAILED
+  DEFINITIVE_PAYMENT_CANCELLED_UNPAID
+}
+
+enum DiscountKind {
+  NONE
+  FIRST_PURCHASE
+}
+
+enum PaymentAttemptStatus {
+  PREPARED
+  PENDING
+  RECONCILIATION_REQUIRED
+  SUCCEEDED
+  DEFINITIVELY_FAILED
+  CANCELLED
+}
+
 enum SaleKind {
   WEIGHT
   PACKAGE
@@ -62,13 +87,13 @@ enum AmountUnit {
 }
 
 model User {
-  id                 String              @id(map: "User_pkey") @default(uuid()) @db.Uuid
-  email              String              @db.VarChar(320)
-  normalizedEmail    String              @unique(map: "User_normalizedEmail_key") @db.VarChar(320)
-  role               UserRole            @default(CUSTOMER)
-  status             UserStatus          @default(ACTIVE)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  id                 String                       @id(map: "User_pkey") @default(uuid()) @db.Uuid
+  email              String                       @db.VarChar(320)
+  normalizedEmail    String                       @unique(map: "User_normalizedEmail_key") @db.VarChar(320)
+  role               UserRole                     @default(CUSTOMER)
+  status             UserStatus                   @default(ACTIVE)
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
   passwordCredential PasswordCredential?
   authSessions       AuthSession[]
   customerProfile    CustomerProfile?
@@ -76,6 +101,8 @@ model User {
   orders             Order[]
   cart               Cart?
   checkoutDrafts     CheckoutDraft[]
+  paymentAttempts    PaymentAttempt[]
+  discountClaims     FirstPurchaseDiscountClaim[]
 }
 
 model CustomerProfile {
@@ -149,36 +176,37 @@ model Category {
 }
 
 model Product {
-  id                 String                   @id(map: "Product_pkey") @default(uuid()) @db.Uuid
-  name               String
-  slug               String                   @unique(map: "Product_slug_key")
-  teaser             String
-  description        String
-  priceMinor         Int
-  priceQualifier     String                   @db.VarChar(64)
-  currency           String                   @default("EUR") @db.VarChar(3)
-  saleKind           SaleKind
-  amountUnit         AmountUnit
-  priceBasisAmount   Int
-  minimumOrderAmount Int
-  orderStepAmount    Int
-  maximumOrderAmount Int?
-  stockAmount        Int                      @default(0)
-  packageNetWeightMg Int?
-  kitYieldVolumeMl   Int?
-  isActive           Boolean                  @default(true)
-  activeFrom         DateTime?                @db.Timestamptz(3)
-  activeUntil        DateTime?                @db.Timestamptz(3)
-  imagePath          String                   @db.VarChar(255)
-  searchDocument     Unsupported("tsvector")?
-  specifications     Json                     @db.JsonB
-  categoryId         String                   @db.Uuid
-  category           Category                 @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Product_categoryId_fkey")
-  cartItems          CartItem[]
-  cartReservations   CartReservation[]
-  orderItems         OrderItem[]
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
+  id                  String                   @id(map: "Product_pkey") @default(uuid()) @db.Uuid
+  name                String
+  slug                String                   @unique(map: "Product_slug_key")
+  teaser              String
+  description         String
+  priceMinor          Int
+  priceQualifier      String                   @db.VarChar(64)
+  currency            String                   @default("EUR") @db.VarChar(3)
+  saleKind            SaleKind
+  amountUnit          AmountUnit
+  priceBasisAmount    Int
+  minimumOrderAmount  Int
+  orderStepAmount     Int
+  maximumOrderAmount  Int?
+  stockAmount         Int                      @default(0)
+  packageNetWeightMg  Int?
+  kitYieldVolumeMl    Int?
+  isActive            Boolean                  @default(true)
+  activeFrom          DateTime?                @db.Timestamptz(3)
+  activeUntil         DateTime?                @db.Timestamptz(3)
+  imagePath           String                   @db.VarChar(255)
+  searchDocument      Unsupported("tsvector")?
+  specifications      Json                     @db.JsonB
+  categoryId          String                   @db.Uuid
+  category            Category                 @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Product_categoryId_fkey")
+  cartItems           CartItem[]
+  cartReservations    CartReservation[]
+  orderItems          OrderItem[]
+  paymentAttemptItems PaymentAttemptItem[]
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
 
   @@index([categoryId, isActive], map: "Product_categoryId_isActive_idx")
   @@index([isActive, priceMinor], map: "Product_isActive_priceMinor_idx")
@@ -248,31 +276,38 @@ model CartReservation {
 }
 
 model Order {
-  id                       String            @id(map: "Order_pkey") @default(uuid()) @db.Uuid
-  userId                   String            @db.Uuid
-  cartId                   String            @unique(map: "Order_cartId_key") @db.Uuid
-  idempotencyKey           String            @db.VarChar(128)
+  id                       String                      @id(map: "Order_pkey") @default(uuid()) @db.Uuid
+  userId                   String                      @db.Uuid
+  cartId                   String                      @unique(map: "Order_cartId_key") @db.Uuid
+  idempotencyKey           String                      @db.VarChar(128)
   requestHash              Bytes
   status                   OrderStatus
   paymentMethod            PaymentMethod
   paymentState             PaymentState
-  providerPaymentReference String?           @unique(map: "Order_providerPaymentReference_key") @db.VarChar(255)
-  currency                 String            @db.VarChar(3)
+  providerPaymentReference String?                     @unique(map: "Order_providerPaymentReference_key") @db.VarChar(255)
+  currency                 String                      @db.VarChar(3)
   itemSubtotalMinor        Int
+  discountKind             DiscountKind                @default(NONE)
+  discountBasisPoints      Int                         @default(0)
+  discountMinor            Int                         @default(0)
+  discountPolicyVersion    String                      @default("no-discount-v1") @db.VarChar(64)
   shippingMinor            Int
   totalMinor               Int
-  fullName                 String            @db.VarChar(200)
-  phoneNumber              String            @db.VarChar(32)
-  city                     String            @db.VarChar(120)
-  shippingAddress          String            @db.VarChar(500)
+  paymentAttemptId         String?                     @unique(map: "Order_paymentAttemptId_key") @db.Uuid
+  fullName                 String                      @db.VarChar(200)
+  phoneNumber              String                      @db.VarChar(32)
+  city                     String                      @db.VarChar(120)
+  shippingAddress          String                      @db.VarChar(500)
   placedAt                 DateTime
   paidAt                   DateTime?
-  createdAt                DateTime          @default(now())
-  updatedAt                DateTime          @updatedAt
-  user                     User              @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Order_userId_fkey")
-  cart                     Cart              @relation(fields: [cartId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Order_cartId_fkey")
+  createdAt                DateTime                    @default(now())
+  updatedAt                DateTime                    @updatedAt
+  user                     User                        @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Order_userId_fkey")
+  cart                     Cart                        @relation(fields: [cartId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Order_cartId_fkey")
   items                    OrderItem[]
   reservations             CartReservation[]
+  paymentAttempt           PaymentAttempt?             @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Order_paymentAttemptId_fkey")
+  consumedDiscountClaim    FirstPurchaseDiscountClaim? @relation("ConsumedDiscountOrder")
 
   @@unique([userId, idempotencyKey], map: "Order_userId_idempotencyKey_key")
   @@index([userId, placedAt, id], map: "Order_userId_placedAt_id_idx")
@@ -305,9 +340,101 @@ model CheckoutDraft {
   cart                     Cart                   @relation(fields: [cartId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "CheckoutDraft_cartId_fkey")
   user                     User?                  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "CheckoutDraft_userId_fkey")
   requests                 CheckoutDraftRequest[]
+  paymentAttempts          PaymentAttempt[]
 
   @@index([userId, status, updatedAt], map: "CheckoutDraft_userId_status_updatedAt_idx")
   @@index([guestCapabilityExpiresAt], map: "CheckoutDraft_guestCapabilityExpiresAt_idx")
+}
+
+model PaymentAttempt {
+  id                       String                      @id(map: "PaymentAttempt_pkey") @default(uuid()) @db.Uuid
+  checkoutDraftId          String                      @db.Uuid
+  checkoutDraftVersion     Int
+  userId                   String?                     @db.Uuid
+  idempotencyKey           String                      @db.VarChar(128)
+  requestHash              Bytes
+  status                   PaymentAttemptStatus        @default(PREPARED)
+  currency                 String                      @db.Char(3)
+  itemSubtotalMinor        Int
+  discountKind             DiscountKind
+  discountBasisPoints      Int
+  discountMinor            Int
+  discountPolicyVersion    String                      @db.VarChar(64)
+  shippingMinor            Int
+  totalMinor               Int
+  quotedAt                 DateTime                    @db.Timestamptz(3)
+  snapshotSealedAt         DateTime?                   @db.Timestamptz(3)
+  email                    String                      @db.VarChar(320)
+  fullName                 String                      @db.VarChar(200)
+  phoneNumber              String                      @db.VarChar(32)
+  countryCode              String                      @db.Char(2)
+  city                     String                      @db.VarChar(120)
+  street                   String                      @db.VarChar(200)
+  postalCode               String?                     @db.VarChar(32)
+  administrativeArea       String?                     @db.VarChar(120)
+  houseNumber              String?                     @db.VarChar(32)
+  apartmentUnit            String?                     @db.VarChar(64)
+  floor                    String?                     @db.VarChar(32)
+  additionalInfo           String?                     @db.VarChar(500)
+  providerPaymentReference String?                     @unique(map: "PaymentAttempt_providerPaymentReference_key") @db.VarChar(255)
+  pendingAt                DateTime?                   @db.Timestamptz(3)
+  reconciliationRequiredAt DateTime?                   @db.Timestamptz(3)
+  succeededAt              DateTime?                   @db.Timestamptz(3)
+  definitivelyFailedAt     DateTime?                   @db.Timestamptz(3)
+  cancelledAt              DateTime?                   @db.Timestamptz(3)
+  createdAt                DateTime                    @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime                    @updatedAt @db.Timestamptz(3)
+  checkoutDraft            CheckoutDraft               @relation(fields: [checkoutDraftId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "PaymentAttempt_checkoutDraftId_fkey")
+  user                     User?                       @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "PaymentAttempt_userId_fkey")
+  firstPurchaseClaim       FirstPurchaseDiscountClaim?
+  order                    Order?
+  items                    PaymentAttemptItem[]
+
+  @@unique([checkoutDraftId, idempotencyKey], map: "PaymentAttempt_draftId_idempotencyKey_key")
+  @@unique([id, userId], map: "PaymentAttempt_id_userId_key")
+  @@index([userId, status, createdAt], map: "PaymentAttempt_userId_status_createdAt_idx")
+  @@index([status, updatedAt], map: "PaymentAttempt_status_updatedAt_idx")
+}
+
+model PaymentAttemptItem {
+  id               String         @id(map: "PaymentAttemptItem_pkey") @default(uuid()) @db.Uuid
+  paymentAttemptId String         @db.Uuid
+  productId        String         @db.Uuid
+  productSlug      String
+  productName      String
+  priceQualifier   String         @db.VarChar(64)
+  saleKind         SaleKind
+  amountUnit       AmountUnit
+  priceMinor       Int
+  priceBasisAmount Int
+  amount           Int
+  lineTotalMinor   Int
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
+  paymentAttempt   PaymentAttempt @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "PaymentAttemptItem_paymentAttemptId_fkey")
+  product          Product        @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "PaymentAttemptItem_productId_fkey")
+
+  @@unique([paymentAttemptId, productId], map: "PaymentAttemptItem_attemptId_productId_key")
+  @@index([productId], map: "PaymentAttemptItem_productId_idx")
+}
+
+model FirstPurchaseDiscountClaim {
+  id               String                      @id(map: "FirstPurchaseDiscountClaim_pkey") @default(uuid()) @db.Uuid
+  userId           String                      @db.Uuid
+  paymentAttemptId String                      @unique(map: "FirstPurchaseDiscountClaim_paymentAttemptId_key") @db.Uuid
+  status           DiscountClaimStatus         @default(CLAIMED)
+  heldAt           DateTime                    @db.Timestamptz(3)
+  consumedAt       DateTime?                   @db.Timestamptz(3)
+  consumedOrderId  String?                     @unique(map: "FirstPurchaseDiscountClaim_consumedOrderId_key") @db.Uuid
+  releasedAt       DateTime?                   @db.Timestamptz(3)
+  releaseReason    DiscountClaimReleaseReason?
+  createdAt        DateTime                    @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime                    @updatedAt @db.Timestamptz(3)
+  user             User                        @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "FirstPurchaseDiscountClaim_userId_fkey")
+  paymentAttempt   PaymentAttempt              @relation(fields: [paymentAttemptId, userId], references: [id, userId], onDelete: Restrict, onUpdate: Cascade, map: "FirstPurchaseDiscountClaim_attempt_user_fkey")
+  consumedOrder    Order?                      @relation("ConsumedDiscountOrder", fields: [consumedOrderId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "FirstPurchaseDiscountClaim_consumedOrderId_fkey")
+
+  @@unique([paymentAttemptId, userId], map: "FirstPurchaseDiscountClaim_attemptId_userId_key")
+  @@index([userId, status, heldAt], map: "FirstPurchaseDiscountClaim_userId_status_heldAt_idx")
 }
 
 model CheckoutDraftRequest {

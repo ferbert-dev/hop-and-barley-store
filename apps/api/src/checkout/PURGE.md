@@ -9,12 +9,13 @@ Output contains only the cutoff and aggregate deleted count.
 
 The deletion predicate is intentionally narrow. A row must be guest-owned,
 `PRE_PAYMENT`, and at or beyond its absolute 24-hour capability expiry. A draft
-whose cart has an `Order` is excluded even if those other predicates match.
-Deleting a qualifying draft cascades only to its `CheckoutDraftRequest` replay
+whose cart has an `Order` or which owns a `PaymentAttempt` is excluded even if
+those other predicates match. Deleting a qualifying draft cascades only to its
+`CheckoutDraftRequest` replay
 snapshots. The cart, cart items, products, users, orders, order items, inventory,
-and reservation history are not deletion targets. Future payment work must move
-a draft out of `PRE_PAYMENT` or add its association to this exclusion before it
-can enable payment creation.
+payment attempts, claims, and reservation history are not deletion targets.
+The payment-attempt foreign key is also restrictive, so financial history is
+retained even if the purge predicate regresses.
 
 Before enabling a recurring invocation, verify the command against a disposable
 PostgreSQL database and record only candidate counts. Disable or stop the job to

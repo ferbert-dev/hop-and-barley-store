@@ -10,6 +10,7 @@ import { validateEnvironment } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { OrdersModule } from './orders/orders.module';
+import { PaymentsModule } from './payments/payments.module';
 import { ProductAssetsModule } from './product-assets/product-assets.module';
 import { UsersModule } from './users/users.module';
 
@@ -28,6 +29,7 @@ import { UsersModule } from './users/users.module';
     ProductAssetsModule,
     AdminModule,
     OrdersModule,
+    PaymentsModule,
     UsersModule,
   ],
   controllers: [AppController],

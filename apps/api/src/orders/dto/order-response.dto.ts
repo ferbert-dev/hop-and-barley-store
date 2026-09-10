@@ -86,6 +86,18 @@ export class OrderDto {
   @ApiProperty({ format: 'int32', minimum: 0, type: 'integer' })
   itemSubtotalMinor!: number;
 
+  @ApiProperty({ enum: ['none', 'first_purchase'], type: String })
+  discountKind!: 'none' | 'first_purchase';
+
+  @ApiProperty({ example: 600, format: 'int32', minimum: 0, type: 'integer' })
+  discountBasisPoints!: number;
+
+  @ApiProperty({ format: 'int32', minimum: 0, type: 'integer' })
+  discountMinor!: number;
+
+  @ApiProperty({ type: String })
+  discountPolicyVersion!: string;
+
   @ApiProperty({ example: 500, format: 'int32', minimum: 0, type: 'integer' })
   shippingMinor!: number;
 

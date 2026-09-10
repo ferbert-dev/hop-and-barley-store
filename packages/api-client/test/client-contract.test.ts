@@ -228,6 +228,10 @@ void unavailablePayment;
 
 const safeOrder: components['schemas']['OrderDto'] = {
   currency: 'USD',
+  discountBasisPoints: 0,
+  discountKind: 'none',
+  discountMinor: 0,
+  discountPolicyVersion: 'no-discount-v1',
   id: '60000000-0000-4000-8000-000000000001',
   itemSubtotalMinor: 1398,
   items: [

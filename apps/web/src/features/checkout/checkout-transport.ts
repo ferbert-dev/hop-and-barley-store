@@ -123,13 +123,43 @@ function isCheckoutDraft(value: unknown): value is CheckoutDraft {
     isRecord(value.delivery) &&
     value.currency === 'EUR' &&
     isNonNegativeSafeInteger(value.itemSubtotalMinor) &&
+    isNonNegativeSafeInteger(value.discountBasisPoints) &&
+    isNonNegativeSafeInteger(value.discountMinor) &&
+    value.discountMinor <= value.itemSubtotalMinor &&
+    isValidDiscountSnapshot(value) &&
     isNonNegativeSafeInteger(value.shippingMinor) &&
     isNonNegativeSafeInteger(value.totalMinor) &&
-    value.totalMinor === value.itemSubtotalMinor + value.shippingMinor &&
+    value.totalMinor ===
+      value.itemSubtotalMinor - value.discountMinor + value.shippingMinor &&
     (value.quoteStatus === 'ready' ||
       value.quoteStatus === 'unavailable' ||
       value.quoteStatus === 'empty') &&
     typeof value.quotedAt === 'string'
+  );
+}
+
+function isValidDiscountSnapshot(value: Record<string, unknown>): boolean {
+  if (
+    !isNonNegativeSafeInteger(value.itemSubtotalMinor) ||
+    !isNonNegativeSafeInteger(value.discountBasisPoints) ||
+    !isNonNegativeSafeInteger(value.discountMinor)
+  ) {
+    return false;
+  }
+  if (value.discountBasisPoints === 0) {
+    return (
+      value.discountMinor === 0 &&
+      value.discountPolicyVersion === 'no-discount-v1'
+    );
+  }
+  return (
+    value.discountBasisPoints === 600 &&
+    value.discountPolicyVersion === 'registered-first-purchase-v1' &&
+    value.discountMinor ===
+      Number(
+        (BigInt(value.itemSubtotalMinor) * BigInt(600) + BigInt(5_000)) /
+          BigInt(10_000),
+      )
   );
 }
 

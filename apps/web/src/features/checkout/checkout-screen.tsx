@@ -205,7 +205,9 @@ export function CheckoutScreen({
             <Link href={`/register${authQuery}`} onClick={preserveForAuth}>
               create an account
             </Link>{' '}
-            to continue with this same cart and draft.
+            to continue with this same cart and draft. Eligible registered
+            customers receive 6% off products on their first successful
+            purchase.
           </p>
         )}
       </div>
@@ -456,6 +458,15 @@ function CheckoutQuote({ quote }: Readonly<{ quote: CheckoutDraft | null }>) {
           />
         </dd>
       </div>
+      {quote.discountMinor > 0 ? (
+        <div>
+          <dt>First purchase account discount (6%)</dt>
+          <dd>
+            −
+            <Price currency={quote.currency} minorUnits={quote.discountMinor} />
+          </dd>
+        </div>
+      ) : null}
       <div>
         <dt>Shipping</dt>
         <dd>

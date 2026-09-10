@@ -662,6 +662,15 @@ export interface components {
             itemSubtotalMinor: number;
             /**
              * Format: int32
+             * @example 600
+             */
+            discountBasisPoints: number;
+            /** Format: int32 */
+            discountMinor: number;
+            /** @example registered-first-purchase-v1 */
+            discountPolicyVersion: string;
+            /**
+             * Format: int32
              * @example 500
              */
             shippingMinor: number;
@@ -1050,6 +1059,16 @@ export interface components {
             items: components["schemas"]["OrderItemDto"][];
             /** Format: int32 */
             itemSubtotalMinor: number;
+            /** @enum {string} */
+            discountKind: "none" | "first_purchase";
+            /**
+             * Format: int32
+             * @example 600
+             */
+            discountBasisPoints: number;
+            /** Format: int32 */
+            discountMinor: number;
+            discountPolicyVersion: string;
             /**
              * Format: int32
              * @example 500
