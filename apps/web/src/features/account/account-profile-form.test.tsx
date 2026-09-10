@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AccountProfileForm } from './account-profile-form';
+import { CHECKOUT_HANDOFF_KEY } from '../checkout/checkout-handoff';
 import {
   deleteAvatarFromBrowser,
   saveAvatarFromBrowser,
@@ -30,6 +31,7 @@ beforeEach(() => {
   saveProfile.mockReset();
   saveAvatar.mockReset();
   vi.mocked(deleteAvatarFromBrowser).mockReset();
+  window.sessionStorage.clear();
   vi.stubGlobal(
     'URL',
     Object.assign(class extends NativeUrl {}, {
@@ -42,6 +44,19 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('AccountProfileForm', () => {
+  it('clears checkout handoff data when logging out from the account page', async () => {
+    window.sessionStorage.setItem(
+      CHECKOUT_HANDOFF_KEY,
+      'private checkout data',
+    );
+    const user = userEvent.setup();
+    render(<AccountProfileForm initialProfile={initialProfile()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Logout' }));
+
+    expect(window.sessionStorage.getItem(CHECKOUT_HANDOFF_KEY)).toBeNull();
+  });
+
   it('keeps phone input exact and saves the self profile with intentional null address fields', async () => {
     saveProfile.mockResolvedValue({
       kind: 'saved',

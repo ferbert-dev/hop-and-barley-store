@@ -15,6 +15,7 @@ import { Button } from '../../components/ui/button';
 import { Field } from '../../components/ui/field';
 import { logoutAction } from '../auth/auth-actions';
 import { INITIAL_AUTH_FORM_STATE } from '../auth/auth-state';
+import { clearCheckoutHandoff } from '../checkout/checkout-handoff';
 import type { CurrentUserProfile as ServerCurrentUserProfile } from './profile-server';
 import {
   browserAvatarUrl,
@@ -507,7 +508,10 @@ export function AccountProfileForm({
           <h2 id="account-session-heading">Session</h2>
           <p>Sign out from this device when you are finished.</p>
         </div>
-        <form action={logoutFormAction}>
+        <form
+          action={logoutFormAction}
+          onSubmit={() => clearCheckoutHandoff(window.sessionStorage)}
+        >
           <Button
             pending={loggingOut}
             pendingLabel="Signing out…"

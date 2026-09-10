@@ -203,6 +203,49 @@ describe('CheckoutScreen', () => {
     );
   });
 
+  it('clears a handoff if an existing draft loads after checkout unmounts', async () => {
+    storeCheckoutHandoff(
+      window.sessionStorage,
+      {
+        delivery: { city: 'Berlin', countryCode: 'DE', street: 'Old street' },
+        email: 'previous@example.com',
+        fullName: 'Previous Customer',
+        paymentMethod: 'stripe_debit_card',
+        phoneNumber: '+4912345678',
+      },
+      null,
+    );
+    let resolveDraft!: (value: Response) => void;
+    const draft = new Promise<Response>((resolve) => {
+      resolveDraft = resolve;
+    });
+    vi.stubGlobal('fetch', vi.fn().mockReturnValueOnce(draft));
+
+    const checkout = render(<CheckoutScreen />);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    checkout.unmount();
+    resolveDraft(
+      response({
+        delivery: {
+          city: 'Madrid',
+          countryCode: 'ES',
+          street: 'New street',
+        },
+        email: 'current@example.com',
+        expiresAt: null,
+        fullName: 'Current Customer',
+        paymentMethod: 'stripe_debit_card',
+        phoneNumber: '+34600123456',
+        status: 'pre_payment',
+        updatedAt: '2026-09-10T10:00:00.000Z',
+      }),
+    );
+
+    await waitFor(() =>
+      expect(window.sessionStorage.getItem(CHECKOUT_HANDOFF_KEY)).toBeNull(),
+    );
+  });
+
   it.each([
     ['empty', 'Your cart is empty. Return to cart to add items.'],
     [
@@ -273,6 +316,8 @@ describe('CheckoutScreen', () => {
   it.each([
     ['Spain', 'ES'],
     [' es ', 'ES'],
+    ['UK', 'GB'],
+    ['ZZ', ''],
     ['Atlantis', ''],
   ])(
     'normalizes profile country %s to an editable checkout code',
