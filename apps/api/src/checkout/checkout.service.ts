@@ -20,13 +20,13 @@ import {
   deriveCheckoutCapability,
   hashCheckoutCapability,
 } from './checkout-capability-token';
+import { calculateCheckoutPricing } from './checkout-pricing';
 import type {
   CheckoutDraftDto,
   SaveCheckoutDraftDto,
 } from './dto/checkout-draft.dto';
 
 const GUEST_CHECKOUT_LIFETIME_MS = 24 * 60 * 60 * 1_000;
-const SHIPPING_MINOR = 500;
 const MAX_PURGE_BATCH_SIZE = 500;
 const UNAUTHORIZED = Object.freeze({ status: 'unauthorized' as const });
 const NOT_FOUND = Object.freeze({ status: 'not-found' as const });
@@ -100,6 +100,9 @@ type StoredCheckoutQuote = Prisma.CartGetPayload<{
 type CheckoutQuote = Pick<
   CheckoutDraftDto,
   | 'currency'
+  | 'discountBasisPoints'
+  | 'discountMinor'
+  | 'discountPolicyVersion'
   | 'itemSubtotalMinor'
   | 'quoteStatus'
   | 'quotedAt'
@@ -155,9 +158,15 @@ export class CheckoutService {
       ]);
       if (!draft || !quoteCart) throw new NotFoundException(NOT_FOUND);
       requireDraftAccess(draft, cart, rawGuestCapability, requestedNow);
+      const claimedQuote = await findClaimedAttemptQuote(transaction, draft);
+      if (claimedQuote) return toCheckoutDraftDto(draft, claimedQuote);
+      const applyDiscount = await previewFirstPurchaseDiscount(
+        transaction,
+        draft,
+      );
       return toCheckoutDraftDto(
         draft,
-        buildCheckoutQuote(quoteCart, requestedNow),
+        buildCheckoutQuote(quoteCart, requestedNow, applyDiscount),
       );
     });
   }
@@ -231,7 +240,7 @@ export class CheckoutService {
             requestHash,
           );
           return {
-            draft: replay.responseSnapshot as unknown as CheckoutDraftDto,
+            draft: normalizeReplaySnapshot(replay.responseSnapshot),
             issuedCapability: {
               expiresAt: existing.guestCapabilityExpiresAt!,
               issuedAt: requestedNow,
@@ -243,8 +252,14 @@ export class CheckoutService {
         if (replay) {
           requireSameRequest(replay.requestHash, requestHash);
           return {
-            draft: replay.responseSnapshot as unknown as CheckoutDraftDto,
+            draft: normalizeReplaySnapshot(replay.responseSnapshot),
           };
+        }
+        if (
+          cart.kind === 'account' &&
+          (await hasClaimedPaymentAttempt(transaction, existing.id))
+        ) {
+          throw new ConflictException({ status: 'discount-claim-held' });
         }
       }
 
@@ -310,9 +325,13 @@ export class CheckoutService {
         where: { id: cart.cartId },
       });
       if (!quoteCart) throw new UnauthorizedException(UNAUTHORIZED);
+      const applyDiscount = await previewFirstPurchaseDiscount(
+        transaction,
+        saved,
+      );
       const response = toCheckoutDraftDto(
         saved,
-        buildCheckoutQuote(quoteCart, requestedNow),
+        buildCheckoutQuote(quoteCart, requestedNow, applyDiscount),
       );
       await transaction.checkoutDraftRequest.create({
         data: {
@@ -360,6 +379,11 @@ export class CheckoutService {
             SELECT 1
             FROM "Order" AS historical_order
             WHERE historical_order."cartId" = draft."cartId"
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "PaymentAttempt" AS payment_attempt
+            WHERE payment_attempt."checkoutDraftId" = draft."id"
           )
         ORDER BY draft."guestCapabilityExpiresAt" ASC, draft."id" ASC
         FOR UPDATE SKIP LOCKED
@@ -549,6 +573,7 @@ function requireSameRequest(
 function buildCheckoutQuote(
   cart: StoredCheckoutQuote,
   quotedAt: Date,
+  applyFirstPurchaseDiscount: boolean,
 ): CheckoutQuote {
   let itemSubtotalMinor = 0;
   let quoteStatus: CheckoutQuote['quoteStatus'] =
@@ -570,22 +595,22 @@ function buildCheckoutQuote(
         ),
       );
     }
-    const totalMinor = addMoneyMinor(itemSubtotalMinor, SHIPPING_MINOR);
+    const pricing = calculateCheckoutPricing(
+      itemSubtotalMinor,
+      applyFirstPurchaseDiscount,
+    );
     if (
       !Number.isSafeInteger(itemSubtotalMinor) ||
-      !Number.isSafeInteger(totalMinor) ||
+      !Number.isSafeInteger(pricing.totalMinor) ||
       itemSubtotalMinor < 0 ||
-      totalMinor < 0
+      pricing.totalMinor < 0
     ) {
       quoteUnavailable();
     }
     return {
-      currency: 'EUR',
-      itemSubtotalMinor,
+      ...pricing,
       quoteStatus,
       quotedAt: quotedAt.toISOString(),
-      shippingMinor: SHIPPING_MINOR,
-      totalMinor,
     };
   } catch (error) {
     if (error instanceof UnprocessableEntityException) throw error;
@@ -593,8 +618,126 @@ function buildCheckoutQuote(
   }
 }
 
+async function previewFirstPurchaseDiscount(
+  transaction: Prisma.TransactionClient,
+  draft: Pick<StoredCheckoutDraft, 'paymentMethod' | 'userId'>,
+): Promise<boolean> {
+  if (!draft.userId || draft.paymentMethod !== 'STRIPE_DEBIT_CARD') {
+    return false;
+  }
+  const [paidOrder, activeClaim] = await Promise.all([
+    transaction.order.findFirst({
+      select: { id: true },
+      where: { paymentState: 'PAID', userId: draft.userId },
+    }),
+    transaction.firstPurchaseDiscountClaim.findFirst({
+      select: { id: true },
+      where: {
+        status: { in: ['CLAIMED', 'CONSUMED'] },
+        userId: draft.userId,
+      },
+    }),
+  ]);
+  return !paidOrder && !activeClaim;
+}
+
+async function hasClaimedPaymentAttempt(
+  transaction: Prisma.TransactionClient,
+  checkoutDraftId: string,
+): Promise<boolean> {
+  return Boolean(
+    await transaction.firstPurchaseDiscountClaim.findFirst({
+      select: { id: true },
+      where: {
+        paymentAttempt: { checkoutDraftId },
+        status: 'CLAIMED',
+      },
+    }),
+  );
+}
+
+async function findClaimedAttemptQuote(
+  transaction: Prisma.TransactionClient,
+  draft: Pick<StoredCheckoutDraft, 'id' | 'userId'>,
+): Promise<CheckoutQuote | null> {
+  if (!draft.userId) return null;
+  const claimed = await transaction.firstPurchaseDiscountClaim.findFirst({
+    orderBy: { heldAt: 'desc' },
+    select: {
+      paymentAttempt: {
+        select: {
+          currency: true,
+          discountBasisPoints: true,
+          discountMinor: true,
+          discountPolicyVersion: true,
+          itemSubtotalMinor: true,
+          quotedAt: true,
+          shippingMinor: true,
+          totalMinor: true,
+        },
+      },
+    },
+    where: {
+      paymentAttempt: { checkoutDraftId: draft.id, userId: draft.userId },
+      status: 'CLAIMED',
+    },
+  });
+  if (!claimed) return null;
+  const quote = claimed.paymentAttempt;
+  if (quote.currency !== 'EUR') quoteUnavailable();
+  return {
+    currency: 'EUR',
+    discountBasisPoints: quote.discountBasisPoints,
+    discountMinor: quote.discountMinor,
+    discountPolicyVersion: quote.discountPolicyVersion,
+    itemSubtotalMinor: quote.itemSubtotalMinor,
+    quoteStatus: 'ready',
+    quotedAt: quote.quotedAt.toISOString(),
+    shippingMinor: quote.shippingMinor,
+    totalMinor: quote.totalMinor,
+  };
+}
+
 function quoteUnavailable(): never {
   throw new UnprocessableEntityException(QUOTE_UNAVAILABLE);
+}
+
+function normalizeReplaySnapshot(snapshot: Prisma.JsonValue): CheckoutDraftDto {
+  if (!isJsonRecord(snapshot)) quoteUnavailable();
+  const hasBasisPoints = 'discountBasisPoints' in snapshot;
+  const hasDiscountMinor = 'discountMinor' in snapshot;
+  const hasPolicyVersion = 'discountPolicyVersion' in snapshot;
+  if (hasBasisPoints || hasDiscountMinor || hasPolicyVersion) {
+    if (!hasBasisPoints || !hasDiscountMinor || !hasPolicyVersion) {
+      quoteUnavailable();
+    }
+    return snapshot as unknown as CheckoutDraftDto;
+  }
+  if (
+    snapshot.currency !== 'EUR' ||
+    !isNonNegativeInteger(snapshot.itemSubtotalMinor) ||
+    !isNonNegativeInteger(snapshot.shippingMinor) ||
+    !isNonNegativeInteger(snapshot.totalMinor) ||
+    snapshot.totalMinor !== snapshot.itemSubtotalMinor + snapshot.shippingMinor
+  ) {
+    quoteUnavailable();
+  }
+  return {
+    ...(snapshot as unknown as CheckoutDraftDto),
+    discountBasisPoints: 0,
+    discountMinor: 0,
+    discountPolicyVersion: 'no-discount-v1',
+  };
+}
+
+function isJsonRecord(value: Prisma.JsonValue): value is Prisma.JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isNonNegativeInteger(
+  value: Prisma.JsonValue | undefined,
+): value is number {
+  return Number.isInteger(value) && Number(value) >= 0;
 }
 
 function toCheckoutDraftDto(

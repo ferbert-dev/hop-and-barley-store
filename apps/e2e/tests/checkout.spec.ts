@@ -50,6 +50,25 @@ test.describe('O2G private checkout draft', () => {
   test('preserves the unchanged draft through sign-in with an existing account cart merge', async ({
     page,
   }) => preserveDraftThroughSignIn(page, 'succeeded'));
+
+  test('renders the server-owned 6% products discount separately from shipping', async ({
+    page,
+  }) => {
+    await interceptCheckoutDraft(page, { discounted: true });
+    await page.goto('/checkout');
+    await expect(
+      page.getByText(/Eligible registered customers receive 6% off products/),
+    ).toBeVisible();
+    await fillCheckoutDraft(page);
+    await page.getByRole('button', { name: 'Save checkout details' }).click();
+    await expect(
+      page.getByText('First purchase account discount (6%)'),
+    ).toBeVisible();
+    await expect(page.getByText('€100.00')).toBeVisible();
+    await expect(page.getByText('€6.00')).toBeVisible();
+    await expect(page.getByText('€5.00')).toBeVisible();
+    await expect(page.getByText('€99.00')).toBeVisible();
+  });
 });
 
 async function fillCheckoutDraft(page: Page) {
@@ -63,7 +82,7 @@ async function fillCheckoutDraft(page: Page) {
 
 async function preserveDraftThroughSignIn(page: Page, cartMerge: string) {
   const api = await interceptCheckoutDraft(page, { requireAdoption: true });
-  await interceptSuccessfulLogin(page, cartMerge);
+  await interceptSuccessfulLogin(page, cartMerge, api.markAuthTransition);
 
   await page.goto('/checkout');
   await fillCheckoutDraft(page);
@@ -72,7 +91,6 @@ async function preserveDraftThroughSignIn(page: Page, cartMerge: string) {
     page.getByText('Checkout details saved privately.'),
   ).toBeVisible();
 
-  api.markAuthTransition();
   await page
     .getByLabel('Checkout')
     .getByRole('link', { name: 'Sign in' })
@@ -142,14 +160,13 @@ test.describe('O2G handoff cleanup', () => {
       failAdoption: true,
       requireAdoption: true,
     });
-    await interceptSuccessfulLogin(page, 'succeeded');
+    await interceptSuccessfulLogin(page, 'succeeded', api.markAuthTransition);
     await page.goto('/checkout');
     await fillCheckoutDraft(page);
     await page.getByRole('button', { name: 'Save checkout details' }).click();
     await expect(
       page.getByText('Checkout details saved privately.'),
     ).toBeVisible();
-    api.markAuthTransition();
     await page
       .getByLabel('Checkout')
       .getByRole('link', { name: 'Sign in' })
@@ -168,12 +185,17 @@ test.describe('O2G handoff cleanup', () => {
   });
 });
 
-async function interceptSuccessfulLogin(page: Page, cartMerge: string) {
+async function interceptSuccessfulLogin(
+  page: Page,
+  cartMerge: string,
+  markAuthTransition: () => void,
+) {
   await page.route('**/api/v1/auth/login', async (route) => {
     if (route.request().method() === 'OPTIONS') {
       await fulfill(route, undefined, 204);
       return;
     }
+    markAuthTransition();
     await route.fulfill({
       body: JSON.stringify({ cartMerge }),
       contentType: 'application/json',
@@ -184,7 +206,11 @@ async function interceptSuccessfulLogin(page: Page, cartMerge: string) {
 
 async function interceptCheckoutDraft(
   page: Page,
-  options: Readonly<{ failAdoption?: boolean; requireAdoption?: boolean }> = {},
+  options: Readonly<{
+    discounted?: boolean;
+    failAdoption?: boolean;
+    requireAdoption?: boolean;
+  }> = {},
 ) {
   let saved: Record<string, unknown> | null = null;
   let authTransition = false;
@@ -211,7 +237,7 @@ async function interceptCheckoutDraft(
         await fulfill(route, undefined, 404);
         return;
       }
-      await fulfill(route, draftResponse(saved));
+      await fulfill(route, draftResponse(saved, options.discounted));
       return;
     }
     saved = request.postDataJSON() as Record<string, unknown>;
@@ -224,7 +250,7 @@ async function interceptCheckoutDraft(
       await fulfill(route, undefined, 503);
       return;
     }
-    await fulfill(route, draftResponse(saved));
+    await fulfill(route, draftResponse(saved, options.discounted));
   });
   return {
     get adoptions() {
@@ -242,10 +268,15 @@ async function interceptCheckoutDraft(
   };
 }
 
-function draftResponse(saved: Record<string, unknown>) {
+function draftResponse(saved: Record<string, unknown>, discounted = false) {
   return {
     currency: 'EUR',
-    itemSubtotalMinor: 599,
+    discountBasisPoints: discounted ? 600 : 0,
+    discountMinor: discounted ? 600 : 0,
+    discountPolicyVersion: discounted
+      ? 'registered-first-purchase-v1'
+      : 'no-discount-v1',
+    itemSubtotalMinor: discounted ? 10_000 : 599,
     ...saved,
     delivery: {
       additionalInfo: null,
@@ -261,7 +292,7 @@ function draftResponse(saved: Record<string, unknown>) {
     quotedAt: '2026-09-10T10:00:00.000Z',
     status: 'pre_payment',
     shippingMinor: 500,
-    totalMinor: 1099,
+    totalMinor: discounted ? 9_900 : 1099,
     updatedAt: '2026-09-09T10:00:00.000Z',
   };
 }

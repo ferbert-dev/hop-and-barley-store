@@ -101,6 +101,8 @@ jobs:
         run: pnpm test:o2c:postgres
       - name: Verify guest checkout migration, privacy, and idempotency
         run: pnpm test:o2g:postgres
+      - name: Verify discount attempts, immutable snapshots, and concurrent claims
+        run: pnpm test:o2d:postgres
       - name: Verify the A1B Argon2 resource profile
         run: pnpm test:a1b:argon2:alpine
 

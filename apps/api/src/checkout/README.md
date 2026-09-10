@@ -35,7 +35,8 @@ idempotency key; a retry with the same canonical input returns the stored safe
 response, while changed input conflicts.
 
 Every successful response includes a server-owned EUR quote with non-negative
-integer `itemSubtotalMinor`, fixed `shippingMinor: 500`, bounded `totalMinor`,
+integer `itemSubtotalMinor`, `discountBasisPoints`, `discountMinor`, fixed
+`shippingMinor: 500`, bounded `totalMinor`, `discountPolicyVersion`,
 `quoteStatus`, and `quotedAt`. `ready` means every current canonical cart line
 is checkout-ready; `unavailable` keeps a safely calculated current EUR amount
 but blocks continuation because at least one line is unavailable; `empty`
@@ -44,6 +45,22 @@ identifies an empty cart. Non-EUR data and unsafe arithmetic fail closed with
 snapshot, including its quote and `quotedAt`; an authorized GET recomputes the
 quote from current product and cart data. Quote reads do not reserve stock,
 decrement inventory, create an order, or call a payment provider.
+
+A complete pre-O2D replay snapshot has no discount fields. On exact-key replay,
+the API preserves its original subtotal, shipping, total, and timestamp and
+adds only the explicit `no-discount-v1` metadata. It does not reprice or apply a
+retroactive benefit. A partial discount-field snapshot or an inconsistent
+legacy total fails closed as `quote-unavailable`.
+
+For an eligible authenticated card checkout, the current preview applies the
+registered-first-purchase policy to products only. It rounds once at subtotal
+level using `(subtotal × 600 + 5000) / 10000` integer division. Guests,
+returning paid purchasers, and Cash on Delivery previews use the explicit
+`no-discount-v1` snapshot. The preview never trusts an email or browser-owned
+amount. Payment preparation creates a separate immutable attempt and durable
+claim; after that, reads resume its exact stored amounts and draft edits fail
+with `discount-claim-held` until the attempt has a definitive outcome. A timeout
+or ambiguous result retains the claim for reconciliation.
 
 Expired abandoned guest data is removed only by the explicit bounded purge
 described in [`PURGE.md`](PURGE.md). It is not tied to a request path and no

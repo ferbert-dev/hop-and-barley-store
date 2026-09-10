@@ -210,6 +210,15 @@ export class CheckoutDraftDto {
   @ApiProperty({ format: 'int32', minimum: 0, type: 'integer' })
   itemSubtotalMinor!: number;
 
+  @ApiProperty({ example: 600, format: 'int32', minimum: 0, type: 'integer' })
+  discountBasisPoints!: number;
+
+  @ApiProperty({ format: 'int32', minimum: 0, type: 'integer' })
+  discountMinor!: number;
+
+  @ApiProperty({ example: 'registered-first-purchase-v1', type: String })
+  discountPolicyVersion!: string;
+
   @ApiProperty({ example: 500, format: 'int32', minimum: 0, type: 'integer' })
   shippingMinor!: number;
 

@@ -274,6 +274,9 @@ describe('CheckoutScreen', () => {
             email: 'brewer@example.com',
             expiresAt: null,
             fullName: 'Alex Brewer',
+            discountBasisPoints: 0,
+            discountMinor: 0,
+            discountPolicyVersion: 'no-discount-v1',
             itemSubtotalMinor: 0,
             paymentMethod: 'stripe_debit_card',
             phoneNumber: '+4912345678',
@@ -311,6 +314,48 @@ describe('CheckoutScreen', () => {
     expect(screen.getByLabelText('Street')).toHaveValue('Hopfenstraße');
     expect(screen.getByLabelText('Postal code')).toHaveValue('10115');
     expect(screen.getByLabelText('Email')).toBeEnabled();
+  });
+
+  it('shows the server-owned first-purchase discount separately from shipping', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        response({
+          delivery: {
+            additionalInfo: null,
+            administrativeArea: null,
+            apartmentUnit: null,
+            city: 'Berlin',
+            countryCode: 'DE',
+            floor: null,
+            houseNumber: '4',
+            postalCode: '10115',
+            street: 'Hopfenstraße',
+          },
+          discountBasisPoints: 600,
+          discountMinor: 600,
+          discountPolicyVersion: 'registered-first-purchase-v1',
+          email: 'brewer@example.com',
+          expiresAt: null,
+          fullName: 'Alex Brewer',
+          itemSubtotalMinor: 10_000,
+          paymentMethod: 'stripe_debit_card',
+          phoneNumber: '+4912345678',
+          status: 'pre_payment',
+          totalMinor: 9_900,
+          updatedAt: '2026-09-10T10:00:00.000Z',
+        }),
+      ),
+    );
+    render(<CheckoutScreen initialProfile={populatedProfile} />);
+
+    expect(
+      await screen.findByText('First purchase account discount (6%)'),
+    ).toBeVisible();
+    expect(screen.getByText('€100.00')).toBeVisible();
+    expect(screen.getByText('€6.00')).toBeVisible();
+    expect(screen.getByText('€5.00')).toBeVisible();
+    expect(screen.getByText('€99.00')).toBeVisible();
   });
 
   it.each([
@@ -402,6 +447,9 @@ function withQuote(body: unknown) {
   }
   return {
     currency: 'EUR',
+    discountBasisPoints: 0,
+    discountMinor: 0,
+    discountPolicyVersion: 'no-discount-v1',
     itemSubtotalMinor: 599,
     quoteStatus: 'ready',
     quotedAt: '2026-09-10T10:00:00.000Z',
