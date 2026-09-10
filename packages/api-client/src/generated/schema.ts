@@ -160,6 +160,30 @@ export interface paths {
         patch: operations["CartController_update"];
         trace?: never;
     };
+    "/api/v1/checkout/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the current private checkout draft
+         * @description Returns the current private pre-payment draft. Guest access requires both the current cart cookie and the separate checkout capability cookie. Authenticated access remains session-scoped.
+         */
+        get: operations["CheckoutController_getDraft"];
+        put?: never;
+        /**
+         * Save a private pre-payment checkout draft
+         * @description Creates or updates a private pre-payment delivery/contact snapshot and server-authoritative EUR quote without reserving or decrementing stock. The first guest write issues a cookie-only 24-hour capability; an exact same-cart idempotent retry may reissue a lost capability without extending expiry, while other later writes require it. Guest payment selection is Stripe debit card only; this endpoint does not contact Stripe or create an order.
+         */
+        post: operations["CheckoutController_saveDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/register": {
         parameters: {
             query?: never;
@@ -610,6 +634,68 @@ export interface components {
         UpdateCartItemDto: {
             /** Format: int32 */
             amount: number;
+        };
+        CheckoutDraftDeliveryDto: {
+            countryCode: string;
+            city: string;
+            street: string;
+            postalCode: string | null;
+            administrativeArea: string | null;
+            houseNumber: string | null;
+            apartmentUnit: string | null;
+            floor: string | null;
+            additionalInfo: string | null;
+        };
+        CheckoutDraftDto: {
+            /** @enum {string} */
+            status: "pre_payment";
+            /** @enum {string} */
+            paymentMethod: "cash_on_delivery" | "stripe_debit_card";
+            /** Format: email */
+            email: string;
+            fullName: string;
+            phoneNumber: string;
+            delivery: components["schemas"]["CheckoutDraftDeliveryDto"];
+            /** @enum {string} */
+            currency: "EUR";
+            /** Format: int32 */
+            itemSubtotalMinor: number;
+            /**
+             * Format: int32
+             * @example 500
+             */
+            shippingMinor: number;
+            /** Format: int32 */
+            totalMinor: number;
+            /** @enum {string} */
+            quoteStatus: "ready" | "unavailable" | "empty";
+            /** Format: date-time */
+            quotedAt: string;
+            /** Format: date-time */
+            expiresAt: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CheckoutDeliveryDto: {
+            /** @example DE */
+            countryCode: string;
+            city: string;
+            street: string;
+            postalCode?: string;
+            administrativeArea?: string;
+            houseNumber?: string;
+            apartmentUnit?: string;
+            floor?: string;
+            additionalInfo?: string;
+        };
+        SaveCheckoutDraftDto: {
+            /** Format: email */
+            email: string;
+            fullName: string;
+            phoneNumber: string;
+            /** @enum {string} */
+            paymentMethod: "cash_on_delivery" | "stripe_debit_card";
+            delivery: components["schemas"]["CheckoutDeliveryDto"];
         };
         RegisterDto: {
             /**
@@ -1529,6 +1615,111 @@ export interface operations {
                 content?: never;
             };
             /** @description Product or amount is unavailable */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CheckoutController_getDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutDraftDto"];
+                };
+            };
+            /** @description Cart or guest-checkout capability is missing, invalid or expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No checkout draft exists for the cart */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CheckoutController_saveDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Retry key scoped to this private checkout draft. Reuse with different input fails. */
+                "Idempotency-Key": string;
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveCheckoutDraftDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    /** @description Issued when a guest draft is first created, safely recovered by an exact idempotent retry, or restarted after expiry. The capability is never returned in JSON. */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutDraftDto"];
+                };
+            };
+            /** @description Invalid or unknown draft input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cart or existing guest-checkout capability is not valid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Origin or CSRF is not valid */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Idempotency key was reused with different canonical input */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description JSON body required */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Anonymous Cash on Delivery or a safe authoritative EUR quote is unavailable */
             422: {
                 headers: {
                     [name: string]: unknown;

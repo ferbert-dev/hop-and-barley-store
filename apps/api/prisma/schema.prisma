@@ -46,6 +46,10 @@ enum PaymentState {
   CANCELLED
 }
 
+enum CheckoutDraftStatus {
+  PRE_PAYMENT
+}
+
 enum SaleKind {
   WEIGHT
   PACKAGE
@@ -71,6 +75,7 @@ model User {
   primaryAddress     PrimaryAddress?
   orders             Order[]
   cart               Cart?
+  checkoutDrafts     CheckoutDraft[]
 }
 
 model CustomerProfile {
@@ -181,16 +186,17 @@ model Product {
 }
 
 model Cart {
-  id           String            @id(map: "Cart_pkey") @default(uuid()) @db.Uuid
-  tokenDigest  Bytes             @unique(map: "Cart_tokenDigest_key")
-  userId       String?           @unique(map: "Cart_userId_key") @db.Uuid
-  user         User?             @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "Cart_userId_fkey")
-  expiresAt    DateTime
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  items        CartItem[]
-  reservations CartReservation[]
-  order        Order?
+  id            String            @id(map: "Cart_pkey") @default(uuid()) @db.Uuid
+  tokenDigest   Bytes             @unique(map: "Cart_tokenDigest_key")
+  userId        String?           @unique(map: "Cart_userId_key") @db.Uuid
+  user          User?             @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "Cart_userId_fkey")
+  expiresAt     DateTime
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  items         CartItem[]
+  reservations  CartReservation[]
+  order         Order?
+  checkoutDraft CheckoutDraft?
 
   @@index([expiresAt], map: "Cart_expiresAt_idx")
 }
@@ -271,6 +277,50 @@ model Order {
   @@unique([userId, idempotencyKey], map: "Order_userId_idempotencyKey_key")
   @@index([userId, placedAt, id], map: "Order_userId_placedAt_id_idx")
   @@index([status, placedAt], map: "Order_status_placedAt_idx")
+}
+
+model CheckoutDraft {
+  id                       String                 @id(map: "CheckoutDraft_pkey") @default(uuid()) @db.Uuid
+  cartId                   String                 @unique(map: "CheckoutDraft_cartId_key") @db.Uuid
+  userId                   String?                @db.Uuid
+  guestCapabilityDigest    Bytes?                 @unique(map: "CheckoutDraft_guestCapabilityDigest_key")
+  guestCapabilityExpiresAt DateTime?              @db.Timestamptz(3)
+  status                   CheckoutDraftStatus    @default(PRE_PAYMENT)
+  paymentMethod            PaymentMethod
+  email                    String                 @db.VarChar(320)
+  fullName                 String                 @db.VarChar(200)
+  phoneNumber              String                 @db.VarChar(32)
+  countryCode              String                 @db.Char(2)
+  city                     String                 @db.VarChar(120)
+  street                   String                 @db.VarChar(200)
+  postalCode               String?                @db.VarChar(32)
+  administrativeArea       String?                @db.VarChar(120)
+  houseNumber              String?                @db.VarChar(32)
+  apartmentUnit            String?                @db.VarChar(64)
+  floor                    String?                @db.VarChar(32)
+  additionalInfo           String?                @db.VarChar(500)
+  version                  Int                    @default(1)
+  createdAt                DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime               @updatedAt @db.Timestamptz(3)
+  cart                     Cart                   @relation(fields: [cartId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "CheckoutDraft_cartId_fkey")
+  user                     User?                  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "CheckoutDraft_userId_fkey")
+  requests                 CheckoutDraftRequest[]
+
+  @@index([userId, status, updatedAt], map: "CheckoutDraft_userId_status_updatedAt_idx")
+  @@index([guestCapabilityExpiresAt], map: "CheckoutDraft_guestCapabilityExpiresAt_idx")
+}
+
+model CheckoutDraftRequest {
+  id               String        @id(map: "CheckoutDraftRequest_pkey") @default(uuid()) @db.Uuid
+  checkoutDraftId  String        @db.Uuid
+  idempotencyKey   String        @db.VarChar(128)
+  requestHash      Bytes
+  responseSnapshot Json          @db.JsonB
+  createdAt        DateTime      @default(now()) @db.Timestamptz(3)
+  checkoutDraft    CheckoutDraft @relation(fields: [checkoutDraftId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "CheckoutDraftRequest_checkoutDraftId_fkey")
+
+  @@unique([checkoutDraftId, idempotencyKey], map: "CheckoutDraftRequest_draftId_idempotencyKey_key")
+  @@index([createdAt], map: "CheckoutDraftRequest_createdAt_idx")
 }
 
 model OrderItem {

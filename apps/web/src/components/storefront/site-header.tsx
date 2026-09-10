@@ -9,6 +9,7 @@ import { assets } from '../../design-system/assets';
 import type { AuthFormAction } from '../../features/auth/auth-form';
 import { INITIAL_AUTH_FORM_STATE } from '../../features/auth/auth-state';
 import { useCart } from '../../features/cart/cart-context';
+import { clearCheckoutHandoff } from '../../features/checkout/checkout-handoff';
 import { Button } from '../ui/button';
 
 const DESKTOP_NAVIGATION_QUERY = '(min-width: 80rem)';
@@ -368,7 +369,11 @@ function LogoutForm({ action }: Readonly<{ action: AuthFormAction }>) {
   );
 
   return (
-    <form action={formAction} className="storefront-nav__logout">
+    <form
+      action={formAction}
+      className="storefront-nav__logout"
+      onSubmit={() => clearCheckoutHandoff(window.sessionStorage)}
+    >
       <Button
         pending={pending}
         pendingLabel="Signing out…"

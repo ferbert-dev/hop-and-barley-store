@@ -11,7 +11,13 @@ import { CartAccessService } from './cart-access.service';
 @Module({
   imports: [SessionModule],
   controllers: [CartController],
-  exports: [CartAccessService, CartCapabilityGuard, CartService],
+  exports: [
+    CartAccessService,
+    CartCapabilityGuard,
+    CartCsrfService,
+    CartMutationGuard,
+    CartService,
+  ],
   providers: [
     CartCapabilityGuard,
     CartAccessService,
