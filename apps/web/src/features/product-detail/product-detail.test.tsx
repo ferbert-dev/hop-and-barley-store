@@ -179,9 +179,13 @@ describe('ProductDetail', () => {
     ).toBeVisible();
     expect(status).toHaveAttribute('aria-busy', 'true');
     expect(status).toHaveAttribute('aria-live', 'polite');
-    expect(status).toHaveTextContent(
-      'Fetching the latest product information.',
-    );
+    expect(status).toHaveTextContent('Loading product details');
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    const region = screen.getByRole('region', { name: 'Product detail' });
+    expect(within(region).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(region).queryByRole('link')).not.toBeInTheDocument();
+    expect(within(region).queryByRole('img')).not.toBeInTheDocument();
+    expect(status.closest('.visually-hidden')).not.toBeNull();
   });
 
   it('renders a polite not-found state with a native recovery link', () => {

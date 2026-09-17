@@ -299,6 +299,16 @@ Page 1 (0:1)
   decision, not evidence that the additional labels or states were drawn in the
   source frame.
 
+**User-confirmed product-detail loading extension — 2026-09-17**
+
+- While product details load, use a skeleton matching the existing page's
+  responsive image, title, price, description and quantity/action areas.
+- Use a soft brand-color pulse, disabled for reduced motion, and one visually
+  hidden loading announcement. Placeholders are decorative and noninteractive.
+- Keep the route's natural loading lifecycle, with no artificial delay or
+  forced spinner. Product, cart, pricing and payment behavior stay unchanged.
+- This is a user-approved addition absent from the Figma frame.
+
 ### Added-to-cart quantity state — `added`
 
 [Open node `51:1944`](https://www.figma.com/design/H7jIUNYzAGc7o8R0iABQjy/Project-M4-1--Next.js--share-?node-id=51-1944)

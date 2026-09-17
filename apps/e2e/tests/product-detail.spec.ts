@@ -308,18 +308,55 @@ test.describe('isolated product-detail states', () => {
   test('streams the loading state during client navigation and resolves ready', async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(runtime.baseUrl);
     const routeAnnouncer = page
       .locator('next-route-announcer')
       .locator('[role="alert"]');
     await expect(routeAnnouncer).toHaveAttribute('aria-live', 'assertive');
-    await page.locator('a[href="/product/mosaic-hops"]').first().click();
-    await expect(
-      page.getByRole('heading', { name: 'Loading product details' }),
-    ).toBeVisible();
+    const [loadingSnapshot] = await Promise.all([
+      page.waitForFunction(() => {
+        const skeleton = document.querySelector(
+          'section[aria-label="Product detail"]',
+        );
+        const media = skeleton?.querySelector('[class*="media"]');
+        const action = skeleton?.querySelector('[class*="skeletonAction"]');
+        const box = media?.getBoundingClientRect();
+        if (!box?.width || !box.height || !action) return false;
+        const style = getComputedStyle(action);
+        return {
+          media: { x: box.x, y: box.y, width: box.width, height: box.height },
+          animation: style.animationName,
+          duration: style.animationDuration,
+          announcement: skeleton?.querySelector('[role="status"]')?.textContent,
+        };
+      }),
+      page.locator('a[href="/product/mosaic-hops"]').first().click(),
+    ]);
+    const loading = await loadingSnapshot.jsonValue();
+    if (!loading) throw new Error('Product skeleton was not observed.');
+    const loadingMedia = loading.media;
+    expect(loadingMedia.width / loadingMedia.height).toBeCloseTo(4 / 3, 1);
+    expect(loading.announcement).toBe('Loading product details');
+    expect(loading.animation).not.toBe('none');
+    expect(loading.duration).toBe('1.8s');
+    const skeleton = page.getByRole('region', {
+      name: 'Product detail',
+      exact: true,
+    });
     await expect(
       page.getByRole('heading', { name: 'Mosaic Hops' }),
     ).toBeVisible();
+    await expect(skeleton).toHaveCount(0);
+    const readyMedia = await page
+      .locator('main [class*="media"]')
+      .boundingBox();
+    expect(readyMedia).not.toBeNull();
+    for (const dimension of ['x', 'y', 'width', 'height'] as const) {
+      expect(
+        Math.abs(readyMedia![dimension] - loadingMedia![dimension]),
+      ).toBeLessThanOrEqual(1);
+    }
     await expect(page).toHaveTitle('Mosaic Hops | Hop & Barley');
     const productAnnouncement = page
       .locator('main [aria-live="polite"]')
@@ -467,14 +504,39 @@ test('streams loading and renders a safe product error when the API is unavailab
     await page.goto(`/product/citra-hops?state=${probe.id}`, {
       waitUntil: 'commit',
     });
-    await expect(
-      page.getByRole('heading', { name: 'Loading product details' }),
-    ).toBeVisible();
-    const loadingStatus = page
-      .getByRole('status')
-      .filter({ hasText: 'Loading product details' });
-    await expect(loadingStatus).toHaveAttribute('aria-live', 'polite');
-    await expect(loadingStatus).toHaveAttribute('aria-busy', 'true');
+    const snapshot = await page.waitForFunction(() => {
+      const element = document.querySelector(
+        'section[aria-label="Product detail"]',
+      );
+      const media = element
+        ?.querySelector('[class*="media"]')
+        ?.getBoundingClientRect();
+      const summary = element
+        ?.querySelector('[class*="summary"]')
+        ?.getBoundingClientRect();
+      if (!element || !media?.width || !media.height || !summary?.height)
+        return false;
+      const status = element.querySelector('[role="status"]');
+      return {
+        aspectRatio: media.width / media.height,
+        stacked: summary.top >= media.bottom,
+        announcement: status?.textContent,
+        live: status?.getAttribute('aria-live'),
+        busy: status?.getAttribute('aria-busy'),
+        animationNames: [
+          ...element.querySelectorAll('[class*="skeleton"]'),
+        ].map((block) => getComputedStyle(block).animationName),
+      };
+    });
+    const geometry = await snapshot.jsonValue();
+    if (!geometry)
+      throw new Error('Visible product skeleton was not observed.');
+    expect(geometry.aspectRatio).toBeCloseTo(4 / 3, 1);
+    expect(geometry.stacked).toBe(probe.width < 768);
+    expect(geometry.animationNames.every((name) => name === 'none')).toBe(true);
+    expect(geometry.announcement).toBe('Loading product details');
+    expect(geometry.live).toBe('polite');
+    expect(geometry.busy).toBe('true');
     await assertResponsiveProductDetail(page, `loading:${probe.id}`);
     await assertReducedMotionState(page, `loading:${probe.id}`);
     if (probe.width === 360) {
