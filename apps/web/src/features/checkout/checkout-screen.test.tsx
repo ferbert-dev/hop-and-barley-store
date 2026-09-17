@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CHECKOUT_HANDOFF_KEY, storeCheckoutHandoff } from './checkout-handoff';
+import { PAYMENT_HANDOFF_KEY } from './checkout-payment';
 import { CheckoutScreen } from './checkout-screen';
 
 const privateHeaders = { 'cache-control': 'private, no-store' };
@@ -34,6 +35,9 @@ describe('CheckoutScreen', () => {
     ).toHaveAttribute('href', '/register?next=%2Fcheckout');
     expect(screen.getByLabelText('Debit Card')).toBeChecked();
     expect(window.sessionStorage.getItem(CHECKOUT_HANDOFF_KEY)).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByLabelText('Full Name')).toBeEnabled(),
+    );
     await user.click(screen.getByRole('link', { name: 'Sign in' }));
     expect(window.sessionStorage.getItem(CHECKOUT_HANDOFF_KEY)).not.toContain(
       'stripe_debit_card',
@@ -51,6 +55,9 @@ describe('CheckoutScreen', () => {
     const user = userEvent.setup();
     render(<CheckoutScreen />);
     await screen.findByRole('heading', { name: 'Checkout' });
+    await waitFor(() =>
+      expect(screen.getByLabelText('Postal code')).toBeEnabled(),
+    );
     const country = screen.getByLabelText('Country');
     expect(screen.getByRole('option', { name: 'Spain' })).toHaveValue('ES');
     expect(screen.getAllByRole('option')).toHaveLength(250);
@@ -108,6 +115,9 @@ describe('CheckoutScreen', () => {
     const user = userEvent.setup();
     render(<CheckoutScreen />);
     await screen.findByRole('heading', { name: 'Checkout' });
+    await waitFor(() =>
+      expect(screen.getByLabelText('Full Name')).toBeEnabled(),
+    );
 
     await user.type(screen.getByLabelText('Full Name'), 'Alex Brewer');
     await user.type(screen.getByLabelText('Email'), 'brewer@example.com');
@@ -132,6 +142,143 @@ describe('CheckoutScreen', () => {
     expect(screen.getByText('€5.99')).toBeVisible();
     expect(screen.getByText('€5.00')).toBeVisible();
     expect(screen.getByText('€10.99')).toBeVisible();
+  });
+
+  it('locks draft edits, saves, and auth handoff while the exact saved payment attempt is unsettled', async () => {
+    const attemptId = '40000000-0000-4000-8000-000000000001';
+    window.sessionStorage.setItem(
+      PAYMENT_HANDOFF_KEY,
+      JSON.stringify({
+        attemptId,
+        draftId: '30000000-0000-4000-8000-000000000001',
+        key: '50000000-0000-4000-8000-000000000001',
+      }),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          response({
+            delivery: {
+              city: 'Berlin',
+              countryCode: 'DE',
+              street: 'Hopfenstraße',
+            },
+            email: 'brewer@example.com',
+            expiresAt: null,
+            fullName: 'Alex Brewer',
+            paymentMethod: 'stripe_debit_card',
+            phoneNumber: '+4912345678',
+            status: 'pre_payment',
+            updatedAt: '2026-09-10T10:00:00.000Z',
+          }),
+        )
+        .mockResolvedValueOnce(response({ attemptId, status: 'processing' })),
+    );
+    const user = userEvent.setup();
+    render(<CheckoutScreen />);
+
+    expect(await screen.findByText(/being confirmed/)).toBeVisible();
+    expect(screen.getByLabelText('Full Name')).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Save checkout details' }),
+    ).toBeDisabled();
+    await user.click(screen.getByRole('link', { name: 'Sign in' }));
+    expect(window.sessionStorage.getItem(CHECKOUT_HANDOFF_KEY)).toBeNull();
+  });
+
+  it('unlocks draft edits only after the exact saved payment attempt is terminal', async () => {
+    const attemptId = '40000000-0000-4000-8000-000000000001';
+    window.sessionStorage.setItem(
+      PAYMENT_HANDOFF_KEY,
+      JSON.stringify({
+        attemptId,
+        draftId: '30000000-0000-4000-8000-000000000001',
+        key: '50000000-0000-4000-8000-000000000001',
+      }),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          response({
+            delivery: {
+              city: 'Berlin',
+              countryCode: 'DE',
+              street: 'Hopfenstraße',
+            },
+            email: 'brewer@example.com',
+            expiresAt: null,
+            fullName: 'Alex Brewer',
+            paymentMethod: 'stripe_debit_card',
+            phoneNumber: '+4912345678',
+            status: 'pre_payment',
+            updatedAt: '2026-09-10T10:00:00.000Z',
+          }),
+        )
+        .mockResolvedValueOnce(response({ attemptId, status: 'failed' })),
+    );
+    render(<CheckoutScreen />);
+
+    expect(await screen.findByText(/not completed/)).toBeVisible();
+    await waitFor(() => {
+      expect(screen.getByLabelText('Full Name')).toBeEnabled();
+      expect(
+        screen.getByRole('button', { name: 'Save checkout details' }),
+      ).toBeEnabled();
+    });
+  });
+
+  it('hides editable checkout details and save prompts only after the correlated payment succeeds', async () => {
+    const attemptId = '40000000-0000-4000-8000-000000000001';
+    window.sessionStorage.setItem(
+      PAYMENT_HANDOFF_KEY,
+      JSON.stringify({
+        attemptId,
+        draftId: '30000000-0000-4000-8000-000000000001',
+        key: '50000000-0000-4000-8000-000000000001',
+      }),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (request: Request) => {
+        if (request.url.endsWith('/api/v1/payments/stripe/status'))
+          return response({ attemptId, status: 'succeeded' });
+        return response(undefined, 404);
+      }),
+    );
+
+    render(<CheckoutScreen />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Payment successful' }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        'Your payment has been received. Thank you for your order.',
+      ),
+    ).toBeVisible();
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Full Name')).toBeNull();
+      expect(
+        screen.queryByText(
+          'Save your delivery details, then continue to secure payment.',
+        ),
+      ).toBeNull();
+      expect(
+        screen.queryByRole('button', { name: 'Save checkout details' }),
+      ).toBeNull();
+      expect(
+        screen.queryByText(
+          'Save your checkout details to receive the current order quote.',
+        ),
+      ).toBeNull();
+    });
+    expect(
+      screen.getByRole('link', { name: 'Continue shopping' }),
+    ).toHaveAttribute('href', '/');
   });
 
   it('adopts an unchanged session-only handoff draft after an auth ownership transition', async () => {
@@ -337,6 +484,7 @@ describe('CheckoutScreen', () => {
     render(<CheckoutScreen initialProfile={populatedProfile} />);
 
     await screen.findByText('Checkout with your account');
+    await waitFor(() => expect(screen.getByLabelText('Email')).toBeEnabled());
     expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
     expect(
       screen.queryByRole('link', { name: 'create an account' }),
@@ -347,6 +495,14 @@ describe('CheckoutScreen', () => {
     expect(screen.getByLabelText('Street')).toHaveValue('Hopfenstraße');
     expect(screen.getByLabelText('Postal code')).toHaveValue('10115');
     expect(screen.getByLabelText('Email')).toBeEnabled();
+    expect(
+      screen.getByText(
+        'Secure Stripe card payment. No payment is taken on this page.',
+      ),
+    ).toBeVisible();
+    expect(
+      screen.queryByText(/Guest checkout uses Stripe debit card/),
+    ).toBeNull();
   });
 
   it('shows the server-owned first-purchase discount separately from shipping', async () => {
@@ -444,6 +600,9 @@ describe('CheckoutScreen', () => {
       } else {
         await screen.findByRole('link', { name: 'Sign in' });
       }
+      await waitFor(() =>
+        expect(screen.getByLabelText('Street')).toBeEnabled(),
+      );
       expect(screen.getByLabelText('Phone number')).toHaveValue(expectedPhone);
       expect(screen.getByLabelText('Street')).toHaveValue('');
       expect(screen.getByLabelText('Street')).toBeEnabled();
@@ -477,6 +636,7 @@ function withQuote(body: unknown) {
     return body;
   }
   return {
+    id: '30000000-0000-4000-8000-000000000001',
     currency: 'EUR',
     discountBasisPoints: 0,
     discountMinor: 0,

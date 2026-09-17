@@ -14,6 +14,7 @@ import type {
   SaveCheckoutDraftDto,
 } from '../src/checkout/dto/checkout-draft.dto';
 import { PrismaService } from '../src/database/prisma.service';
+import type { Prisma } from '../src/generated/prisma/client';
 import { CheckoutPaymentMethod } from '../src/orders/dto/create-order.dto';
 
 const describePostgres =
@@ -153,6 +154,7 @@ describePostgres(
           street: 'شارع الشيخ زايد',
         },
         email: 'ada@example.com',
+        id: stored.id,
         itemSubtotalMinor: 325,
         paymentMethod: 'stripe_debit_card',
         quoteStatus: 'ready',
@@ -206,11 +208,24 @@ describePostgres(
         ...access.mutationHeaders,
         Cookie: `${access.cartCookie}; ${checkoutCookie}`,
       };
-      const expiresAt = (
-        await prisma.checkoutDraft.findUniqueOrThrow({
-          where: { cartId: access.cartId },
-        })
-      ).guestCapabilityExpiresAt;
+      const stored = await prisma.checkoutDraft.findUniqueOrThrow({
+        where: { cartId: access.cartId },
+      });
+      const expiresAt = stored.guestCapabilityExpiresAt;
+      const firstBody = first.body as CheckoutDraftDto;
+      expect(firstBody).toMatchObject({ id: stored.id });
+
+      const legacySnapshot: Partial<CheckoutDraftDto> = { ...firstBody };
+      delete legacySnapshot.id;
+      await prisma.checkoutDraftRequest.updateMany({
+        data: {
+          responseSnapshot: legacySnapshot as unknown as Prisma.InputJsonValue,
+        },
+        where: {
+          checkoutDraftId: stored.id,
+          idempotencyKey: 'guest-idempotent-0001',
+        },
+      });
 
       const recovered = await request(app.getHttpServer() as App)
         .post('/api/v1/checkout/draft')
@@ -218,7 +233,9 @@ describePostgres(
         .set('Idempotency-Key', 'guest-idempotent-0001')
         .send(aeDraft())
         .expect(200);
-      expect(recovered.body).toEqual(first.body);
+      const recoveredBody = recovered.body as CheckoutDraftDto;
+      expect(recoveredBody).toEqual(firstBody);
+      expect(recoveredBody).toMatchObject({ id: stored.id });
       const recoveredCookie = requireCookie(
         recovered.headers['set-cookie'],
         'hb_guest_checkout',

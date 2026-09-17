@@ -2,6 +2,10 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 
 const csrfToken = `v1.${'A'.repeat(43)}`;
 const handoffKey = 'hb-checkout-draft-handoff-v2';
+const paymentHandoffKey = 'hb-checkout-payment-v1';
+const unrelatedSessionKey = 'hb-checkout-test-sentinel';
+const paymentAttemptId = '40000000-0000-4000-8000-000000000001';
+const paymentIdempotencyKey = '50000000-0000-4000-8000-000000000001';
 
 test.describe('O2G private checkout draft', () => {
   test('shows guest and auth entry, structured delivery fields, fixed shipping, and a draft save/reload', async ({
@@ -25,7 +29,9 @@ test.describe('O2G private checkout draft', () => {
         'Save your checkout details to receive the current order quote.',
       ),
     ).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Pay' })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Pay with Stripe' }),
+    ).toBeDisabled();
 
     await fillCheckoutDraft(page);
     await page.getByRole('button', { name: 'Save checkout details' }).click();
@@ -226,6 +232,225 @@ test.describe('O2G handoff cleanup', () => {
   });
 });
 
+test.describe('O3 payment handoff regressions', () => {
+  test('does not treat a payment return URL as proof of payment', async ({
+    page,
+  }) => {
+    await interceptCheckoutDraft(page);
+    await page.goto('/checkout?payment=return');
+
+    await expect(
+      page.getByText('We cannot confirm the payment result yet.'),
+    ).toBeVisible();
+    await expect(page.getByLabel('Full Name')).toBeDisabled();
+    await expect(
+      page.getByRole('button', { name: 'Save checkout details' }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole('button', { name: 'Pay with Stripe' }),
+    ).toHaveCount(0);
+  });
+
+  test('locks the checkout while a persisted payment is processing', async ({
+    page,
+  }) => {
+    await page.addInitScript(
+      ({ key, value }) => window.sessionStorage.setItem(key, value),
+      {
+        key: paymentHandoffKey,
+        value: JSON.stringify({
+          attemptId: paymentAttemptId,
+          draftId: '30000000-0000-4000-8000-000000000001',
+          key: paymentIdempotencyKey,
+        }),
+      },
+    );
+    await interceptCheckoutDraft(page);
+    await interceptPaymentStatus(page, {
+      attemptId: paymentAttemptId,
+      status: 'processing',
+    });
+    const starts = await interceptPaymentStart(page);
+
+    await page.goto('/checkout');
+    await expect(
+      page.getByText('Your payment is being confirmed.'),
+    ).toBeVisible();
+    await expect(page.getByLabel('Full Name')).toBeDisabled();
+    await expect(page.getByLabel('Debit Card')).toBeDisabled();
+    await expect(
+      page.getByRole('button', { name: 'Save checkout details' }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole('button', { name: 'Continue existing payment' }),
+    ).toHaveCount(0);
+    expect(starts).toHaveLength(0);
+  });
+
+  test('polls a correlated returned ready payment until its canonical status succeeds without starting another session', async ({
+    page,
+  }) => {
+    await page.addInitScript(
+      ({ key, value }) => window.sessionStorage.setItem(key, value),
+      {
+        key: paymentHandoffKey,
+        value: JSON.stringify({
+          attemptId: paymentAttemptId,
+          draftId: '30000000-0000-4000-8000-000000000001',
+          key: paymentIdempotencyKey,
+        }),
+      },
+    );
+    await interceptCheckoutDraft(page);
+    let statusRequests = 0;
+    await page.route('**/api/v1/payments/stripe/status', async (route) => {
+      statusRequests += 1;
+      await fulfill(route, {
+        attemptId: paymentAttemptId,
+        status: statusRequests === 1 ? 'ready_for_redirect' : 'succeeded',
+      });
+    });
+    const starts = await interceptPaymentStart(page);
+
+    await page.goto('/checkout?payment=return');
+    await expect(
+      page.getByText('Your payment is being confirmed.'),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Continue existing payment' }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('heading', { name: 'Payment successful' }),
+    ).toBeVisible({ timeout: 5_000 });
+    expect(statusRequests).toBe(2);
+    expect(starts).toHaveLength(0);
+  });
+
+  test('locks the checkout for an unknown persisted payment without starting a fresh payment', async ({
+    page,
+  }) => {
+    await page.addInitScript(
+      ({ key, value }) => window.sessionStorage.setItem(key, value),
+      {
+        key: paymentHandoffKey,
+        value: JSON.stringify({
+          draftId: '30000000-0000-4000-8000-000000000001',
+          key: paymentIdempotencyKey,
+        }),
+      },
+    );
+    await interceptCheckoutDraft(page);
+    await interceptPaymentStatus(page, {});
+    const starts = await interceptPaymentStart(page);
+
+    await page.goto('/checkout');
+    await expect(
+      page.getByText('We cannot confirm the payment result yet.'),
+    ).toBeVisible();
+    await expect(page.getByLabel('Full Name')).toBeDisabled();
+    await expect(page.getByLabel('Debit Card')).toBeDisabled();
+    await expect(
+      page.getByRole('button', { name: 'Save checkout details' }),
+    ).toBeDisabled();
+    expect(starts).toHaveLength(0);
+  });
+
+  test('clears only the canonical payment handoff after a matching success', async ({
+    page,
+  }) => {
+    await page.addInitScript(
+      ({ key, sentinelKey, value }) => {
+        if (
+          window.location.pathname === '/checkout' &&
+          !window.sessionStorage.getItem(sentinelKey)
+        ) {
+          window.sessionStorage.setItem(key, value);
+          window.sessionStorage.setItem(sentinelKey, 'preserve-me');
+        }
+      },
+      {
+        key: paymentHandoffKey,
+        sentinelKey: unrelatedSessionKey,
+        value: JSON.stringify({
+          attemptId: paymentAttemptId,
+          draftId: '30000000-0000-4000-8000-000000000001',
+          key: paymentIdempotencyKey,
+        }),
+      },
+    );
+    await interceptCheckoutDraft(page);
+    await interceptPaymentStatus(page, {
+      attemptId: paymentAttemptId,
+      status: 'succeeded',
+    });
+    await page.goto('/checkout');
+    await expect(
+      page.getByRole('heading', { name: 'Payment successful' }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        'Your payment has been received. Thank you for your order.',
+      ),
+    ).toBeVisible();
+    await page.getByRole('link', { name: 'Continue shopping' }).click();
+    await expect(page).toHaveURL(/\/$/);
+    expect(
+      await page.evaluate(
+        (key) => sessionStorage.getItem(key),
+        paymentHandoffKey,
+      ),
+    ).toBeNull();
+    expect(
+      await page.evaluate(
+        (key) => sessionStorage.getItem(key),
+        unrelatedSessionKey,
+      ),
+    ).toBe('preserve-me');
+  });
+
+  test('retains the same draft and idempotency key when resuming an unknown start', async ({
+    page,
+  }) => {
+    await interceptCheckoutDraft(page);
+    const starts = await interceptPaymentStart(page, undefined, 503);
+    await page.goto('/checkout');
+    await fillCheckoutDraft(page);
+    await page.getByRole('button', { name: 'Save checkout details' }).click();
+    await expect(
+      page.getByText('Checkout details saved privately.'),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Pay with Stripe' }).click();
+    await expect(
+      page.getByText('We cannot confirm the payment result yet.'),
+    ).toBeVisible();
+    const savedRaw = await page.evaluate(
+      (key) => sessionStorage.getItem(key),
+      paymentHandoffKey,
+    );
+    if (savedRaw === null) throw new Error('Payment handoff was not persisted');
+    const saved = JSON.parse(savedRaw) as { draftId: string; key: string };
+    expect(saved.draftId).toBe('30000000-0000-4000-8000-000000000001');
+    expect(saved.key).toMatch(/^[0-9a-f-]{36}$/i);
+
+    await page
+      .getByRole('button', { name: 'Continue existing payment' })
+      .click();
+    await expect.poll(() => starts.length).toBe(2);
+    expect(starts[0]).toEqual(starts[1]);
+    expect(starts[0]).toMatchObject({
+      draftId: saved.draftId,
+      idempotencyKey: saved.key,
+    });
+    expect(
+      await page.evaluate(
+        (key) => sessionStorage.getItem(key),
+        paymentHandoffKey,
+      ),
+    ).toBe(JSON.stringify(saved));
+  });
+});
+
 async function interceptSuccessfulLogin(
   page: Page,
   cartMerge: string,
@@ -243,6 +468,38 @@ async function interceptSuccessfulLogin(
       headers: privateHeaders(route),
     });
   });
+}
+
+async function interceptPaymentStatus(page: Page, body: unknown, status = 200) {
+  await page.route('**/api/v1/payments/stripe/status', async (route) => {
+    await fulfill(route, body, status);
+  });
+}
+
+async function interceptPaymentStart(
+  page: Page,
+  body: unknown = undefined,
+  status = 503,
+) {
+  const starts: Array<{ draftId: string; idempotencyKey: string }> = [];
+  await page.route(
+    '**/api/v1/payments/stripe/checkout-session',
+    async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        await fulfill(route, undefined, 204);
+        return;
+      }
+      const payload = route.request().postDataJSON() as {
+        checkoutDraftId: string;
+      };
+      starts.push({
+        draftId: payload.checkoutDraftId,
+        idempotencyKey: route.request().headers()['idempotency-key'] ?? '',
+      });
+      await fulfill(route, body, status);
+    },
+  );
+  return starts;
 }
 
 async function interceptCheckoutDraft(
@@ -329,6 +586,7 @@ function draftResponse(saved: Record<string, unknown>, discounted = false) {
       ...(saved.delivery as Record<string, unknown>),
     },
     expiresAt: null,
+    id: '30000000-0000-4000-8000-000000000001',
     quoteStatus: 'ready',
     quotedAt: '2026-09-10T10:00:00.000Z',
     status: 'pre_payment',

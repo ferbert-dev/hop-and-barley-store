@@ -6,6 +6,7 @@ import {
 } from './checkout-transport';
 
 const draft = {
+  id: '30000000-0000-4000-8000-000000000001',
   currency: 'EUR' as const,
   delivery: {
     additionalInfo: null,
