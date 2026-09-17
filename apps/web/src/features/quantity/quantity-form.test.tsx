@@ -30,7 +30,7 @@ describe('QuantityForm', () => {
       />,
     );
 
-    const input = screen.getByLabelText('Quantity');
+    const input = screen.getByLabelText('Quantity (kg)');
     expect(input).toHaveValue('0.1');
     expect(screen.queryByRole('combobox')).toBeNull();
     expect(screen.getByText('Price')).toHaveTextContent('€5.99');
@@ -42,7 +42,7 @@ describe('QuantityForm', () => {
     expect(onSubmit).toHaveBeenCalledWith(900_000);
   });
 
-  it('can place the kilogram unit in the input label without a separate inline unit', () => {
+  it('always places the kilogram unit in the input label without a separate inline unit', () => {
     render(
       <QuantityForm
         amount={100_000}
@@ -51,7 +51,6 @@ describe('QuantityForm', () => {
         onSubmit={vi.fn()}
         priceMinor={599}
         submitLabel="Add to Cart"
-        weightUnitPlacement="label"
       />,
     );
 
@@ -78,8 +77,8 @@ describe('QuantityForm', () => {
     );
     expect(screen.queryByText(/selected$/i)).not.toBeInTheDocument();
     expect(screen.getByText('Price')).toHaveTextContent('€11.98');
-    await user.clear(screen.getByLabelText('Quantity'));
-    await user.type(screen.getByLabelText('Quantity'), '0.15');
+    await user.clear(screen.getByLabelText('Quantity (kg)'));
+    await user.type(screen.getByLabelText('Quantity (kg)'), '0.15');
     await user.click(screen.getByRole('button', { name: 'Update cart' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Choose increments of 100g.',
@@ -108,7 +107,7 @@ describe('QuantityForm', () => {
       </>,
     );
 
-    const inputs = screen.getAllByLabelText('Quantity');
+    const inputs = screen.getAllByLabelText('Quantity (kg)');
     expect(inputs[0]?.id).not.toBe(inputs[1]?.id);
   });
 
@@ -124,7 +123,7 @@ describe('QuantityForm', () => {
         submitLabel="Update cart"
       />,
     );
-    const input = screen.getByLabelText('Quantity');
+    const input = screen.getByLabelText('Quantity (kg)');
     await user.clear(input);
     await user.type(input, '0.9');
     rerender(
@@ -138,7 +137,7 @@ describe('QuantityForm', () => {
       />,
     );
 
-    expect(screen.getByLabelText('Quantity')).toHaveValue('0.2');
+    expect(screen.getByLabelText('Quantity (kg)')).toHaveValue('0.2');
     expect(screen.queryByText(/selected$/i)).not.toBeInTheDocument();
     expect(screen.getByText('Price')).toHaveTextContent('€11.98');
   });
@@ -167,7 +166,7 @@ describe('QuantityForm', () => {
       increase,
     );
 
-    const input = screen.getByLabelText('Quantity');
+    const input = screen.getByLabelText('Quantity (kg)');
     await user.clear(input);
     await user.type(input, '0.9');
     await user.keyboard('{Enter}');

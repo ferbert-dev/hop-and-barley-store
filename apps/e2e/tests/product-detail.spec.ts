@@ -200,7 +200,7 @@ test.describe('database-backed product details', () => {
       await expect(
         page
           .getByRole('form', { name: 'Mosaic Hops quantity' })
-          .getByLabel('Quantity'),
+          .getByLabel('Quantity (kg)'),
       ).toHaveValue('0.3');
       await expect(
         page.getByLabel('Cart summary').getByText('€28.50'),
@@ -209,7 +209,7 @@ test.describe('database-backed product details', () => {
       await expect(
         page
           .getByRole('form', { name: 'Mosaic Hops quantity' })
-          .getByLabel('Quantity'),
+          .getByLabel('Quantity (kg)'),
       ).toHaveValue('0.3');
       await expect(
         page.getByLabel('Cart summary').getByText('€28.50'),

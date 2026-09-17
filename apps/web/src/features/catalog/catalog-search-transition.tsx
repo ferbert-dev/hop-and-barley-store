@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import { CatalogProductGridSkeleton } from './catalog-skeleton';
 import styles from './catalog.module.css';
 
 interface CatalogSearchTransitionValue {
@@ -84,31 +85,7 @@ export function useCatalogSearchTransition() {
 function CatalogSearchSkeleton() {
   return (
     <div className={styles.searchResultsLoading}>
-      <div aria-hidden="true" className={styles.productGrid}>
-        {Array.from({ length: 8 }, (_, index) => (
-          <div
-            className={styles.productSkeleton}
-            data-testid="catalog-product-skeleton"
-            key={index}
-          >
-            <span
-              className={`${styles.skeletonSurface} ${styles.skeletonMedia}`}
-            />
-            <span
-              className={`${styles.skeletonSurface} ${styles.skeletonEyebrow}`}
-            />
-            <span
-              className={`${styles.skeletonSurface} ${styles.skeletonTitle}`}
-            />
-            <span
-              className={`${styles.skeletonSurface} ${styles.skeletonPrice}`}
-            />
-            <span
-              className={`${styles.skeletonSurface} ${styles.skeletonDescription}`}
-            />
-          </div>
-        ))}
-      </div>
+      <CatalogProductGridSkeleton />
     </div>
   );
 }

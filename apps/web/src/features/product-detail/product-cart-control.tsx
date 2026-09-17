@@ -128,7 +128,6 @@ function AddToCartControl({
           }}
           priceMinor={priceMinor}
           submitLabel={`Add ${productName} to Cart`}
-          weightUnitPlacement="label"
         />
         {inCartAmount ? (
           <Button
