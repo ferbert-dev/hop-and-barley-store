@@ -72,6 +72,48 @@
 .summary {
   align-content: start;
 }
+.successLayout {
+  display: grid;
+  min-height: min(32rem, 60vh);
+  place-items: center;
+}
+.successPanel {
+  display: grid;
+  width: 100%;
+}
+.successCard {
+  justify-self: stretch;
+}
+.successContent {
+  align-items: center;
+  display: grid;
+  gap: var(--hb-space-4);
+  justify-items: center;
+  margin: 0 auto;
+  max-width: 36rem;
+  padding: var(--hb-space-8) var(--hb-space-4);
+  text-align: center;
+}
+.successContent h1,
+.successContent p {
+  margin: 0;
+}
+.successContent h1 {
+  font-size: clamp(2.5rem, 8vw, 5rem);
+}
+.successCheck {
+  align-items: center;
+  background: var(--hb-color-success);
+  border-radius: var(--hb-radius-round);
+  color: var(--hb-color-surface);
+  display: inline-flex;
+  font-size: 3rem;
+  font-weight: 700;
+  height: 5rem;
+  justify-content: center;
+  line-height: 1;
+  width: 5rem;
+}
 .payment {
   align-items: start;
   display: flex;

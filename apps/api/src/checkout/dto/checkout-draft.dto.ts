@@ -179,6 +179,9 @@ export class CheckoutDraftDeliveryDto {
 }
 
 export class CheckoutDraftDto {
+  @ApiProperty({ format: 'uuid', type: String })
+  id!: string;
+
   @ApiProperty({ enum: ['pre_payment'], type: String })
   status!: 'pre_payment';
 

@@ -241,7 +241,10 @@ export class CheckoutService {
             requestHash,
           );
           return {
-            draft: normalizeReplaySnapshot(replay.responseSnapshot),
+            draft: normalizeReplaySnapshot(
+              replay.responseSnapshot,
+              existing.id,
+            ),
             issuedCapability: {
               expiresAt: existing.guestCapabilityExpiresAt!,
               issuedAt: requestedNow,
@@ -253,7 +256,10 @@ export class CheckoutService {
         if (replay) {
           requireSameRequest(replay.requestHash, requestHash);
           return {
-            draft: normalizeReplaySnapshot(replay.responseSnapshot),
+            draft: normalizeReplaySnapshot(
+              replay.responseSnapshot,
+              existing.id,
+            ),
           };
         }
         if (
@@ -700,7 +706,10 @@ function quoteUnavailable(): never {
   throw new UnprocessableEntityException(QUOTE_UNAVAILABLE);
 }
 
-function normalizeReplaySnapshot(snapshot: Prisma.JsonValue): CheckoutDraftDto {
+function normalizeReplaySnapshot(
+  snapshot: Prisma.JsonValue,
+  checkoutDraftId: string,
+): CheckoutDraftDto {
   if (!isJsonRecord(snapshot)) quoteUnavailable();
   const hasBasisPoints = 'discountBasisPoints' in snapshot;
   const hasDiscountMinor = 'discountMinor' in snapshot;
@@ -709,7 +718,10 @@ function normalizeReplaySnapshot(snapshot: Prisma.JsonValue): CheckoutDraftDto {
     if (!hasBasisPoints || !hasDiscountMinor || !hasPolicyVersion) {
       quoteUnavailable();
     }
-    return snapshot as unknown as CheckoutDraftDto;
+    return {
+      ...(snapshot as unknown as CheckoutDraftDto),
+      id: checkoutDraftId,
+    };
   }
   if (
     snapshot.currency !== 'EUR' ||
@@ -725,6 +737,7 @@ function normalizeReplaySnapshot(snapshot: Prisma.JsonValue): CheckoutDraftDto {
     discountBasisPoints: 0,
     discountMinor: 0,
     discountPolicyVersion: 'no-discount-v1',
+    id: checkoutDraftId,
   };
 }
 
@@ -758,6 +771,7 @@ function toCheckoutDraftDto(
     email: draft.email,
     expiresAt: draft.guestCapabilityExpiresAt?.toISOString() ?? null,
     fullName: draft.fullName,
+    id: draft.id,
     paymentMethod:
       draft.paymentMethod === 'CASH_ON_DELIVERY'
         ? CheckoutPaymentMethod.CASH_ON_DELIVERY

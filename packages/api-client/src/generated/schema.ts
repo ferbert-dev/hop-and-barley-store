@@ -715,6 +715,8 @@ export interface components {
             additionalInfo: string | null;
         };
         CheckoutDraftDto: {
+            /** Format: uuid */
+            id: string;
             /** @enum {string} */
             status: "pre_payment";
             /** @enum {string} */
