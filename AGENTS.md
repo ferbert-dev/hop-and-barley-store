@@ -2,7 +2,7 @@
 
 ## Read first
 
-- Read the relevant Notion ticket and architecture before state-changing work.
+- Before execution, read a decision-complete Notion ticket, relevant architecture and the linked Running Agent Run. Read-only status work reuses those records and never authorizes a mutation.
 - Read [`docs/engineering-workflow.md`](docs/engineering-workflow.md) before planning, implementation, integration or review; it defines the detailed delivery, evidence, verification and rollback lifecycle.
 - This `AGENTS.md` is the sole source of truth for the worker concurrency limit. Do not duplicate a numeric worker limit in the engineering workflow or its machine contract.
 - Implementation truth lives in repository code, tests, migrations and Git history. Notion owns intent, decisions, tickets and Agent Runs. GitHub owns PR, CI, review and merge evidence.
@@ -11,7 +11,7 @@
 
 ## Delivery lifecycle
 
-1. Start from current `main`; create a Running Agent Run before delegation.
+1. Start from current `main`; create a Running Agent Run before execution or delegation.
 2. Implement the smallest reversible ticket-owned change.
 3. Keep temporary screenshots, traces, reports, coverage and generated evidence out of Git.
 4. Push a draft PR and wait for required CI to be green.
@@ -20,13 +20,15 @@
 
 ## Cost-aware orchestration
 
+- New project work is led by one `gpt-6-astra` Medium orchestrator, which must read and decompose the Notion ticket, delegate bounded implementation, integrate it and verify closure. The current root may fulfill that role; reuse the existing orchestrator for follow-ups and status, and never spawn recursive orchestrators.
 - The root orchestrator owns one vertical scope, integration, PR and final status. It does not maintain an idle agent pool.
 - Use one root orchestrator plus at most three spawned workers concurrently, for four total slots. Stop or reuse each worker immediately after its handoff; never leave completed agents waiting.
-- `gpt-5.6-sol`: architecture, security-sensitive work, risky cross-cutting changes and independent exact-head closure review.
-- `gpt-5.6-terra`: ordinary feature implementation, medium-complexity fixes and integration work.
-- `gpt-5.6-luna`: bounded mechanical edits, fixtures, repetitive tests, inventories and documentation.
+- `gpt-5.6-terra` Medium: ordinary frontend/backend implementation and integration work.
+- `gpt-5.6-luna` Medium: bounded mechanical edits, fixtures, routine test execution, inventories and documentation.
+- `gpt-5.6-sol` High: security-sensitive, risky or uncertain work, plus the independent exact-head closure review.
 - Always set model and reasoning effort explicitly when delegating. Record a one-line cost/correctness rationale in the Agent Run.
 - Fall back upward to Sol when boundaries, security, data integrity or correctness are unclear. Never fall back downward merely to save cost after a worker reports uncertainty.
+- Keep Notion handoff, status, blocker and closure evidence current; terminal Agent Runs require evidence, and unknown completion is not Done.
 - Do not start a second vertical scope until the current PR is merged or explicitly Blocked.
 
 ## Project baseline and safety
