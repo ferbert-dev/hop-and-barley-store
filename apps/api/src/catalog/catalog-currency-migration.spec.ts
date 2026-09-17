@@ -1,13 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const migrationPath = resolve(
-  __dirname,
-  '../../prisma/migrations/20260905120000_use_eur_product_currency/migration.sql',
-);
-
-describe('O2C EUR product-currency migration contract', () => {
-  const migration = readFileSync(migrationPath, 'utf8');
+describe.each([
+  '20260905120000_use_eur_product_currency',
+  '20260917100000_reconcile_product_currency_eur',
+])('EUR product-currency migration contract: %s', (migrationName) => {
+  const migration = readFileSync(
+    resolve(
+      __dirname,
+      '../../prisma/migrations',
+      migrationName,
+      'migration.sql',
+    ),
+    'utf8',
+  );
 
   it('fails closed before changing USD products or the default', () => {
     const lock = migration.indexOf(

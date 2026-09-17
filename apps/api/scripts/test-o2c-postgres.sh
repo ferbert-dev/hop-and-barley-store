@@ -6,6 +6,7 @@ container_name="hop-barley-o2c-postgres-${$}"
 database_user='hopbarley_o2c'
 database_password='hopbarley_o2c_fixture'
 migration_path="$repo_root/apps/api/prisma/migrations/20260905120000_use_eur_product_currency/migration.sql"
+repair_path="$repo_root/apps/api/prisma/migrations/20260917100000_reconcile_product_currency_eur/migration.sql"
 
 cleanup() {
   if docker inspect "$container_name" >/dev/null 2>&1; then
@@ -16,6 +17,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 docker run --rm --detach \
+  --memory 1g \
   --name "$container_name" \
   --env POSTGRES_DB=bootstrap_o2c \
   --env POSTGRES_PASSWORD="$database_password" \
@@ -196,6 +198,21 @@ test "$upgrade_state" = '12:12:5:1:1:1'
 [[ "$upgrade_default" == *"'EUR'"* ]]
 test "$historical_currency" = 'USD:599:500:1099'
 
+# Reproduce post-O2C drift, including inactive/scheduled products. Repair twice
+# to prove idempotence and preserve every non-currency product/cart/order field.
+docker exec "$container_name" psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --username "$database_user" --dbname upgrade_o2c \
+  --command "UPDATE \"Product\" SET \"currency\" = 'USD' WHERE \"slug\" <> 'unmalted-wheat';" >/dev/null
+for _ in 1 2; do
+  docker exec --interactive "$container_name" psql --no-psqlrc \
+    --set ON_ERROR_STOP=1 --username "$database_user" --dbname upgrade_o2c \
+    < "$repair_path" >/dev/null
+done
+test "$(query_scalar upgrade_o2c 'SELECT count(*) FROM "Product" WHERE "currency" <> '\''EUR'\'';')" = '0'
+test "$(query_scalar upgrade_o2c 'SELECT md5(string_agg(md5((to_jsonb(p) - '\''currency'\'')::text), '\'','\'' ORDER BY "id")) FROM "Product" p;')" = "$product_before"
+test "$(query_scalar upgrade_o2c 'SELECT md5(to_jsonb(o)::text) || '\'':'\'' || md5(to_jsonb(i)::text) FROM "Order" o CROSS JOIN "OrderItem" i WHERE o."id" = '\''83000000-0000-4000-8000-000000000001'\'';')" = "$history_before"
+test "$(query_scalar upgrade_o2c 'SELECT md5(to_jsonb(c)::text) || '\'':'\'' || md5(to_jsonb(i)::text) FROM "Cart" c JOIN "CartItem" i ON i."cartId" = c."id" WHERE c."id" = '\''82000000-0000-4000-8000-000000000002'\'';')" = "$cart_before"
+
 docker exec "$container_name" psql --no-psqlrc --set ON_ERROR_STOP=1 \
   --username "$database_user" --dbname fail_closed_o2c \
   --command "UPDATE \"Product\" SET \"currency\" = 'JPY' WHERE \"slug\" = 'cascade-hops';" \
@@ -215,6 +232,13 @@ failure_state=$(query_scalar fail_closed_o2c \
 failure_default=$(query_scalar fail_closed_o2c \
   'SELECT column_default FROM information_schema.columns WHERE table_schema = '"'"'public'"'"' AND table_name = '"'"'Product'"'"' AND column_name = '"'"'currency'"'"';')
 test "$failure_after" = "$failure_before"
+if docker exec --interactive "$container_name" psql --no-psqlrc \
+  --set ON_ERROR_STOP=1 --username "$database_user" --dbname fail_closed_o2c \
+  < "$repair_path" >/dev/null 2>&1; then
+  echo 'Expected corrective migration to reject an unexpected currency' >&2
+  exit 1
+fi
+test "$(query_scalar fail_closed_o2c 'SELECT md5(string_agg(md5(to_jsonb(p)::text), '\'','\'' ORDER BY "id")) FROM "Product" p;')" = "$failure_before"
 test "$failure_state" = '10:1:1'
 [[ "$failure_default" == *"'USD'"* ]]
 

@@ -11,7 +11,9 @@ const describePostgres =
   process.env.RUN_O2P_POSTGRES_INTEGRATION === '1' ? describe : describe.skip;
 
 const productSlug = 'safale-us05-yeast';
-const now = new Date('2026-09-10T12:00:00.000Z');
+// currentStatus uses the wall clock: fixture capabilities must not expire as
+// the calendar advances beyond the date this integration suite was written.
+const now = new Date();
 let sequence = 0;
 
 describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
