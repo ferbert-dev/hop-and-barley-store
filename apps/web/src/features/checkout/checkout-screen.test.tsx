@@ -43,6 +43,39 @@ describe('CheckoutScreen', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('updates postal validation when switching EU countries without blocking other destinations', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response(undefined, 404)),
+    );
+    const user = userEvent.setup();
+    render(<CheckoutScreen />);
+    await screen.findByRole('heading', { name: 'Checkout' });
+    const country = screen.getByLabelText('Country');
+    expect(screen.getByRole('option', { name: 'Spain' })).toHaveValue('ES');
+    expect(screen.getAllByRole('option')).toHaveLength(250);
+    const postal = screen.getByLabelText('Postal code') as HTMLInputElement;
+    for (const [code, valid, invalid] of [
+      ['ES', '08001', 'ABCDE'],
+      ['NL', '1012 AB', '1012'],
+    ]) {
+      await user.selectOptions(country, code);
+      await user.clear(postal);
+      await user.type(postal, invalid);
+      expect(postal.checkValidity()).toBe(false);
+      await user.clear(postal);
+      await user.type(postal, valid);
+      expect(postal.checkValidity()).toBe(true);
+      expect(postal).toBeRequired();
+    }
+    for (const code of ['IE', 'AE', 'GB', 'CH', 'NO']) {
+      await user.selectOptions(country, code);
+      await user.clear(postal);
+      expect(postal).not.toBeRequired();
+      expect(postal.checkValidity()).toBe(true);
+    }
+  });
+
   it('loads and saves a structured private draft without a payment call', async () => {
     const csrfToken = `v1.${'A'.repeat(43)}`;
     const fetch = vi
@@ -381,9 +414,7 @@ describe('CheckoutScreen', () => {
       );
 
       await screen.findByText('Checkout with your account');
-      expect(screen.getByLabelText('Country (ISO code)')).toHaveValue(
-        expectedCode,
-      );
+      expect(screen.getByLabelText('Country')).toHaveValue(expectedCode);
       expect(fetch).toHaveBeenCalledTimes(1);
     },
   );

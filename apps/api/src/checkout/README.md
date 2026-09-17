@@ -72,14 +72,17 @@ The canonical country value is ISO 3166-1 alpha-2 `countryCode`; a country name
 is not stored. The delivery model is worldwide and therefore does not pretend
 that postal codes or administrative areas are universally required:
 
-- Germany (`DE`) requires a five-digit postal code.
+- EU postal formats are shared with the web form via `@hop-and-barley/address-policy`.
+  Ireland keeps Eircode optional; Malta permits personal-code exceptions. See
+  `packages/address-policy/README.md` for sources and limitations.
 - United States (`US`) requires a five- or nine-digit ZIP code and a two-letter
   administrative-area code.
-- United Arab Emirates (`AE`) and all other currently unencoded countries keep
+- United Arab Emirates (`AE`) and other countries outside the EU/US keep
   postal code and administrative area optional.
 - Names, cities, streets, and optional address details accept international
   Unicode within explicit length limits.
 
-Future country-specific rules extend the DTO and database check together with
-fixtures. O2E owns emailed cross-device recovery. O2G intentionally exposes no
+New EU format rules validate draft submissions before persistence; historical
+address snapshots and database structural constraints are unchanged. Future
+structural changes require matching database checks and migration fixtures. O2E owns emailed cross-device recovery. O2G intentionally exposes no
 public lookup, capability-in-link, account claim, or post-order recovery route.

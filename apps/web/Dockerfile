@@ -24,6 +24,7 @@ FROM build-base AS dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
 COPY packages/api-client/package.json packages/api-client/package.json
+COPY packages/address-policy/package.json packages/address-policy/package.json
 COPY packages/auth-contract/package.json packages/auth-contract/package.json
 COPY packages/typescript-config/package.json packages/typescript-config/package.json
 
@@ -35,6 +36,7 @@ FROM dependencies AS builder
 
 COPY apps/web apps/web
 COPY packages/api-client packages/api-client
+COPY packages/address-policy packages/address-policy
 COPY packages/auth-contract packages/auth-contract
 COPY packages/typescript-config packages/typescript-config
 

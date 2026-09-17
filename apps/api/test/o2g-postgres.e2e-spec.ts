@@ -66,6 +66,47 @@ describePostgres(
       await postgres?.end();
     });
 
+    it('rejects an invalid EU address before persistence and roundtrips normalized Unicode delivery', async () => {
+      const access = await createGuestCart();
+      const draft = aeDraft();
+      const delivery = {
+        ...draft.delivery,
+        countryCode: 'nl',
+        city: 'Den Haag',
+        street: 'Laan van Nieuw Oost-Indië',
+        postalCode: 'invalid',
+      };
+      await request(app.getHttpServer() as App)
+        .post('/api/v1/checkout/draft')
+        .set(access.mutationHeaders)
+        .set('Idempotency-Key', 'eu-address-invalid-001')
+        .send({ ...draft, delivery })
+        .expect(400);
+      expect(await prisma.checkoutDraft.count()).toBe(0);
+      expect(await prisma.checkoutDraftRequest.count()).toBe(0);
+      const saved = await request(app.getHttpServer() as App)
+        .post('/api/v1/checkout/draft')
+        .set(access.mutationHeaders)
+        .set('Idempotency-Key', 'eu-address-valid-001')
+        .send({ ...draft, delivery: { ...delivery, postalCode: ' 2593 bm ' } })
+        .expect(200);
+      expect(saved.body).toMatchObject({
+        delivery: {
+          countryCode: 'NL',
+          postalCode: '2593 BM',
+          street: delivery.street,
+        },
+      });
+      const stored = await prisma.checkoutDraft.findUniqueOrThrow({
+        where: { cartId: access.cartId },
+      });
+      expect(stored).toMatchObject({
+        countryCode: 'NL',
+        postalCode: '2593 BM',
+        street: delivery.street,
+      });
+    });
+
     it('stores only the digest, snapshots Unicode delivery, and does not touch commerce state', async () => {
       const access = await createGuestCart();
       const stockBefore = await productStock();

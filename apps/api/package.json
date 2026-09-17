@@ -46,6 +46,7 @@
     "checkout:purge-expired-drafts": "prisma generate && node --import tsx scripts/purge-expired-checkout-drafts.ts"
   },
   "dependencies": {
+    "@hop-and-barley/address-policy": "workspace:*",
     "@hop-and-barley/auth-contract": "workspace:*",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "4.0.4",

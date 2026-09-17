@@ -1,5 +1,10 @@
 'use client';
 
+import {
+  getPostalCodePolicy,
+  isValidPostalCode,
+  normalizePostalCode,
+} from '@hop-and-barley/address-policy';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
@@ -7,7 +12,7 @@ import type { components } from '@hop-and-barley/api-client';
 
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
-import { Field } from '../../components/ui/field';
+import { Field, Select } from '../../components/ui/field';
 import { Price } from '../../components/ui/price';
 import {
   clearCheckoutHandoff,
@@ -57,6 +62,11 @@ export function CheckoutScreen({
   initialProfile = null,
 }: Readonly<{ initialProfile?: CheckoutProfile | null }>) {
   const [form, setForm] = useState<CheckoutForm>(EMPTY_FORM);
+  const postalPolicy = getPostalCodePolicy(form.countryCode);
+  const [postalError, setPostalError] = useState('');
+  const postalMessage = postalPolicy.example
+    ? `Enter a postal code in this format: ${postalPolicy.example}.`
+    : 'Enter a postal code of up to 32 characters.';
   const [loadState, setLoadState] = useState<
     'loading' | 'ready' | 'unavailable'
   >('loading');
@@ -253,29 +263,27 @@ export function CheckoutScreen({
               type="tel"
               value={form.phoneNumber}
             />
-            <Field
+            <Select
               autoComplete="country"
               id="checkout-country"
-              label="Country (ISO code)"
-              list="checkout-countries"
-              maxLength={2}
+              label="Country"
               name="countryCode"
-              onChange={(event) =>
-                setValue('countryCode', event.currentTarget.value.toUpperCase())
-              }
-              pattern="[A-Za-z]{2}"
+              onChange={(event) => {
+                setPostalError('');
+                setValue('countryCode', event.currentTarget.value);
+              }}
               required
               value={form.countryCode}
-            />
-            <datalist id="checkout-countries">
-              <option label="Germany" value="DE" />
-              <option label="United States" value="US" />
-              <option label="Spain" value="ES" />
-              <option label="United Kingdom" value="GB" />
-              <option label="France" value="FR" />
-              <option label="Italy" value="IT" />
-              <option label="Netherlands" value="NL" />
-            </datalist>
+            >
+              <option disabled value="">
+                Select a country
+              </option>
+              {COUNTRY_OPTIONS.map(({ code, name }) => (
+                <option key={code} value={code}>
+                  {name}
+                </option>
+              ))}
+            </Select>
             <Field
               autoComplete="address-line1"
               id="checkout-street"
@@ -350,17 +358,33 @@ export function CheckoutScreen({
               label="Postal code"
               maxLength={32}
               name="postalCode"
-              onChange={(event) =>
-                setValue('postalCode', event.currentTarget.value)
+              error={postalError || undefined}
+              onChange={(event) => {
+                setPostalError('');
+                setValue('postalCode', event.currentTarget.value);
+              }}
+              onBlur={(event) => {
+                const value = normalizePostalCode(
+                  form.countryCode,
+                  event.currentTarget.value,
+                );
+                const normalized = typeof value === 'string' ? value : '';
+                if (normalized !== form.postalCode)
+                  setValue('postalCode', normalized);
+                setPostalError(
+                  isValidPostalCode(form.countryCode, value)
+                    ? ''
+                    : postalMessage,
+                );
+              }}
+              onInvalid={() => setPostalError(postalMessage)}
+              description={
+                postalPolicy.example
+                  ? `Format: ${postalPolicy.example}`
+                  : undefined
               }
-              pattern={
-                form.countryCode === 'DE'
-                  ? '[0-9]{5}'
-                  : form.countryCode === 'US'
-                    ? '[0-9]{5}(-[0-9]{4})?'
-                    : undefined
-              }
-              required={form.countryCode === 'DE' || form.countryCode === 'US'}
+              pattern={postalPolicy.pattern}
+              required={postalPolicy.required}
               value={form.postalCode}
             />
             <div className={styles.notes}>
@@ -806,6 +830,11 @@ const ISO_ALPHA_2_COUNTRY_CODES = new Set([
   'ZM',
   'ZW',
 ]);
+
+const countryNames = new Intl.DisplayNames(['en'], { type: 'region' });
+const COUNTRY_OPTIONS = [...ISO_ALPHA_2_COUNTRY_CODES]
+  .map((code) => ({ code, name: countryNames.of(code) ?? code }))
+  .sort((left, right) => left.name.localeCompare(right.name, 'en'));
 
 function normalizeProfileCountry(country: string | null | undefined) {
   const normalized = country?.trim();
