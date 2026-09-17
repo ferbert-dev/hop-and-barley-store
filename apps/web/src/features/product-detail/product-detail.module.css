@@ -189,6 +189,71 @@
   padding-inline-start: var(--hb-space-6);
 }
 
+.skeleton {
+  animation: skeletonPulse 1.8s ease-in-out infinite;
+  background: var(--hb-color-brand-soft);
+  border-radius: var(--hb-radius-md);
+  max-inline-size: 100%;
+}
+
+.skeletonBreadcrumb {
+  align-items: center;
+  display: flex;
+  min-block-size: 2.75rem;
+}
+
+.skeletonLine,
+.skeletonTeaser,
+.skeletonShort {
+  block-size: 1rem;
+}
+
+.skeletonShort {
+  inline-size: 6rem;
+}
+
+.skeletonTeaser {
+  inline-size: 72%;
+}
+
+.skeletonTitle {
+  block-size: calc(clamp(2rem, 6vw, 3.25rem) * var(--hb-line-height-tight));
+  inline-size: 80%;
+  margin-block-end: var(--hb-space-3);
+}
+
+.skeletonPrice {
+  block-size: calc(clamp(2rem, 7vw, 3rem) * var(--hb-line-height-tight));
+  inline-size: 8rem;
+}
+
+.skeletonQuantity,
+.skeletonAction {
+  block-size: 2.75rem;
+  inline-size: 10rem;
+}
+
+.skeletonAction {
+  background: color-mix(
+    in srgb,
+    var(--hb-color-brand) 20%,
+    var(--hb-color-surface)
+  );
+  inline-size: 12rem;
+}
+
+@keyframes skeletonPulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
 @media (min-width: 48rem) {
   .page {
     padding-block-start: var(--hb-space-12);
