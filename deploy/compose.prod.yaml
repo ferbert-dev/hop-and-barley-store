@@ -1,0 +1,228 @@
+name: ${COMPOSE_PROJECT_NAME:-hopbarley}
+
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-file: '2'
+    max-size: 5m
+
+x-api-environment: &api-environment
+  AUTH_COOKIE_MODE: secure-https
+  AUTH_CSRF_KEYRING: ${AUTH_CSRF_KEYRING:?Generate the server-local environment file}
+  AUTH_ORIGIN: https://hopbarley.shop
+  AUTH_SESSIONS_ENABLED: 'true'
+  CART_COOKIE_MODE: secure-https
+  CART_CSRF_KEYRING: ${CART_CSRF_KEYRING:?Generate the server-local environment file}
+  CART_ORIGIN: https://hopbarley.shop
+  CORS_ORIGINS: https://hopbarley.shop
+  DATABASE_URL: ${DATABASE_URL:?Generate the server-local environment file}
+  NODE_ENV: production
+  NODE_OPTIONS: --max-old-space-size=224
+  PORT: '3001'
+  PRODUCT_ASSET_STORAGE_PATH: /var/lib/hop-and-barley/product-assets
+  REGISTRATION_ENABLED: 'true'
+  REGISTRATION_ORIGIN: https://hopbarley.shop
+  STRIPE_API_TIMEOUT_MS: '10000'
+  STRIPE_CHECKOUT_CANCEL_URL: ''
+  STRIPE_CHECKOUT_SUCCESS_URL: ''
+  STRIPE_PAYMENT_METHOD_CONFIGURATION_ID: ''
+  STRIPE_PAYMENTS_ENABLED: 'false'
+  STRIPE_SANDBOX_SECRET_KEY: ''
+  STRIPE_SANDBOX_WEBHOOK_SECRET: ''
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?Set an exact PostgreSQL image reference}
+    command:
+      - postgres
+      - -c
+      - max_connections=20
+      - -c
+      - shared_buffers=64MB
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hopbarley}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Generate the server-local environment file}
+      POSTGRES_USER: ${POSTGRES_USER:-hopbarley}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    init: true
+    logging: *bounded-logging
+    mem_limit: 256m
+    networks:
+      - backend
+    restart: unless-stopped
+    shm_size: 64m
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  migrate:
+    image: ${MIGRATE_IMAGE:?Set the immutable migration image reference}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Generate the server-local environment file}
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=160
+    init: true
+    labels:
+      com.hopbarley.release: ${RELEASE_ID:?Set the release identifier}
+    logging: *bounded-logging
+    mem_limit: 256m
+    networks:
+      - backend
+    profiles:
+      - operations
+    restart: 'no'
+    security_opt:
+      - no-new-privileges:true
+
+  seed:
+    image: ${API_IMAGE:?Set the immutable API image reference}
+    command:
+      - node
+      - dist/seed/prisma/seed.js
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Generate the server-local environment file}
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=224
+    init: true
+    labels:
+      com.hopbarley.release: ${RELEASE_ID:?Set the release identifier}
+    logging: *bounded-logging
+    mem_limit: 320m
+    networks:
+      - backend
+    profiles:
+      - operations
+    read_only: true
+    restart: 'no'
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+
+  api:
+    image: ${API_IMAGE:?Set the immutable API image reference}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: *api-environment
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3001/api/v1/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    init: true
+    labels:
+      com.hopbarley.release: ${RELEASE_ID:?Set the release identifier}
+    logging: *bounded-logging
+    mem_limit: 320m
+    networks:
+      - backend
+      - edge
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    volumes:
+      - product-assets:/var/lib/hop-and-barley/product-assets
+
+  web:
+    image: ${WEB_IMAGE:?Set the immutable web image reference}
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_INTERNAL_URL: http://api:3001/api/v1
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_API_HOST_ALIASES: hopbarley.shop
+      NEXT_PUBLIC_API_URL: https://hopbarley.shop
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=160
+      PORT: '3000'
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    init: true
+    labels:
+      com.hopbarley.release: ${RELEASE_ID:?Set the release identifier}
+    logging: *bounded-logging
+    mem_limit: 256m
+    networks:
+      - edge
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  caddy:
+    image: ${CADDY_IMAGE:?Set an exact Caddy image reference}
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --output-document=/dev/null
+        - http://127.0.0.1:2019/config/
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    init: true
+    logging: *bounded-logging
+    mem_limit: 64m
+    networks:
+      - edge
+    ports:
+      - target: 80
+        published: '80'
+        protocol: tcp
+      - target: 443
+        published: '443'
+        protocol: tcp
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-config:/config
+      - caddy-data:/data
+
+networks:
+  backend:
+    internal: true
+  edge:
+
+volumes:
+  caddy-config:
+  caddy-data:
+  postgres-data:
+  product-assets:
