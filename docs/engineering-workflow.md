@@ -12,6 +12,15 @@ BLOCKED before closure.
 Trace completed engineering as: Notion Epic/Ticket/Agent Runs → Git
 branch/PR/CI → repository code/tests/docs.
 
+## Notion-first execution control
+
+Before execution, the Astra orchestrator reads a decision-complete Notion ticket
+and the linked Running Agent Run, then reads and decomposes the Notion ticket
+into bounded ownership, acceptance, risk, verification and rollback. It records
+handoff, status, blocker and closure evidence in the ticket and Agent Runs.
+Read-only status reuses those records and never authorizes mutations. Terminal
+Agent Runs need closure evidence; unknown completion is not Done.
+
 ## Evidence boundary
 
 Use repository code, tests, migrations and Git history for implementation
@@ -43,18 +52,22 @@ The root [`AGENTS.md`](../AGENTS.md) is the sole source of truth for the worker
 concurrency limit. Read it before delegation; this document intentionally does
 not duplicate a numeric worker limit.
 
-One root orchestrator owns one vertical scope, its integration, pull request and
-final status. There is no standing agent pool. A worker is stopped or reused
-immediately after handoff, and a second vertical scope waits until the current
-PR is merged or explicitly Blocked.
+One `gpt-6-astra` Medium root orchestrator owns one vertical scope, its
+integration, pull request and final status. It must delegate bounded
+implementation, then integrate and verify the result. Reuse the existing
+orchestrator for follow-ups or status; never spawn recursive orchestrators.
+There is no standing agent pool. A worker is stopped or reused immediately after
+handoff, and a second vertical scope waits until the current PR is merged or
+explicitly Blocked.
 
 Model selection is explicit on every delegation:
 
-| Model           | Default work                                                                                  | Escalation boundary                                                          |
-| --------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `gpt-5.6-sol`   | architecture, security-sensitive changes, risky cross-cutting work, exact-head closure review | authoritative fallback whenever correctness, trust, data or scope is unclear |
-| `gpt-5.6-terra` | routine feature implementation, medium-complexity fixes and integration                       | escalate to Sol when the task crosses an uncertain boundary                  |
-| `gpt-5.6-luna`  | bounded mechanical edits, fixtures, repetitive tests, inventories and documentation           | escalate when judgment or architecture becomes material                      |
+| Model           | Default work                                                                           | Escalation boundary                                                          |
+| --------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `gpt-6-astra`   | Medium root orchestration: Notion decomposition, bounded delegation and integration    | keep one orchestrator for the vertical scope                                 |
+| `gpt-5.6-terra` | Medium ordinary frontend/backend implementation and integration                        | escalate to Sol when the task crosses an uncertain boundary                  |
+| `gpt-5.6-luna`  | Medium bounded mechanical work, routine tests, fixtures, inventories and documentation | escalate when judgment or architecture becomes material                      |
+| `gpt-5.6-sol`   | High security-sensitive, risky or uncertain work; exact-head closure review            | authoritative fallback whenever correctness, trust, data or scope is unclear |
 
 The delegating Agent Run records model, reasoning effort and one sentence
 explaining the cost/correctness choice. A worker may return uncertainty instead
