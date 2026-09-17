@@ -1,3 +1,7 @@
+import {
+  isValidPostalCode,
+  normalizePostalCode,
+} from '@hop-and-barley/address-policy';
 import { Transform, Type } from 'class-transformer';
 import {
   IsEmail,
@@ -21,21 +25,7 @@ import { CheckoutPaymentMethod } from '../../orders/dto/create-order.dto';
 class BoundedPostalCodePolicy implements ValidatorConstraintInterface {
   validate(value: unknown, arguments_: ValidationArguments): boolean {
     const countryCode = (arguments_.object as CheckoutDeliveryDto).countryCode;
-    if (
-      typeof value === 'string' &&
-      (value.length === 0 || value.length > 32)
-    ) {
-      return false;
-    }
-    if (countryCode === 'DE') {
-      return typeof value === 'string' && /^[0-9]{5}$/.test(value);
-    }
-    if (countryCode === 'US') {
-      return (
-        typeof value === 'string' && /^[0-9]{5}(?:-[0-9]{4})?$/.test(value)
-      );
-    }
-    return value === undefined || typeof value === 'string';
+    return isValidPostalCode(countryCode, value);
   }
 
   defaultMessage(): string {
@@ -87,7 +77,10 @@ export class CheckoutDeliveryDto {
   street!: string;
 
   @ApiPropertyOptional({ maxLength: 32, type: String })
-  @Transform(({ value }: { value: unknown }) => trimOptional(value))
+  @Transform(
+    ({ value, obj }: { value: unknown; obj: { countryCode?: unknown } }) =>
+      normalizePostalCode(obj.countryCode, value),
+  )
   @Validate(BoundedPostalCodePolicy)
   postalCode?: string;
 

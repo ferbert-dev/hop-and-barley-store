@@ -24,6 +24,7 @@ FROM build-base AS dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/api-migrate/package.json apps/api-migrate/package.json
+COPY packages/address-policy/package.json packages/address-policy/package.json
 COPY packages/auth-contract/package.json packages/auth-contract/package.json
 COPY packages/typescript-config/package.json packages/typescript-config/package.json
 
@@ -37,6 +38,7 @@ FROM dependencies AS builder
 
 COPY apps/api apps/api
 COPY apps/api-migrate apps/api-migrate
+COPY packages/address-policy packages/address-policy
 COPY packages/auth-contract packages/auth-contract
 COPY packages/typescript-config packages/typescript-config
 
@@ -67,12 +69,15 @@ WORKDIR /app
 
 COPY --from=builder /opt/api/package.json ./package.json
 COPY --from=builder /opt/api/node_modules ./node_modules
+COPY --from=builder /workspace/packages/address-policy ./packages/address-policy
 COPY --from=builder /opt/auth-contract/package.json ./packages/auth-contract/package.json
 COPY --from=builder /opt/auth-contract/node_modules ./packages/auth-contract/node_modules
 COPY --from=builder /opt/auth-contract/dist ./packages/auth-contract/dist
 COPY --from=builder /workspace/apps/api/dist ./dist
 
-RUN rm -f node_modules/@hop-and-barley/auth-contract && \
+RUN rm -f node_modules/@hop-and-barley/address-policy && \
+  ln -s ../../packages/address-policy node_modules/@hop-and-barley/address-policy && \
+  rm -f node_modules/@hop-and-barley/auth-contract && \
   ln -s ../../packages/auth-contract node_modules/@hop-and-barley/auth-contract && \
   mkdir -p /var/lib/hop-and-barley/product-assets
 

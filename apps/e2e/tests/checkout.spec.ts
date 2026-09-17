@@ -18,7 +18,7 @@ test.describe('O2G private checkout draft', () => {
       page.getByRole('link', { name: 'create an account' }),
     ).toHaveAttribute('href', '/register?next=%2Fcheckout');
     await expect(page.getByLabel('Full Name')).toBeVisible();
-    await expect(page.getByLabel('Country (ISO code)')).toBeVisible();
+    await expect(page.getByLabel('Country')).toBeVisible();
     await expect(page.getByLabel('Delivery notes')).toBeVisible();
     await expect(
       page.getByText(
@@ -41,6 +41,47 @@ test.describe('O2G private checkout draft', () => {
     await page.reload();
     await expect(page.getByLabel('Full Name')).toHaveValue('Alex Brewer');
     await expect(page.getByLabel('Postal code')).toHaveValue('10115');
+  });
+
+  test('blocks an invalid EU postal code and allows a non-EU address without a postcode', async ({
+    page,
+  }) => {
+    const api = await interceptCheckoutDraft(page);
+    await page.goto('/checkout');
+    await fillCheckoutDraft(page);
+    await page.getByLabel('Country').selectOption('ES');
+    await page.getByLabel('City').fill('A Coruña');
+    await page.getByLabel('Street').fill('Rúa Real');
+    await page.getByLabel('Postal code').fill('ABCDE');
+    await page.getByRole('button', { name: 'Save checkout details' }).click();
+    expect(
+      await page
+        .getByLabel('Postal code')
+        .evaluate((input: HTMLInputElement) => input.validity.patternMismatch),
+    ).toBe(true);
+    await expect(page.locator('#checkout-postal-code-error')).toContainText(
+      'Enter a postal code',
+    );
+    expect(api.saved).toBeNull();
+    await page.getByLabel('Postal code').fill('15001');
+    await page.getByRole('button', { name: 'Save checkout details' }).click();
+    await expect(
+      page.getByText('Checkout details saved privately.'),
+    ).toBeVisible();
+    expect(api.saved).toMatchObject({
+      delivery: { countryCode: 'ES', city: 'A Coruña', postalCode: '15001' },
+    });
+    await page.getByLabel('Country').selectOption('AE');
+    await page.getByLabel('City').fill('دبي');
+    await page.getByLabel('Street').fill('شارع الشيخ زايد');
+    await page.getByLabel('Postal code').fill('');
+    await page.getByRole('button', { name: 'Save checkout details' }).click();
+    await expect(
+      page.getByText('Checkout details saved privately.'),
+    ).toBeVisible();
+    expect(api.saved).toMatchObject({
+      delivery: { countryCode: 'AE', city: 'دبي' },
+    });
   });
 
   test('preserves the unchanged draft through sign-in without an existing account cart', async ({

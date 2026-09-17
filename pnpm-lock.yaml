@@ -35,6 +35,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@hop-and-barley/address-policy':
+        specifier: workspace:*
+        version: link:../../packages/address-policy
       '@hop-and-barley/auth-contract':
         specifier: workspace:*
         version: link:../../packages/auth-contract
@@ -201,6 +204,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@hop-and-barley/address-policy':
+        specifier: workspace:*
+        version: link:../../packages/address-policy
       '@hop-and-barley/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
@@ -268,6 +274,8 @@ importers:
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@types/node@20.19.43)(jsdom@30.0.1(@noble/hashes@1.8.0))(vite@8.2.1(@types/node@20.19.43)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.50.0)(tsx@4.23.12)(yaml@2.9.0))
+
+  packages/address-policy: {}
 
   packages/api-client:
     dependencies:
