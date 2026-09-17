@@ -1,0 +1,114 @@
+name: Deploy Oracle VM2
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Version tag from main history (for example V1.0.0)
+        type: string
+        required: true
+        default: V1.0.0
+      operation:
+        description: Release a new version or roll back to a retained successful version
+        type: choice
+        options:
+          - release
+          - rollback
+        default: release
+      seed_initial:
+        description: Seed the empty catalog on the first deployment only
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deploy-oracle-vm2
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy reviewed main
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    environment: production
+    env:
+      RELEASE_VERSION: ${{ inputs.release_tag }}
+      RELEASE_OPERATION: ${{ inputs.operation }}
+      GH_TOKEN: ${{ github.token }}
+      SEED_INITIAL: ${{ inputs.seed_initial }}
+    steps:
+      - name: Check out release
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - name: Require a version tag from main with successful CI
+        run: |
+          set -euo pipefail
+          if [ "$RELEASE_OPERATION" = rollback ] && [ "$SEED_INITIAL" = true ]; then
+            echo 'Rollback cannot seed the database.' >&2
+            exit 1
+          fi
+          RELEASE_SHA=$(sh deploy/verify-release-tag.sh "$RELEASE_VERSION")
+          printf 'RELEASE_SHA=%s\n' "$RELEASE_SHA" >> "$GITHUB_ENV"
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$RELEASE_SHA&status=success&per_page=20" \
+            --jq '.workflow_runs | any(.head_branch == "main" and .event == "push" and .conclusion == "success")' \
+            | grep -qx true
+      - name: Select the tagged source
+        if: inputs.operation == 'release'
+        run: git checkout --detach "$RELEASE_SHA"
+      - name: Build immutable Linux images
+        if: inputs.operation == 'release'
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 --provenance=false --target web \
+            --build-arg NEXT_PUBLIC_API_URL=https://hopbarley.shop \
+            --build-arg NEXT_PUBLIC_API_HOST_ALIASES=hopbarley.shop \
+            --label "org.opencontainers.image.revision=$RELEASE_SHA" \
+            --label "org.opencontainers.image.version=$RELEASE_VERSION" \
+            --tag "hopbarley/web:$RELEASE_SHA" -f apps/web/Dockerfile .
+          docker build --platform linux/amd64 --provenance=false --target api \
+            --label "org.opencontainers.image.revision=$RELEASE_SHA" \
+            --label "org.opencontainers.image.version=$RELEASE_VERSION" \
+            --tag "hopbarley/api:$RELEASE_SHA" -f apps/api/Dockerfile .
+          docker build --platform linux/amd64 --provenance=false --target migrate \
+            --label "org.opencontainers.image.revision=$RELEASE_SHA" \
+            --label "org.opencontainers.image.version=$RELEASE_VERSION" \
+            --tag "hopbarley/migrate:$RELEASE_SHA" -f apps/api/Dockerfile .
+      - name: Deliver images through the restricted deployment receiver
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.VM2_DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.VM2_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          ssh_dir=$(mktemp -d)
+          trap 'rm -rf "$ssh_dir"' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          if [ "$RELEASE_OPERATION" = rollback ]; then
+            ssh -i "$ssh_dir/key" -o BatchMode=yes -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$ssh_dir/known_hosts" \
+              -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+              hopbarley-deploy@141.144.249.25 "rollback $RELEASE_VERSION $RELEASE_SHA"
+            exit 0
+          fi
+          command=deploy
+          if [ "$SEED_INITIAL" = true ]; then command=deploy-initial; fi
+          docker save "hopbarley/web:$RELEASE_SHA" "hopbarley/api:$RELEASE_SHA" "hopbarley/migrate:$RELEASE_SHA" \
+            | gzip -1 > "$RUNNER_TEMP/images.tar.gz"
+          archive_sha=$(sha256sum "$RUNNER_TEMP/images.tar.gz" | cut -d " " -f 1)
+          ssh -i "$ssh_dir/key" -o BatchMode=yes -o IdentitiesOnly=yes \
+                -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$ssh_dir/known_hosts" \
+                -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+                hopbarley-deploy@141.144.249.25 "$command $RELEASE_VERSION $RELEASE_SHA $archive_sha" < "$RUNNER_TEMP/images.tar.gz"
+      - name: Verify public HTTPS endpoints
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
+            --max-time 15 https://hopbarley.shop/api/v1/health/ready
+          curl --fail --silent --show-error --max-time 20 --output /dev/null https://hopbarley.shop/
+          printf 'Successful %s: %s (%s) at https://hopbarley.shop\n' "$RELEASE_OPERATION" "$RELEASE_VERSION" "$RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"

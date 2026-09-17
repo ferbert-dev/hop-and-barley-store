@@ -79,7 +79,10 @@ RUN rm -f node_modules/@hop-and-barley/address-policy && \
   ln -s ../../packages/address-policy node_modules/@hop-and-barley/address-policy && \
   rm -f node_modules/@hop-and-barley/auth-contract && \
   ln -s ../../packages/auth-contract node_modules/@hop-and-barley/auth-contract && \
-  mkdir -p /var/lib/hop-and-barley/product-assets
+  mkdir -p /var/lib/hop-and-barley/product-assets && \
+  chown node:node /var/lib/hop-and-barley/product-assets
+
+USER node
 
 EXPOSE 3001
 

@@ -1,0 +1,29 @@
+{
+	servers {
+		protocols h1 h2
+	}
+}
+
+www.hopbarley.shop {
+	redir https://hopbarley.shop{uri} permanent
+}
+
+hopbarley.shop {
+	encode zstd gzip
+
+	@api path /api/v1 /api/v1/*
+	reverse_proxy @api api:3001
+	reverse_proxy web:3000
+
+	header {
+		-Server
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
