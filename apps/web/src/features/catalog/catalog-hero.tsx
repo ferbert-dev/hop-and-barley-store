@@ -33,14 +33,19 @@ export function CatalogHero({
         alt={hero.alt}
         className={styles.heroImage}
         height={hero.height}
+        placeholder="blur"
+        blurDataURL={hero.blurDataURL}
         preload
+        quality={60}
         sizes={hero.sizes}
         src={hero.src}
         width={hero.width}
       />
-      <p className="visually-hidden" role={announce ? 'status' : undefined}>
-        {copy.label}
-      </p>
+      {announce ? (
+        <p className="visually-hidden" role="status">
+          {copy.label}
+        </p>
+      ) : null}
     </section>
   );
 }

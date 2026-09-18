@@ -12,8 +12,7 @@
   gap: var(--hb-space-2);
 }
 
-.inputLabel,
-.unitLabel {
+.inputLabel {
   display: grid;
   gap: var(--hb-space-1);
   font-weight: 700;
@@ -31,11 +30,6 @@
 
 .inputLabel input {
   inline-size: min(9rem, 35vw);
-}
-
-.unitLabel {
-  align-items: center;
-  min-block-size: 2.75rem;
 }
 
 .supportingText,

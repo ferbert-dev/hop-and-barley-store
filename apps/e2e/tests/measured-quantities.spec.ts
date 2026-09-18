@@ -133,7 +133,7 @@ test.describe('measured product quantities', () => {
       page.getByRole('heading', { name: 'Citra Hops' }),
     ).toBeVisible();
     await expect(
-      page.getByLabel('Citra Hops quantity').getByLabel('Quantity'),
+      page.getByLabel('Citra Hops quantity').getByLabel('Quantity (kg)'),
     ).toHaveValue('0.9');
     await expect(
       page.getByLabel('Cart summary').getByText('€53.91'),
@@ -141,7 +141,7 @@ test.describe('measured product quantities', () => {
 
     await page.reload();
     await expect(
-      page.getByLabel('Citra Hops quantity').getByLabel('Quantity'),
+      page.getByLabel('Citra Hops quantity').getByLabel('Quantity (kg)'),
     ).toHaveValue('0.9');
     await expect(
       page.getByLabel('Cart summary').getByText('€53.91'),

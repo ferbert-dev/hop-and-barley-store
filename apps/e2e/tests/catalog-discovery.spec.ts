@@ -412,8 +412,7 @@ test('announces and titles loading and error catalog routes', async ({
   const loading = page
     .getByRole('status')
     .filter({ hasText: 'Loading products' });
-  await expect(loading).toHaveAttribute('aria-busy', 'true');
-  await expect(loading).toHaveAttribute('aria-live', 'polite');
+  await expect(loading).toHaveCount(1);
   await expect(page).toHaveTitle(`${search} — Hop & Barley products`);
 
   const error = page
@@ -506,8 +505,7 @@ test('honours reduced motion in ready, filtered, empty, loading, and error state
     const loading = page
       .getByRole('status')
       .filter({ hasText: 'Loading products' });
-    await expect(loading).toHaveAttribute('aria-busy', 'true');
-    await expect(loading).toHaveAttribute('aria-live', 'polite');
+    await expect(loading).toHaveCount(1);
     await expect(page).toHaveTitle(`${loadingSearch} — Hop & Barley products`);
     await assertReducedMotionState(page, 'loading');
 
@@ -562,9 +560,24 @@ async function startLoadingNavigation(page: Page, targetHref: string) {
     link.href = href;
     link.click();
   }, targetHref);
+  await expectCatalogLoading(page);
+}
+
+async function expectCatalogLoading(page: Page) {
+  const loading = page
+    .getByRole('status')
+    .filter({ hasText: 'Loading products' });
+  await expect(loading).toHaveCount(1, { timeout: 750 });
+  await expect(loading).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: 'Loading products' }),
-  ).toBeVisible({ timeout: 750 });
+    page.getByRole('region', { name: 'Catalog', exact: true }),
+  ).toHaveAttribute('aria-busy', 'true');
+
+  const skeletons = page.getByTestId('catalog-product-skeleton');
+  await expect(skeletons).toHaveCount(8);
+  for (const skeleton of await skeletons.all()) {
+    await expect(skeleton).toBeVisible();
+  }
 }
 
 async function expectApiStatus(page: Page, status: string) {

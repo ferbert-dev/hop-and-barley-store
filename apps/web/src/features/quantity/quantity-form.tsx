@@ -23,7 +23,6 @@ type QuantityFormBaseProps = Readonly<{
   onSubmit: (amount: number) => void | Promise<void>;
   priceMinor: number | null;
   metadata: QuantityMetadata;
-  weightUnitPlacement?: 'inline' | 'label';
 }>;
 
 type QuantityFormProps = QuantityFormBaseProps &
@@ -57,7 +56,6 @@ function QuantityFormEditor({
   onSubmit,
   priceMinor,
   submitLabel,
-  weightUnitPlacement = 'inline',
 }: QuantityFormProps) {
   const formId = useId();
   const canonicalEditor: QuantityEditorState = {
@@ -165,9 +163,7 @@ function QuantityFormEditor({
         <label className={styles.inputLabel} htmlFor={inputId}>
           <span>
             {isWeight
-              ? weightUnitPlacement === 'label'
-                ? 'Quantity (kg)'
-                : 'Quantity'
+              ? 'Quantity (kg)'
               : metadata.saleKind === 'PACKAGE'
                 ? 'Packs'
                 : 'Kits'}
@@ -199,11 +195,6 @@ function QuantityFormEditor({
             value={input}
           />
         </label>
-        {isWeight && weightUnitPlacement === 'inline' ? (
-          <span className={styles.unitLabel} aria-hidden="true">
-            kg
-          </span>
-        ) : null}
         <Button
           aria-label={`Increase ${metadata.saleKind.toLowerCase()} amount`}
           disabled={!canIncrement}

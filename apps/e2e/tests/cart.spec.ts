@@ -54,7 +54,7 @@ test.describe('API-backed guest cart', () => {
       .click();
     await updateResponse;
     await expect(
-      quantityForm(page, 'Citra Hops').getByLabel('Quantity'),
+      quantityForm(page, 'Citra Hops').getByLabel('Quantity (kg)'),
     ).toHaveValue('0.2');
     await expect(
       page.getByLabel('Cart summary').getByText('€11.98'),
@@ -114,11 +114,11 @@ test.describe('API-backed guest cart', () => {
     await page.keyboard.press('Enter');
     await keyboardUpdateResponse;
     await expect(
-      quantityForm(page, 'Citra Hops').getByLabel('Quantity'),
+      quantityForm(page, 'Citra Hops').getByLabel('Quantity (kg)'),
     ).toHaveValue('0.2');
 
     const quantityInput = quantityForm(page, 'Citra Hops').getByLabel(
-      'Quantity',
+      'Quantity (kg)',
     );
     await quantityInput.fill('0.4');
     const directUpdateResponse = page.waitForResponse(
@@ -223,7 +223,7 @@ test.describe('O2S advisory checkout readiness', () => {
       caramelLine.getByText('This item is no longer available.'),
     ).toBeVisible();
     await expect(
-      quantityForm(page, 'Mosaic Hops').getByLabel('Quantity'),
+      quantityForm(page, 'Mosaic Hops').getByLabel('Quantity (kg)'),
     ).toBeEnabled();
     await expect(
       quantityForm(page, 'Citra Hops').getByRole('button', {
@@ -251,7 +251,9 @@ test.describe('O2S advisory checkout readiness', () => {
     await interceptCart(page, cart, { update: afterCitraUpdate });
 
     await page.goto('/cart');
-    const citraAmount = quantityForm(page, 'Citra Hops').getByLabel('Quantity');
+    const citraAmount = quantityForm(page, 'Citra Hops').getByLabel(
+      'Quantity (kg)',
+    );
     await citraAmount.fill('100');
     const updateRequest = page.waitForRequest(
       (request) =>
@@ -264,7 +266,7 @@ test.describe('O2S advisory checkout readiness', () => {
     });
     await expect(citraAmount).toHaveValue('100');
     await expect(
-      quantityForm(page, 'Mosaic Hops').getByLabel('Quantity'),
+      quantityForm(page, 'Mosaic Hops').getByLabel('Quantity (kg)'),
     ).toHaveValue('0.1');
   });
 
@@ -332,7 +334,7 @@ test.describe('O2S advisory checkout readiness', () => {
     await focusWithKeyboard(page, increase);
     await page.keyboard.press('Enter');
     await expect(
-      quantityForm(page, 'Citra Hops').getByLabel('Quantity'),
+      quantityForm(page, 'Citra Hops').getByLabel('Quantity (kg)'),
     ).toHaveValue('0.2');
 
     const remove = page.getByRole('button', {

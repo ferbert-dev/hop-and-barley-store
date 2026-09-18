@@ -103,7 +103,7 @@ describe('CartScreen', () => {
           element?.tagName === 'P' && element.textContent === '€5.99 per 100g',
       ),
     ).toBeVisible();
-    expect(screen.getByLabelText('Quantity')).toHaveValue('0.1');
+    expect(screen.getByLabelText('Quantity (kg)')).toHaveValue('0.1');
     expect(screen.queryByText(/selected$/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Selection price')).not.toBeInTheDocument();
     expect(
@@ -254,7 +254,7 @@ describe('CartScreen', () => {
       screen.getByRole('button', { name: 'Increase weight amount' }),
     );
 
-    expect(screen.getByLabelText('Quantity')).toHaveValue('0.2');
+    expect(screen.getByLabelText('Quantity (kg)')).toHaveValue('0.2');
     expect(screen.getAllByText('€11.98')).toHaveLength(2);
     expect(
       screen.queryByText(/updating from the store/i),
@@ -267,7 +267,7 @@ describe('CartScreen', () => {
       resolveUpdate?.(updatedCart);
     });
 
-    expect(screen.getByLabelText('Quantity')).toHaveValue('0.2');
+    expect(screen.getByLabelText('Quantity (kg)')).toHaveValue('0.2');
     expect(screen.getByRole('link', { name: 'View Citra Hops' })).toBe(
       productImageLink,
     );

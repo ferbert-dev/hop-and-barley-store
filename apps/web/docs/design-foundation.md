@@ -79,6 +79,22 @@ The two oversized reference backgrounds were reduced as follows:
 - hop hero: `8704×2176` JPEG → `2560×640` WebP;
 - auth pattern: `6000×2000` JPEG → `2400×800` WebP.
 
+The catalog hero remains the same 2560×640 local artwork. On 2026-09-17 it
+was deterministically re-encoded with Sharp 0.35.4 (`quality: 62`, `effort: 6`)
+to reduce the committed WebP from 175,836 to 93,440 bytes. The prior file hash
+was `7f146c40f108f37b7390ff70bb38aedb9b2653d7818987c16ec615e81935d871`; the
+derived runtime asset is
+`/assets/backgrounds/hops-field-hero-20260917.webp`
+(`48d2bff7b31ad0d9d23b1c3431d097723df13b27b541c2f7d9c069ad25e03e62`).
+It remains a locally supplied project-internal asset, preserves the typed
+manifest dimensions and full-bleed `100vw` delivery behavior, and now supplies
+a 16×4 WebP blur placeholder generated from that same artwork.
+
+`next.config.ts` allowlists qualities 60 and 75. The catalog hero explicitly
+uses 60; all other images retain Next.js's default quality 75. This keeps the
+lower setting restricted to the reviewed full-bleed image rather than changing
+delivery quality across the storefront.
+
 The 12 product photos remain at their source dimensions (mostly `1000×667`)
 because they are already suitable master sizes for responsive card/detail use.
 Next.js can produce smaller delivery variants from the committed WebP masters.

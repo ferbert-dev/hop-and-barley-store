@@ -7,6 +7,7 @@ type AssetPath = `/assets/${string}.${'svg' | 'webp'}`;
 
 export type AssetDefinition = Readonly<{
   alt: string;
+  blurDataURL?: string;
   category: AssetCategory;
   height: number;
   role: 'content' | 'decorative';
@@ -58,11 +59,13 @@ export const assets = {
   }),
   hopsFieldHero: defineAsset({
     alt: 'Close-up hop cones and green leaves',
+    blurDataURL:
+      'data:image/webp;base64,UklGRk4AAABXRUJQVlA4IEIAAADQAQCdASoQAAQAA4BaJQBOgCKsEDhsAAD+26xwvZ+QivWmwJ1RmrsP50BqDuFg+RbBF6jc5zri/sNGn4cYTSR2AAA=',
     category: 'background',
     height: 640,
     role: 'content',
     sizes: responsiveImageSizes.fullBleed,
-    src: '/assets/backgrounds/hops-field-hero.webp',
+    src: '/assets/backgrounds/hops-field-hero-20260917.webp',
     width: 2560,
   }),
   authPattern: defineAsset({

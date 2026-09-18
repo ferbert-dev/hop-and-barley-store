@@ -247,6 +247,7 @@
     calc(100% - (2 * var(--hb-space-4))),
     var(--hb-layout-reading)
   );
+  margin: auto;
   max-block-size: calc(100dvh - (2 * var(--hb-space-4)));
   overflow: auto;
   padding: var(--hb-space-6);
