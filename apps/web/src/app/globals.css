@@ -266,7 +266,8 @@ body:has(.admin-workspace) > .site-footer {
 .site-footer {
   background: var(--hb-color-ink);
   color: var(--hb-color-text-inverse);
-  padding: var(--hb-space-12) var(--hb-page-gutter) var(--hb-space-6);
+  padding: var(--hb-space-12) var(--hb-page-gutter)
+    calc(var(--hb-space-6) + 8rem);
 }
 
 .site-footer__content {

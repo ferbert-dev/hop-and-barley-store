@@ -62,6 +62,10 @@ describe('checkout payment', () => {
     expect(
       screen.getByRole('link', { name: 'Continue shopping' }),
     ).toHaveAttribute('href', '/');
+    expect(
+      screen.getByRole('button', { name: 'Like this shop' }),
+    ).toBeEnabled();
+    expect(transport.start).not.toHaveBeenCalled();
   });
 
   it('reports a canonical correlated success to its mounted checkout screen', async () => {

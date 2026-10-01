@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '../../components/ui/button';
+import { PurchaseLikeCta } from '../likes/purchase-like-cta';
 import { createBrowserCheckoutPaymentTransport } from './checkout-payment-transport';
 
 export const PAYMENT_HANDOFF_KEY = 'hb-checkout-payment-v1';
@@ -63,6 +64,9 @@ export function CheckoutPayment({
   const [hasAttempt, setHasAttempt] = useState(false);
   const [paymentReturn, setPaymentReturn] = useState(false);
   const [returnTimedOut, setReturnTimedOut] = useState(false);
+  const [succeededAttemptId, setSucceededAttemptId] = useState<string | null>(
+    null,
+  );
   const attempt = useRef<Attempt | null>(null);
   const operation = useRef(0);
   const busy = useRef(false);
@@ -119,6 +123,8 @@ export function CheckoutPayment({
         }
         if (returned) setPaymentReturn(true);
         setState(result.status);
+        if (result.status === 'succeeded')
+          setSucceededAttemptId(saved.attemptId);
         const pendingReturn =
           returned &&
           (result.status === 'processing' ||
@@ -191,6 +197,9 @@ export function CheckoutPayment({
         throw new Error('Uncorrelated payment');
       }
       if (mounted.current) setState(result.status);
+      if (mounted.current && result.status === 'succeeded') {
+        setSucceededAttemptId(attempt.current.attemptId);
+      }
     } catch {
       if (mounted.current) setState('unknown');
     } finally {
@@ -206,6 +215,13 @@ export function CheckoutPayment({
         </span>
         <h1 id={successHeadingId}>Payment successful</h1>
         <p>Your payment has been received. Thank you for your order.</p>
+        <p>
+          Thanks for your test purchase. If you like our shop, leave a like for
+          the community.
+        </p>
+        {succeededAttemptId ? (
+          <PurchaseLikeCta paymentAttemptId={succeededAttemptId} />
+        ) : null}
         <Button
           href="/"
           onClick={(event) => {

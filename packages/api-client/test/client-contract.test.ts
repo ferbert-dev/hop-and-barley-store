@@ -201,6 +201,19 @@ const reconcileStripePayment = configuredClient.POST(
 );
 void reconcileStripePayment;
 
+const publicLikeCount = configuredClient.GET('/api/v1/likes');
+const createPurchaseLike = configuredClient.POST('/api/v1/likes', {
+  body: { paymentAttemptId: '11111111-1111-4111-8111-111111111111' },
+  params: {
+    header: {
+      Origin: 'http://localhost:3000',
+      'X-CSRF-Token': `cart-v1.${'A'.repeat(43)}`,
+    },
+  },
+});
+void publicLikeCount;
+void createPurchaseLike;
+
 const createOrder = configuredClient.POST('/api/v1/orders', {
   body: {
     city: 'Portland',

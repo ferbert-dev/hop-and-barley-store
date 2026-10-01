@@ -328,6 +328,7 @@ model Order {
   reservations             CartReservation[]
   paymentAttempt           PaymentAttempt?             @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "Order_paymentAttemptId_fkey")
   paymentAllocation        PaymentAllocation?
+  purchaseLike             PurchaseLike?
   consumedDiscountClaim    FirstPurchaseDiscountClaim? @relation("ConsumedDiscountOrder")
 
   @@unique([userId, idempotencyKey], map: "Order_userId_idempotencyKey_key")
@@ -413,12 +414,24 @@ model PaymentAttempt {
   order                    Order?
   items                    PaymentAttemptItem[]
   allocation               PaymentAllocation?
+  purchaseLike             PurchaseLike?
   stripeWebhookReceipts    StripeWebhookReceipt[]
 
   @@unique([checkoutDraftId, idempotencyKey], map: "PaymentAttempt_draftId_idempotencyKey_key")
   @@unique([id, userId], map: "PaymentAttempt_id_userId_key")
   @@index([userId, status, createdAt], map: "PaymentAttempt_userId_status_createdAt_idx")
   @@index([status, updatedAt], map: "PaymentAttempt_status_updatedAt_idx")
+}
+
+/// A single public appreciation action earned by one fully server-confirmed
+/// Stripe Sandbox purchase. It intentionally contains no customer attributes.
+model PurchaseLike {
+  id               String         @id(map: "PurchaseLike_pkey") @default(uuid()) @db.Uuid
+  paymentAttemptId String         @unique(map: "PurchaseLike_paymentAttemptId_key") @db.Uuid
+  orderId          String         @unique(map: "PurchaseLike_orderId_key") @db.Uuid
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
+  paymentAttempt   PaymentAttempt @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "PurchaseLike_paymentAttemptId_fkey")
+  order            Order          @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "PurchaseLike_orderId_fkey")
 }
 
 model PaymentAllocation {

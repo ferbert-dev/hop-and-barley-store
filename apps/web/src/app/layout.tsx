@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { StorefrontShell } from '../components/storefront/storefront-shell';
 import { CartProvider } from '../features/cart/cart-context';
 import { CartMergeNotice } from '../features/auth/cart-merge-notice';
+import { LikesProvider } from '../features/likes/likes-context';
 import '../styles/design-tokens.css';
 import './globals.css';
 
@@ -20,10 +21,12 @@ export default function RootLayout({ children }: RootLayoutProps) {
     <html lang="en-GB">
       <body>
         <CartProvider>
-          <StorefrontShell>
-            <CartMergeNotice />
-            {children}
-          </StorefrontShell>
+          <LikesProvider>
+            <StorefrontShell>
+              <CartMergeNotice />
+              {children}
+            </StorefrontShell>
+          </LikesProvider>
         </CartProvider>
       </body>
     </html>

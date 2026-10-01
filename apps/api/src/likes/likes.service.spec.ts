@@ -1,0 +1,123 @@
+import { UnprocessableEntityException } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { PrismaService } from '../database/prisma.service';
+import { LikesService } from './likes.service';
+
+jest.mock('../database/prisma.service', () => ({
+  PrismaService: class PrismaService {},
+}));
+
+describe('LikesService', () => {
+  const count = jest.fn();
+  const findFirst = jest.fn();
+  const upsert = jest.fn();
+  let service: LikesService;
+
+  beforeEach(async () => {
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        LikesService,
+        {
+          provide: PrismaService,
+          useValue: {
+            paymentAttempt: { findFirst },
+            purchaseLike: { count, upsert },
+          },
+        },
+      ],
+    }).compile();
+    service = moduleRef.get(LikesService);
+    jest.clearAllMocks();
+    count.mockResolvedValue(41);
+    upsert.mockResolvedValue({ id: 'like-id' });
+  });
+
+  it('creates one Like for the exact paid account purchase after capture rotated its cart', async () => {
+    findFirst.mockResolvedValue({
+      checkoutDraft: {
+        cartId: 'cart-id',
+        guestCapabilityDigest: null,
+        guestCapabilityExpiresAt: null,
+        userId: 'user-id',
+      },
+      id: '11111111-1111-4111-8111-111111111111',
+      order: { id: '22222222-2222-4222-8222-222222222222' },
+    });
+
+    await expect(
+      service.create(
+        '11111111-1111-4111-8111-111111111111',
+        {
+          cartId: 'new-account-cart-id',
+          kind: 'account',
+          rawToken: 'session',
+          userId: 'user-id',
+        },
+        null,
+      ),
+    ).resolves.toEqual({ count: 41, liked: true });
+    expect(findFirst).toHaveBeenCalledWith({
+      select: {
+        checkoutDraft: {
+          select: {
+            cartId: true,
+            guestCapabilityDigest: true,
+            guestCapabilityExpiresAt: true,
+            userId: true,
+          },
+        },
+        id: true,
+        order: { select: { id: true } },
+      },
+      where: {
+        id: '11111111-1111-4111-8111-111111111111',
+        order: {
+          is: {
+            paymentMethod: 'STRIPE_DEBIT_CARD',
+            paymentState: 'PAID',
+            status: 'PAID',
+          },
+        },
+        status: 'SUCCEEDED',
+        userId: 'user-id',
+      },
+    });
+    expect(upsert).toHaveBeenCalledWith({
+      create: {
+        orderId: '22222222-2222-4222-8222-222222222222',
+        paymentAttemptId: '11111111-1111-4111-8111-111111111111',
+      },
+      update: {},
+      where: { paymentAttemptId: '11111111-1111-4111-8111-111111111111' },
+    });
+  });
+
+  it.each([
+    [null, 'unknown'],
+    [{ id: 'attempt', order: null }, 'unverified'],
+  ])(
+    'rejects %s attempts without creating a Like',
+    async (eligible, _reason) => {
+      void _reason;
+      findFirst.mockResolvedValue(eligible);
+
+      await expect(
+        service.create(
+          'attempt-id',
+          {
+            cartId: 'cart-id',
+            kind: 'account',
+            rawToken: 'session',
+            userId: 'user-id',
+          },
+          null,
+        ),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+      expect(upsert).not.toHaveBeenCalled();
+    },
+  );
+
+  it('returns only the aggregate count', async () => {
+    await expect(service.count()).resolves.toEqual({ count: 41 });
+  });
+});

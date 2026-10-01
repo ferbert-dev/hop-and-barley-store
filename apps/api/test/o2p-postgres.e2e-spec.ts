@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import type Stripe from 'stripe';
 import { hashCheckoutCapability } from '../src/checkout/checkout-capability-token';
 import { PrismaService } from '../src/database/prisma.service';
+import { LikesService } from '../src/likes/likes.service';
 import { PaymentAttemptService } from '../src/payments/payment-attempt.service';
 import type { StripeGatewayService } from '../src/payments/stripe-gateway.service';
 import { StripePaymentService } from '../src/payments/stripe-payment.service';
@@ -30,12 +31,14 @@ describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
       | 'retrievePaymentIntent'
     >
   >;
+  let likes: LikesService;
   let payments: StripePaymentService;
   let prisma: PrismaService;
 
   beforeAll(() => {
     prisma = new PrismaService();
     attempts = new PaymentAttemptService(prisma);
+    likes = new LikesService(prisma);
   });
 
   beforeEach(async () => {
@@ -231,6 +234,84 @@ describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
         fixture.rawGuestCapability,
       ),
     ).toMatchObject({ status: 'succeeded' });
+  });
+
+  it('creates one Like for an accessible completed Sandbox purchase and dedupes its retry', async () => {
+    const fixture = await prepareSession('like-success', 'guest');
+    const attempt = await prisma.paymentAttempt.findFirstOrThrow();
+    gateway.constructEvent.mockReturnValue(
+      event(
+        'evt_like_success',
+        'payment_intent.amount_capturable_updated',
+        paymentIntent(attempt, 'requires_capture'),
+      ),
+    );
+    gateway.capturePaymentIntent.mockResolvedValue(
+      paymentIntent(attempt, 'succeeded'),
+    );
+
+    await payments.acceptWebhook(
+      Buffer.from('{"id":"evt_like_success"}'),
+      'test-signature',
+      now,
+    );
+    await expect(
+      likes.create(attempt.id, fixture.cartAccess, fixture.rawGuestCapability),
+    ).resolves.toEqual({ count: 1, liked: true });
+    await expect(
+      likes.create(attempt.id, fixture.cartAccess, fixture.rawGuestCapability),
+    ).resolves.toEqual({ count: 1, liked: true });
+    expect(await prisma.purchaseLike.count()).toBe(1);
+  });
+
+  it('keeps an account Like eligible after capture clears its old cart and a new cart is created', async () => {
+    const fixture = await prepareSession('like-account-success', 'account');
+    if (fixture.cartAccess.kind !== 'account') {
+      throw new Error('Account fixture invariant failed');
+    }
+    const attempt = await prisma.paymentAttempt.findFirstOrThrow();
+    gateway.constructEvent.mockReturnValue(
+      event(
+        'evt_like_account_success',
+        'payment_intent.amount_capturable_updated',
+        paymentIntent(attempt, 'requires_capture'),
+      ),
+    );
+    gateway.capturePaymentIntent.mockResolvedValue(
+      paymentIntent(attempt, 'succeeded'),
+    );
+    await payments.acceptWebhook(
+      Buffer.from('{"id":"evt_like_account_success"}'),
+      'test-signature',
+      now,
+    );
+    expect(
+      await prisma.cart.findUniqueOrThrow({
+        select: { userId: true },
+        where: { id: fixture.cartAccess.cartId },
+      }),
+    ).toEqual({ userId: null });
+    const nextCart = await prisma.cart.create({
+      data: {
+        expiresAt: new Date(now.getTime() + 60 * 60 * 1_000),
+        tokenDigest: Buffer.alloc(32, 7),
+        userId: fixture.cartAccess.userId,
+      },
+      select: { id: true },
+    });
+
+    await expect(
+      likes.create(
+        attempt.id,
+        {
+          cartId: nextCart.id,
+          kind: 'account',
+          rawToken: fixture.cartAccess.rawToken,
+          userId: fixture.cartAccess.userId,
+        },
+        null,
+      ),
+    ).resolves.toEqual({ count: 1, liked: true });
   });
 
   it('cancels the authorization and releases the discount claim when stock is unavailable', async () => {

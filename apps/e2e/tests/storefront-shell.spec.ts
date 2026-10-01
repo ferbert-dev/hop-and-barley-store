@@ -9,6 +9,16 @@ import {
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
 
+async function interceptLikes(page: Page, count = 41) {
+  await page.route('**/api/v1/likes', (route) =>
+    route.fulfill({
+      body: JSON.stringify({ count }),
+      contentType: 'application/json',
+      status: 200,
+    }),
+  );
+}
+
 async function waitForShellAssets(page: Page) {
   const images = await page
     .locator('.site-header img:visible, .site-footer img:visible')
@@ -133,6 +143,67 @@ test('has no unexpected horizontal overflow at every Q1 viewport probe', async (
       brandBox!.height,
       `${probe.id} brand target height`,
     ).toBeGreaterThanOrEqual(qualityGates.pointerTarget.minimumHeightCssPx);
+  }
+});
+
+test('keeps the community Like sticker prominent and within the viewport', async ({
+  page,
+}) => {
+  await interceptLikes(page);
+
+  for (const viewport of [
+    { width: 360, height: 800 },
+    { width: 1280, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+    const sticker = page.getByRole('complementary', {
+      name: 'Community likes',
+    });
+    await expect(sticker).toBeVisible();
+    await expect(page.getByLabel('41 likes')).toBeVisible();
+    await expect(
+      sticker.getByText('Complete a test purchase to leave your like.'),
+    ).toBeVisible();
+    expect(
+      await sticker.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return (
+          box.left >= 0 &&
+          box.top >= 0 &&
+          box.right <= window.innerWidth &&
+          box.bottom <= window.innerHeight
+        );
+      }),
+    ).toBe(true);
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(
+      qualityGates.overflow.maximumUnexpectedHorizontalOverflowCssPx,
+    );
+
+    const footerNavigation = page.getByRole('navigation', { name: 'Footer' });
+    await page.evaluate(() =>
+      window.scrollTo({ behavior: 'instant', top: document.body.scrollHeight }),
+    );
+    await expect(footerNavigation).toBeVisible();
+    const footerBox = await footerNavigation.boundingBox();
+    const stickerBox = await sticker.boundingBox();
+    expect(footerBox).not.toBeNull();
+    expect(stickerBox).not.toBeNull();
+    expect(
+      !(
+        footerBox!.x + footerBox!.width <= stickerBox!.x ||
+        footerBox!.x >= stickerBox!.x + stickerBox!.width ||
+        footerBox!.y + footerBox!.height <= stickerBox!.y ||
+        footerBox!.y >= stickerBox!.y + stickerBox!.height
+      ),
+    ).toBe(false);
   }
 });
 

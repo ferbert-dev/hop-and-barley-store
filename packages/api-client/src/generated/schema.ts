@@ -36,6 +36,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/likes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the public completed-purchase Like count */
+        get: operations["LikesController_count"];
+        put?: never;
+        /**
+         * Record the Like earned by one completed Stripe Sandbox purchase
+         * @description The opaque payment attempt ID is checked server-side against its exact paid Stripe Sandbox order and the caller’s private cart/checkout capability. Retries are idempotent.
+         */
+        post: operations["LikesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products": {
         parameters: {
             query?: never;
@@ -502,6 +523,23 @@ export interface components {
              * @enum {string}
              */
             status: "ok";
+        };
+        PurchaseLikeCountDto: {
+            /** @description Public count of completed-purchase Likes. */
+            count: number;
+        };
+        CreatePurchaseLikeDto: {
+            /**
+             * Format: uuid
+             * @description Opaque ID returned only by the private payment-status flow after purchase.
+             */
+            paymentAttemptId: string;
+        };
+        PurchaseLikeResponseDto: {
+            /** @description Public count of completed-purchase Likes. */
+            count: number;
+            /** @description Always true when this accessible purchase has a Like. */
+            liked: boolean;
         };
         ProductCategoryDto: {
             slug: string;
@@ -1363,6 +1401,65 @@ export interface operations {
                         };
                     };
                 };
+            };
+        };
+    };
+    LikesController_count: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseLikeCountDto"];
+                };
+            };
+        };
+    };
+    LikesController_create: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-CSRF-Token": string;
+                Origin: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePurchaseLikeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseLikeResponseDto"];
+                };
+            };
+            /** @description Origin or CSRF is not valid */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The supplied purchase is absent or not eligible to Like */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -326,6 +326,42 @@ test.describe('O3 payment handoff regressions', () => {
     expect(starts).toHaveLength(0);
   });
 
+  test('offers one manual Like after canonical sandbox success and updates the public aggregate', async ({
+    page,
+  }) => {
+    await page.addInitScript(
+      ({ key, value }) => window.sessionStorage.setItem(key, value),
+      {
+        key: paymentHandoffKey,
+        value: JSON.stringify({
+          attemptId: paymentAttemptId,
+          draftId: '30000000-0000-4000-8000-000000000001',
+          key: paymentIdempotencyKey,
+        }),
+      },
+    );
+    await interceptCheckoutDraft(page);
+    await interceptPaymentStatus(page, {
+      attemptId: paymentAttemptId,
+      status: 'succeeded',
+    });
+    const likes = await interceptLikes(page, 41);
+
+    await page.goto('/checkout?payment=return');
+    await expect(
+      page.getByRole('heading', { name: 'Payment successful' }),
+    ).toBeVisible();
+    await expect(page.getByLabel('41 likes')).toBeVisible();
+    expect(likes.posts).toHaveLength(0);
+
+    await page.getByRole('button', { name: 'Like this shop' }).click();
+
+    await expect(page.getByText('Like sent — thank you.')).toBeVisible();
+    await expect(page.getByLabel('42 likes')).toBeVisible();
+    expect(likes.posts).toEqual([paymentAttemptId]);
+    expect(likes.csrfTokens).toEqual([csrfToken]);
+  });
+
   test('locks the checkout for an unknown persisted payment without starting a fresh payment', async ({
     page,
   }) => {
@@ -500,6 +536,27 @@ async function interceptPaymentStart(
     },
   );
   return starts;
+}
+
+async function interceptLikes(page: Page, initialCount: number) {
+  const posts: string[] = [];
+  const csrfTokens: string[] = [];
+  await page.route('**/api/v1/likes', async (route) => {
+    const request = route.request();
+    if (request.method() === 'GET') {
+      await fulfill(route, { count: initialCount });
+      return;
+    }
+    if (request.method() === 'OPTIONS') {
+      await fulfill(route, undefined, 204);
+      return;
+    }
+    const body = request.postDataJSON() as { paymentAttemptId: string };
+    posts.push(body.paymentAttemptId);
+    csrfTokens.push(request.headers()['x-csrf-token'] ?? '');
+    await fulfill(route, { count: initialCount + 1, liked: true });
+  });
+  return { csrfTokens, posts };
 }
 
 async function interceptCheckoutDraft(
