@@ -57,38 +57,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/products": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["CatalogController_listProducts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/products/{slug}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["CatalogController_getProduct"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/cart": {
         parameters: {
             query?: never;
@@ -179,6 +147,38 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["CartController_update"];
+        trace?: never;
+    };
+    "/api/v1/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CatalogController_listProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CatalogController_getProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/checkout/draft": {
@@ -541,6 +541,73 @@ export interface components {
             /** @description Always true when this accessible purchase has a Like. */
             liked: boolean;
         };
+        CartItemDto: {
+            /** Format: uuid */
+            productId: string;
+            productSlug: string;
+            name: string;
+            imagePath: string;
+            priceQualifier: string;
+            /** Format: int32 */
+            amount: number;
+            /** @enum {string} */
+            saleKind: "WEIGHT" | "PACKAGE" | "KIT";
+            /** @enum {string} */
+            amountUnit: "MILLIGRAM" | "EACH";
+            /** Format: int32 */
+            priceBasisAmount: number;
+            /** Format: int32 */
+            minimumOrderAmount: number;
+            /** Format: int32 */
+            orderStepAmount: number;
+            /** Format: int32 */
+            maximumOrderAmount: number | null;
+            /** Format: int32 */
+            stockAmount: number;
+            /** Format: int32 */
+            packageNetWeightMg: number | null;
+            /** Format: int32 */
+            kitYieldVolumeMl: number | null;
+            /** Format: int32 */
+            priceMinor: number | null;
+            /** Format: int32 */
+            lineTotalMinor: number | null;
+        };
+        CartDto: {
+            /** @enum {string} */
+            currency: "EUR";
+            items: components["schemas"]["CartItemDto"][];
+            /** Format: int32 */
+            distinctItemCount: number;
+            /** Format: int32 */
+            subtotalMinor: number;
+        };
+        CartCsrfResponseDto: {
+            csrfToken: string;
+        };
+        CheckoutReadinessLineDto: {
+            productSlug: string;
+            /** Format: int32 */
+            requestedAmount: number;
+            /** @enum {string} */
+            outcome: "available" | "insufficient_stock" | "product_unavailable" | "invalid_amount" | "price_unavailable";
+        };
+        CheckoutReadinessDto: {
+            /** @enum {string} */
+            status: "ready" | "empty" | "unavailable";
+            /** Format: date-time */
+            checkedAt: string;
+            lines: components["schemas"]["CheckoutReadinessLineDto"][];
+        };
+        AddCartItemDto: {
+            productSlug: string;
+            /** Format: int32 */
+            amount: number;
+        };
+        UpdateCartItemDto: {
+            /** Format: int32 */
+            amount: number;
+        };
         ProductCategoryDto: {
             slug: string;
             name: string;
@@ -673,73 +740,6 @@ export interface components {
             availability: "in-stock" | "out-of-stock";
             category: components["schemas"]["ProductCategoryDto"];
             specifications: components["schemas"]["ProductSpecificationDto"][];
-        };
-        CartItemDto: {
-            /** Format: uuid */
-            productId: string;
-            productSlug: string;
-            name: string;
-            imagePath: string;
-            priceQualifier: string;
-            /** Format: int32 */
-            amount: number;
-            /** @enum {string} */
-            saleKind: "WEIGHT" | "PACKAGE" | "KIT";
-            /** @enum {string} */
-            amountUnit: "MILLIGRAM" | "EACH";
-            /** Format: int32 */
-            priceBasisAmount: number;
-            /** Format: int32 */
-            minimumOrderAmount: number;
-            /** Format: int32 */
-            orderStepAmount: number;
-            /** Format: int32 */
-            maximumOrderAmount: number | null;
-            /** Format: int32 */
-            stockAmount: number;
-            /** Format: int32 */
-            packageNetWeightMg: number | null;
-            /** Format: int32 */
-            kitYieldVolumeMl: number | null;
-            /** Format: int32 */
-            priceMinor: number | null;
-            /** Format: int32 */
-            lineTotalMinor: number | null;
-        };
-        CartDto: {
-            /** @enum {string} */
-            currency: "EUR";
-            items: components["schemas"]["CartItemDto"][];
-            /** Format: int32 */
-            distinctItemCount: number;
-            /** Format: int32 */
-            subtotalMinor: number;
-        };
-        CartCsrfResponseDto: {
-            csrfToken: string;
-        };
-        CheckoutReadinessLineDto: {
-            productSlug: string;
-            /** Format: int32 */
-            requestedAmount: number;
-            /** @enum {string} */
-            outcome: "available" | "insufficient_stock" | "product_unavailable" | "invalid_amount" | "price_unavailable";
-        };
-        CheckoutReadinessDto: {
-            /** @enum {string} */
-            status: "ready" | "empty" | "unavailable";
-            /** Format: date-time */
-            checkedAt: string;
-            lines: components["schemas"]["CheckoutReadinessLineDto"][];
-        };
-        AddCartItemDto: {
-            productSlug: string;
-            /** Format: int32 */
-            amount: number;
-        };
-        UpdateCartItemDto: {
-            /** Format: int32 */
-            amount: number;
         };
         CheckoutDraftDeliveryDto: {
             countryCode: string;
@@ -1463,76 +1463,6 @@ export interface operations {
             };
         };
     };
-    CatalogController_listProducts: {
-        parameters: {
-            query?: {
-                limit?: number;
-                page?: number;
-                sort?: "name-asc" | "name-desc" | "price-asc" | "price-desc";
-                maxPriceMinor?: number;
-                minPriceMinor?: number;
-                category?: string[];
-                /** @description Unicode NFC search; control characters and literal backslash, percent and underscore are forbidden. */
-                search?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatalogResponseDto"];
-                };
-            };
-            /** @description Invalid catalog query parameters */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    CatalogController_getProduct: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                slug: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProductDetailDto"];
-                };
-            };
-            /** @description Invalid product slug */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Product not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     CartController_get: {
         parameters: {
             query?: never;
@@ -1822,6 +1752,76 @@ export interface operations {
             };
             /** @description Product or amount is unavailable */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CatalogController_listProducts: {
+        parameters: {
+            query?: {
+                limit?: number;
+                page?: number;
+                sort?: "name-asc" | "name-desc" | "price-asc" | "price-desc";
+                maxPriceMinor?: number;
+                minPriceMinor?: number;
+                category?: string[];
+                /** @description Unicode NFC search; control characters and literal backslash, percent and underscore are forbidden. */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogResponseDto"];
+                };
+            };
+            /** @description Invalid catalog query parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CatalogController_getProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductDetailDto"];
+                };
+            };
+            /** @description Invalid product slug */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Product not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
