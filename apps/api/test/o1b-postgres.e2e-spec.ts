@@ -9,7 +9,7 @@ const describePostgres =
 
 const alphaSlug = 'o2s-alpha';
 const betaSlug = 'o2s-beta';
-const now = new Date('2026-08-27T12:00:00.000Z');
+let now: Date;
 
 describePostgres('O2S desired carts with disposable PostgreSQL', () => {
   let carts: CartService;
@@ -19,6 +19,10 @@ describePostgres('O2S desired carts with disposable PostgreSQL', () => {
   beforeAll(async () => {
     postgres = new Client({ connectionString: process.env.DATABASE_URL });
     await postgres.connect();
+    const databaseClock = await postgres.query<{ now: Date }>(
+      'SELECT clock_timestamp() AS "now"',
+    );
+    now = databaseClock.rows[0].now;
     prisma = new PrismaService();
     carts = new CartService(prisma);
     const category = await prisma.category.findFirstOrThrow();
@@ -100,6 +104,13 @@ describePostgres('O2S desired carts with disposable PostgreSQL', () => {
       now,
     );
     const capability = await requireCapability(created.rawToken);
+    const storedCart = await prisma.cart.findUniqueOrThrow({
+      select: { createdAt: true, expiresAt: true },
+      where: { id: capability.cartId },
+    });
+    expect(storedCart.expiresAt.getTime()).toBeGreaterThan(
+      storedCart.createdAt.getTime(),
+    );
     const item = await prisma.cartItem.findFirstOrThrow({
       where: { cartId: capability.cartId },
     });
