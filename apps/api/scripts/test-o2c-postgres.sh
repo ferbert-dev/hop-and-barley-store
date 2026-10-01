@@ -103,10 +103,10 @@ docker exec "$container_name" psql --no-psqlrc --set ON_ERROR_STOP=1 \
 
     INSERT INTO \"User\" (\"id\", \"email\", \"normalizedEmail\", \"updatedAt\")
     VALUES ('81000000-0000-4000-8000-000000000001', 'o2c-history@example.com', 'o2c-history@example.com', '2026-09-01T10:00:00.000Z');
-    INSERT INTO \"Cart\" (\"id\", \"tokenDigest\", \"expiresAt\", \"updatedAt\")
+    INSERT INTO \"Cart\" (\"id\", \"tokenDigest\", \"createdAt\", \"expiresAt\", \"updatedAt\")
     VALUES
-      ('82000000-0000-4000-8000-000000000001', decode(repeat('88', 32), 'hex'), '2026-10-01T00:00:00.000Z', '2026-09-01T10:00:00.000Z'),
-      ('82000000-0000-4000-8000-000000000002', decode(repeat('99', 32), 'hex'), '2026-10-02T00:00:00.000Z', '2026-09-02T10:00:00.000Z');
+      ('82000000-0000-4000-8000-000000000001', decode(repeat('88', 32), 'hex'), '2026-09-01T10:00:00.000Z', '2026-10-01T00:00:00.000Z', '2026-09-01T10:00:00.000Z'),
+      ('82000000-0000-4000-8000-000000000002', decode(repeat('99', 32), 'hex'), '2026-09-02T10:00:00.000Z', '2026-10-02T00:00:00.000Z', '2026-09-02T10:00:00.000Z');
     INSERT INTO \"CartItem\" (
       \"id\", \"cartId\", \"productId\", \"amount\", \"createdAt\", \"updatedAt\"
     ) SELECT
