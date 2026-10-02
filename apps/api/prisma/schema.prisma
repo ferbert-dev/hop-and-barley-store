@@ -423,12 +423,13 @@ model PaymentAttempt {
   @@index([status, updatedAt], map: "PaymentAttempt_status_updatedAt_idx")
 }
 
-/// A single public appreciation action earned by one fully server-confirmed
-/// Stripe Sandbox purchase. It intentionally contains no customer attributes.
+/// Repeatable public appreciation earned by one fully server-confirmed Stripe
+/// Sandbox purchase. It intentionally contains no customer attributes.
 model PurchaseLike {
   id               String         @id(map: "PurchaseLike_pkey") @default(uuid()) @db.Uuid
   paymentAttemptId String         @unique(map: "PurchaseLike_paymentAttemptId_key") @db.Uuid
   orderId          String         @unique(map: "PurchaseLike_orderId_key") @db.Uuid
+  count            Int            @default(1)
   createdAt        DateTime       @default(now()) @db.Timestamptz(3)
   paymentAttempt   PaymentAttempt @relation(fields: [paymentAttemptId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "PurchaseLike_paymentAttemptId_fkey")
   order            Order          @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "PurchaseLike_orderId_fkey")

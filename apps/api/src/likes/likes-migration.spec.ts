@@ -10,11 +10,15 @@ const migration = readFileSync(
 );
 
 describe('O3L purchase Like migration contract', () => {
-  it('enforces one Like for each exact confirmed Stripe purchase', () => {
+  it('enforces a positive repeatable counter for each exact confirmed Stripe purchase', () => {
     expect(migration).toContain('CREATE TABLE "PurchaseLike"');
     expect(migration).toContain('"PurchaseLike_paymentAttemptId_key"');
     expect(migration).toContain('"PurchaseLike_orderId_key"');
+    expect(migration).toContain('"count" INTEGER NOT NULL DEFAULT 1');
+    expect(migration).toContain('"PurchaseLike_count_positive_check"');
+    expect(migration).toContain('CHECK ("count" > 0)');
     expect(migration).toContain('"PurchaseLike_eligible_payment_trigger"');
+    expect(migration).toContain('BEFORE INSERT OR UPDATE ON "PurchaseLike"');
     expect(migration).toContain('attempt."status" = \'SUCCEEDED\'');
     expect(migration).toContain(
       'purchase."paymentMethod" = \'STRIPE_DEBIT_CARD\'',

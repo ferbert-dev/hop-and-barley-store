@@ -326,7 +326,7 @@ test.describe('O3 payment handoff regressions', () => {
     expect(starts).toHaveLength(0);
   });
 
-  test('offers one manual Like after canonical sandbox success and updates the public aggregate', async ({
+  test('offers repeated manual Likes after canonical sandbox success and updates the public aggregate', async ({
     page,
   }) => {
     await page.addInitScript(
@@ -358,8 +358,12 @@ test.describe('O3 payment handoff regressions', () => {
 
     await expect(page.getByText('Like sent — thank you.')).toBeVisible();
     await expect(page.getByLabel('42 likes')).toBeVisible();
-    expect(likes.posts).toEqual([paymentAttemptId]);
-    expect(likes.csrfTokens).toEqual([csrfToken]);
+
+    await page.getByRole('button', { name: 'Like this shop again' }).click();
+
+    await expect(page.getByLabel('43 likes')).toBeVisible();
+    expect(likes.posts).toEqual([paymentAttemptId, paymentAttemptId]);
+    expect(likes.csrfTokens).toEqual([csrfToken, csrfToken]);
   });
 
   test('locks the checkout for an unknown persisted payment without starting a fresh payment', async ({
@@ -541,6 +545,7 @@ async function interceptPaymentStart(
 async function interceptLikes(page: Page, initialCount: number) {
   const posts: string[] = [];
   const csrfTokens: string[] = [];
+  let count = initialCount;
   await page.route('**/api/v1/likes', async (route) => {
     const request = route.request();
     if (request.method() === 'GET') {
@@ -554,7 +559,8 @@ async function interceptLikes(page: Page, initialCount: number) {
     const body = request.postDataJSON() as { paymentAttemptId: string };
     posts.push(body.paymentAttemptId);
     csrfTokens.push(request.headers()['x-csrf-token'] ?? '');
-    await fulfill(route, { count: initialCount + 1, liked: true });
+    count += 1;
+    await fulfill(route, { count, liked: true });
   });
   return { csrfTokens, posts };
 }

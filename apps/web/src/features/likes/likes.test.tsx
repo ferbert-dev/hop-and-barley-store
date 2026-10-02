@@ -27,10 +27,13 @@ describe('purchase likes', () => {
     pathname = '/';
   });
 
-  it('shows the public aggregate and updates it only after a manual successful Like', async () => {
+  it('keeps the CTA actionable and increments the aggregate after every successful Like', async () => {
     const transport: LikesTransport = {
       count: vi.fn().mockResolvedValue({ count: 12 }),
-      create: vi.fn().mockResolvedValue({ count: 13 }),
+      create: vi
+        .fn()
+        .mockResolvedValueOnce({ count: 13 })
+        .mockResolvedValueOnce({ count: 14 }),
     };
     const user = userEvent.setup();
     renderLikes(transport);
@@ -51,6 +54,46 @@ describe('purchase likes', () => {
       'Like sent — thank you.',
     );
     expect(screen.getByLabelText('13 likes')).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Like this shop again' }),
+    );
+
+    await waitFor(() => expect(transport.create).toHaveBeenCalledTimes(2));
+    expect(transport.create).toHaveBeenNthCalledWith(
+      2,
+      '40000000-0000-4000-8000-000000000001',
+    );
+    expect(await screen.findByLabelText('14 likes')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Like this shop again' }),
+    ).toBeEnabled();
+  });
+
+  it('does not start a duplicate Like while one submission is pending', async () => {
+    const acceptedLike = { count: 13, liked: true } as const;
+    let resolveCreate: (result: typeof acceptedLike) => void = () => undefined;
+    const pendingCreate = new Promise<typeof acceptedLike>((resolve) => {
+      resolveCreate = resolve;
+    });
+    const transport: LikesTransport = {
+      count: vi.fn().mockResolvedValue({ count: 12 }),
+      create: vi.fn().mockReturnValue(pendingCreate),
+    };
+    const user = userEvent.setup();
+    renderLikes(transport);
+
+    await screen.findByLabelText('12 likes');
+    const button = screen.getByRole('button', { name: 'Like this shop' });
+    await user.dblClick(button);
+
+    expect(transport.create).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole('button', { name: 'Sending your like…' }),
+    ).toBeDisabled();
+
+    resolveCreate(acceptedLike);
+    expect(await screen.findByLabelText('13 likes')).toBeInTheDocument();
   });
 
   it('keeps the aggregate unchanged and offers a retry after a failed Like', async () => {

@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class PurchaseLikeCountDto {
   @ApiProperty({
-    description: 'Public count of completed-purchase Likes.',
+    description: 'Public aggregate of accepted completed-purchase Likes.',
     minimum: 0,
     type: Number,
   })
@@ -11,7 +11,7 @@ export class PurchaseLikeCountDto {
 
 export class PurchaseLikeResponseDto extends PurchaseLikeCountDto {
   @ApiProperty({
-    description: 'Always true when this accessible purchase has a Like.',
+    description: 'Always true after this accessible purchase increments Likes.',
     type: Boolean,
   })
   liked!: true;

@@ -82,6 +82,25 @@ expect_like_rejection() {
   test "$(query_scalar fresh_o3l 'SELECT count(*) FROM "PurchaseLike";')" = '0'
 }
 
+expect_like_increment_rejection() {
+  local label=$1
+  local payment_attempt_id=$2
+  local expected_count=$3
+  local output
+
+  if output=$(docker exec "$container_name" psql --no-psqlrc \
+    --set ON_ERROR_STOP=1 --username "$database_user" --dbname fresh_o3l \
+    --command "UPDATE \"PurchaseLike\" SET \"count\" = \"count\" + 1 WHERE \"paymentAttemptId\" = '$payment_attempt_id';" 2>&1); then
+    echo "Expected PurchaseLike increment trigger to reject $label" >&2
+    exit 1
+  fi
+  if [[ "$output" != *'PurchaseLike requires its exact successful paid Stripe Sandbox order'* ]]; then
+    echo "PurchaseLike $label increment failed for an unexpected reason" >&2
+    exit 1
+  fi
+  test "$(query_scalar fresh_o3l "SELECT \"count\" FROM \"PurchaseLike\" WHERE \"paymentAttemptId\" = '$payment_attempt_id';")" = "$expected_count"
+}
+
 # Prove the committed migration is atomic on an upgrade-shaped database. The
 # injected error is inside its BEGIN/COMMIT block; no O3L object may survive.
 docker exec "$container_name" createdb -U "$database_user" atomic_o3l
@@ -101,12 +120,16 @@ atomic_shape=$(query_scalar atomic_o3l "
     to_regclass('public.\"PurchaseLike_paymentAttemptId_key\"') IS NULL,
     to_regclass('public.\"PurchaseLike_orderId_key\"') IS NULL,
     NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conname = 'PurchaseLike_count_positive_check'
+    ),
+    NOT EXISTS (
       SELECT 1 FROM pg_trigger
       WHERE tgname = 'PurchaseLike_eligible_payment_trigger'
     ),
     to_regprocedure('enforce_purchase_like_eligible_payment()') IS NULL;
 ")
-test "$atomic_shape" = 't|t|t|t|t|t|t'
+test "$atomic_shape" = 't|t|t|t|t|t|t|t'
 docker exec --interactive "$container_name" psql --no-psqlrc \
   --set ON_ERROR_STOP=1 --username "$database_user" \
   --dbname atomic_o3l < "$migration_path" >/dev/null
@@ -116,12 +139,27 @@ recovered_shape=$(query_scalar atomic_o3l "
     to_regclass('public.\"PurchaseLike_paymentAttemptId_key\"') IS NOT NULL,
     to_regclass('public.\"PurchaseLike_orderId_key\"') IS NOT NULL,
     EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'PurchaseLike'
+        AND column_name = 'count'
+        AND data_type = 'integer'
+        AND column_default IS NOT NULL
+    ),
+    EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conrelid = 'public.\"PurchaseLike\"'::regclass
+        AND conname = 'PurchaseLike_count_positive_check'
+    ),
+    EXISTS (
       SELECT 1 FROM pg_trigger
-      WHERE tgname = 'PurchaseLike_eligible_payment_trigger' AND NOT tgisinternal
+      WHERE tgname = 'PurchaseLike_eligible_payment_trigger'
+        AND NOT tgisinternal
+        AND pg_get_triggerdef(oid) LIKE '%BEFORE INSERT OR UPDATE ON%'
     ),
     to_regprocedure('enforce_purchase_like_eligible_payment()') IS NOT NULL;
 ")
-test "$recovered_shape" = 't|t|t|t|t'
+test "$recovered_shape" = 't|t|t|t|t|t|t'
 
 fresh_url=$(database_url fresh_o3l)
 DATABASE_URL="$fresh_url" pnpm --dir "$repo_root" --filter @hop-and-barley/api db:migrate:deploy
@@ -165,9 +203,10 @@ shape=$(docker exec "$container_name" psql --no-psqlrc --tuples-only --no-align 
   SELECT to_regclass('public.\"PurchaseLike\"') IS NOT NULL,
     to_regclass('public.\"PurchaseLike_paymentAttemptId_key\"') IS NOT NULL,
     to_regclass('public.\"PurchaseLike_orderId_key\"') IS NOT NULL,
-    EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'PurchaseLike_eligible_payment_trigger' AND NOT tgisinternal),
+    EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.\"PurchaseLike\"'::regclass AND conname = 'PurchaseLike_count_positive_check'),
+    EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'PurchaseLike_eligible_payment_trigger' AND NOT tgisinternal AND pg_get_triggerdef(oid) LIKE '%BEFORE INSERT OR UPDATE ON%'),
     to_regprocedure('enforce_purchase_like_eligible_payment()') IS NOT NULL;")
-test "$shape" = 't|t|t|t|t'
+test "$shape" = 't|t|t|t|t|t'
 
 # Create two individually valid pairs while suppressing older payment-history
 # constraint triggers. Re-enable normal trigger execution before testing O3L.
@@ -251,11 +290,34 @@ SQL
 
 docker exec "$container_name" psql --no-psqlrc --set ON_ERROR_STOP=1 \
   --username "$database_user" --dbname fresh_o3l --command \
-  'INSERT INTO "PurchaseLike" ("paymentAttemptId", "orderId") VALUES ('\''00000000-0000-4000-8000-000000000301'\'', '\''00000000-0000-4000-8000-000000000401'\''); DELETE FROM "PurchaseLike";' >/dev/null
+  'INSERT INTO "PurchaseLike" ("paymentAttemptId", "orderId") VALUES ('\''00000000-0000-4000-8000-000000000301'\'', '\''00000000-0000-4000-8000-000000000401'\'');' >/dev/null
+test "$(query_scalar fresh_o3l 'SELECT "count" FROM "PurchaseLike" WHERE "paymentAttemptId" = '\''00000000-0000-4000-8000-000000000301'\'';')" = '1'
+
+if output=$(docker exec "$container_name" psql --no-psqlrc \
+  --set ON_ERROR_STOP=1 --username "$database_user" --dbname fresh_o3l \
+  --command 'UPDATE "PurchaseLike" SET "count" = 0 WHERE "paymentAttemptId" = '\''00000000-0000-4000-8000-000000000301'\'';' 2>&1); then
+  echo 'Expected PurchaseLike positive-count check to reject zero' >&2
+  exit 1
+fi
+if [[ "$output" != *'PurchaseLike_count_positive_check'* ]]; then
+  echo 'PurchaseLike zero-count update failed for an unexpected reason' >&2
+  exit 1
+fi
+test "$(query_scalar fresh_o3l 'SELECT "count" FROM "PurchaseLike" WHERE "paymentAttemptId" = '\''00000000-0000-4000-8000-000000000301'\'';')" = '1'
+
+docker exec "$container_name" psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --username "$database_user" --dbname fresh_o3l --command \
+  'UPDATE "PurchaseLike" SET "count" = "count" + 1 WHERE "paymentAttemptId" = '\''00000000-0000-4000-8000-000000000301'\'';' >/dev/null
+test "$(query_scalar fresh_o3l 'SELECT COALESCE(sum("count"), 0) FROM "PurchaseLike";')" = '2'
 
 docker exec "$container_name" psql --no-psqlrc --set ON_ERROR_STOP=1 \
   --username "$database_user" --dbname fresh_o3l --command \
   'SET session_replication_role = replica; UPDATE "PaymentAttempt" SET "status" = '\''DEFINITIVELY_FAILED'\'', "succeededAt" = NULL, "definitivelyFailedAt" = CURRENT_TIMESTAMP WHERE "id" = '\''00000000-0000-4000-8000-000000000301'\'';' >/dev/null
+expect_like_increment_rejection 'definitively failed attempt' \
+  '00000000-0000-4000-8000-000000000301' '2'
+docker exec "$container_name" psql --no-psqlrc --set ON_ERROR_STOP=1 \
+  --username "$database_user" --dbname fresh_o3l --command \
+  'DELETE FROM "PurchaseLike" WHERE "paymentAttemptId" = '\''00000000-0000-4000-8000-000000000301'\'';' >/dev/null
 expect_like_rejection 'definitively failed attempt' \
   '00000000-0000-4000-8000-000000000301' '00000000-0000-4000-8000-000000000401'
 

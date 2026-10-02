@@ -54,9 +54,9 @@ export class LikesController {
   @UseGuards(CartMutationGuard)
   @ApiSecurity({ cartCookie: [], guestCheckoutCookie: [], sessionCookie: [] })
   @ApiOperation({
-    summary: 'Record the Like earned by one completed Stripe Sandbox purchase',
+    summary: 'Increment Likes for one completed Stripe Sandbox purchase',
     description:
-      'The opaque payment attempt ID is checked server-side against its exact paid Stripe Sandbox order and the caller’s private cart/checkout capability. Retries are idempotent.',
+      'The opaque payment attempt ID is checked server-side against its exact paid Stripe Sandbox order and the caller’s private cart/checkout capability. Every accepted request increments the public aggregate.',
   })
   @ApiHeader({ name: 'Origin', required: true })
   @ApiHeader({ name: 'X-CSRF-Token', required: true })

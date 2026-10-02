@@ -9,7 +9,7 @@ jest.mock('../database/prisma.service', () => ({
 }));
 
 describe('LikesService', () => {
-  const count = jest.fn();
+  const aggregate = jest.fn();
   const findFirst = jest.fn();
   const upsert = jest.fn();
   let service: LikesService;
@@ -22,18 +22,18 @@ describe('LikesService', () => {
           provide: PrismaService,
           useValue: {
             paymentAttempt: { findFirst },
-            purchaseLike: { count, upsert },
+            purchaseLike: { aggregate, upsert },
           },
         },
       ],
     }).compile();
     service = moduleRef.get(LikesService);
     jest.clearAllMocks();
-    count.mockResolvedValue(41);
+    aggregate.mockResolvedValue({ _sum: { count: 41 } });
     upsert.mockResolvedValue({ id: 'like-id' });
   });
 
-  it('creates one Like for the exact paid account purchase after capture rotated its cart', async () => {
+  it('increments Likes for the exact paid account purchase after capture rotated its cart', async () => {
     findFirst.mockResolvedValue({
       checkoutDraft: {
         cartId: 'cart-id',
@@ -88,7 +88,7 @@ describe('LikesService', () => {
         orderId: '22222222-2222-4222-8222-222222222222',
         paymentAttemptId: '11111111-1111-4111-8111-111111111111',
       },
-      update: {},
+      update: { count: { increment: 1 } },
       where: { paymentAttemptId: '11111111-1111-4111-8111-111111111111' },
     });
   });
@@ -193,10 +193,17 @@ describe('LikesService', () => {
       ),
     ).rejects.toBe(unrelated);
     expect(upsert).toHaveBeenCalledTimes(1);
-    expect(count).not.toHaveBeenCalled();
+    expect(aggregate).not.toHaveBeenCalled();
   });
 
-  it('returns only the aggregate count', async () => {
+  it('returns only the summed aggregate count', async () => {
     await expect(service.count()).resolves.toEqual({ count: 41 });
+    expect(aggregate).toHaveBeenCalledWith({ _sum: { count: true } });
+  });
+
+  it('returns zero when no purchase counter exists', async () => {
+    aggregate.mockResolvedValue({ _sum: { count: null } });
+
+    await expect(service.count()).resolves.toEqual({ count: 0 });
   });
 });

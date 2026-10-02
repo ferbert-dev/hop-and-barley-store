@@ -15,7 +15,10 @@ export class LikesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async count(): Promise<PurchaseLikeCountDto> {
-    return { count: await this.prisma.purchaseLike.count() };
+    const aggregate = await this.prisma.purchaseLike.aggregate({
+      _sum: { count: true },
+    });
+    return { count: aggregate._sum.count ?? 0 };
   }
 
   async create(
@@ -67,21 +70,21 @@ export class LikesService {
       throw new UnprocessableEntityException(INELIGIBLE);
     }
 
-    // Both unique relations make a retry (including concurrent retries) return
-    // the same earned action instead of incrementing the public total twice.
+    // Keep one privacy-preserving row per purchase while atomically counting
+    // every accepted press, including concurrent requests.
     const persist = () =>
       this.prisma.purchaseLike.upsert({
         create: { orderId, paymentAttemptId },
-        update: {},
+        update: { count: { increment: 1 } },
         where: { paymentAttemptId },
       });
     try {
       await persist();
     } catch (error: unknown) {
       if (!isPurchaseLikeUniqueConflict(error)) throw error;
-      // Prisma's client-side upsert can race after concurrent reads observe no
-      // row. Retry only the two O3L uniqueness conflicts; the winner is now
-      // visible and every other persistence failure still propagates.
+      // A client-side first-insert race can lose after another request creates
+      // the row. Retrying only the two O3L uniqueness conflicts turns this
+      // accepted request into the required atomic increment.
       await persist();
     }
     return { ...(await this.count()), liked: true };

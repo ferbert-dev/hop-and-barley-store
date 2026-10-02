@@ -1,6 +1,6 @@
--- O3L records one public Like for one fully server-confirmed Stripe Sandbox
--- purchase. The table deliberately stores only immutable payment/order IDs;
--- all customer data remains in its private source records.
+-- O3L records repeatable public Likes for one fully server-confirmed Stripe
+-- Sandbox purchase. The table deliberately stores only immutable payment/order
+-- IDs and their positive aggregate; all customer data remains private.
 
 BEGIN;
 
@@ -8,9 +8,11 @@ CREATE TABLE "PurchaseLike" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "paymentAttemptId" UUID NOT NULL,
   "orderId" UUID NOT NULL,
+  "count" INTEGER NOT NULL DEFAULT 1,
   "createdAt" TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-  CONSTRAINT "PurchaseLike_pkey" PRIMARY KEY ("id")
+  CONSTRAINT "PurchaseLike_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "PurchaseLike_count_positive_check" CHECK ("count" > 0)
 );
 
 CREATE UNIQUE INDEX "PurchaseLike_paymentAttemptId_key"
@@ -52,7 +54,7 @@ END;
 $$;
 
 CREATE TRIGGER "PurchaseLike_eligible_payment_trigger"
-  BEFORE INSERT OR UPDATE OF "paymentAttemptId", "orderId" ON "PurchaseLike"
+  BEFORE INSERT OR UPDATE ON "PurchaseLike"
   FOR EACH ROW EXECUTE FUNCTION enforce_purchase_like_eligible_payment();
 
 COMMIT;

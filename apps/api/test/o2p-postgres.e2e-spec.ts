@@ -236,7 +236,7 @@ describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
     ).toMatchObject({ status: 'succeeded' });
   });
 
-  it('creates one Like for simultaneous retries of an accessible completed Sandbox purchase', async () => {
+  it('counts every simultaneous Like for an accessible completed Sandbox purchase', async () => {
     const fixture = await prepareSession('like-success', 'guest');
     const attempt = await prisma.paymentAttempt.findFirstOrThrow();
     gateway.constructEvent.mockReturnValue(
@@ -265,10 +265,16 @@ describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
       ),
     );
 
-    expect(retries).toEqual(
-      Array.from({ length: 8 }, () => ({ count: 1, liked: true })),
-    );
+    expect(retries).toHaveLength(8);
+    expect(retries.every(({ liked }) => liked)).toBe(true);
     expect(await prisma.purchaseLike.count()).toBe(1);
+    expect(
+      await prisma.purchaseLike.findUniqueOrThrow({
+        select: { count: true },
+        where: { paymentAttemptId: attempt.id },
+      }),
+    ).toEqual({ count: 8 });
+    await expect(likes.count()).resolves.toEqual({ count: 8 });
   });
 
   it('keeps an account Like eligible after capture clears its old cart and a new cart is created', async () => {
@@ -319,6 +325,19 @@ describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
         null,
       ),
     ).resolves.toEqual({ count: 1, liked: true });
+    await expect(
+      likes.create(
+        attempt.id,
+        {
+          cartId: nextCart.id,
+          kind: 'account',
+          rawToken: fixture.cartAccess.rawToken,
+          userId: fixture.cartAccess.userId,
+        },
+        null,
+      ),
+    ).resolves.toEqual({ count: 2, liked: true });
+    await expect(likes.count()).resolves.toEqual({ count: 2 });
   });
 
   it('cancels the authorization and releases the discount claim when stock is unavailable', async () => {

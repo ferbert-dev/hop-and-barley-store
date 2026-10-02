@@ -47,8 +47,8 @@ export interface paths {
         get: operations["LikesController_count"];
         put?: never;
         /**
-         * Record the Like earned by one completed Stripe Sandbox purchase
-         * @description The opaque payment attempt ID is checked server-side against its exact paid Stripe Sandbox order and the caller’s private cart/checkout capability. Retries are idempotent.
+         * Increment Likes for one completed Stripe Sandbox purchase
+         * @description The opaque payment attempt ID is checked server-side against its exact paid Stripe Sandbox order and the caller’s private cart/checkout capability. Every accepted request increments the public aggregate.
          */
         post: operations["LikesController_create"];
         delete?: never;
@@ -525,7 +525,7 @@ export interface components {
             status: "ok";
         };
         PurchaseLikeCountDto: {
-            /** @description Public count of completed-purchase Likes. */
+            /** @description Public aggregate of accepted completed-purchase Likes. */
             count: number;
         };
         CreatePurchaseLikeDto: {
@@ -536,9 +536,9 @@ export interface components {
             paymentAttemptId: string;
         };
         PurchaseLikeResponseDto: {
-            /** @description Public count of completed-purchase Likes. */
+            /** @description Public aggregate of accepted completed-purchase Likes. */
             count: number;
-            /** @description Always true when this accessible purchase has a Like. */
+            /** @description Always true after this accessible purchase increments Likes. */
             liked: boolean;
         };
         CartItemDto: {
