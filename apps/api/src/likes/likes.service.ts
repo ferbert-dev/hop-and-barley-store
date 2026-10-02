@@ -1,4 +1,5 @@
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import type { ActiveCartAccess } from '../cart/cart-request';
 import { verifyCheckoutCapability } from '../checkout/checkout-capability-token';
 import { PrismaService } from '../database/prisma.service';
@@ -68,11 +69,64 @@ export class LikesService {
 
     // Both unique relations make a retry (including concurrent retries) return
     // the same earned action instead of incrementing the public total twice.
-    await this.prisma.purchaseLike.upsert({
-      create: { orderId, paymentAttemptId },
-      update: {},
-      where: { paymentAttemptId },
-    });
+    const persist = () =>
+      this.prisma.purchaseLike.upsert({
+        create: { orderId, paymentAttemptId },
+        update: {},
+        where: { paymentAttemptId },
+      });
+    try {
+      await persist();
+    } catch (error: unknown) {
+      if (!isPurchaseLikeUniqueConflict(error)) throw error;
+      // Prisma's client-side upsert can race after concurrent reads observe no
+      // row. Retry only the two O3L uniqueness conflicts; the winner is now
+      // visible and every other persistence failure still propagates.
+      await persist();
+    }
     return { ...(await this.count()), liked: true };
   }
+}
+
+function isPurchaseLikeUniqueConflict(error: unknown): boolean {
+  if (
+    !(error instanceof PrismaClientKnownRequestError) ||
+    error.code !== 'P2002' ||
+    !isRecord(error.meta)
+  ) {
+    return false;
+  }
+  if (isPurchaseLikeUniqueTarget(error.meta.target)) return true;
+
+  const driver = error.meta.driverAdapterError;
+  if (!isRecord(driver) || !isRecord(driver.cause)) return false;
+  const cause = driver.cause;
+  if (
+    cause.kind !== 'UniqueConstraintViolation' ||
+    !isRecord(cause.constraint)
+  ) {
+    return false;
+  }
+  return (
+    isPurchaseLikeUniqueTarget(cause.constraint.index) ||
+    isPurchaseLikeUniqueTarget(cause.constraint.fields)
+  );
+}
+
+function isPurchaseLikeUniqueTarget(target: unknown): boolean {
+  if (Array.isArray(target)) {
+    return target.length === 1 && isPurchaseLikeUniqueTarget(target[0]);
+  }
+  return (
+    target === 'PurchaseLike_paymentAttemptId_key' ||
+    target === 'PurchaseLike_orderId_key' ||
+    target === 'paymentAttemptId' ||
+    target === 'orderId' ||
+    target === '"paymentAttemptId"' ||
+    target === '"orderId"'
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object';
 }

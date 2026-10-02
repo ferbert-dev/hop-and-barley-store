@@ -236,7 +236,7 @@ describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
     ).toMatchObject({ status: 'succeeded' });
   });
 
-  it('creates one Like for an accessible completed Sandbox purchase and dedupes its retry', async () => {
+  it('creates one Like for simultaneous retries of an accessible completed Sandbox purchase', async () => {
     const fixture = await prepareSession('like-success', 'guest');
     const attempt = await prisma.paymentAttempt.findFirstOrThrow();
     gateway.constructEvent.mockReturnValue(
@@ -255,12 +255,19 @@ describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
       'test-signature',
       now,
     );
-    await expect(
-      likes.create(attempt.id, fixture.cartAccess, fixture.rawGuestCapability),
-    ).resolves.toEqual({ count: 1, liked: true });
-    await expect(
-      likes.create(attempt.id, fixture.cartAccess, fixture.rawGuestCapability),
-    ).resolves.toEqual({ count: 1, liked: true });
+    const retries = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        likes.create(
+          attempt.id,
+          fixture.cartAccess,
+          fixture.rawGuestCapability,
+        ),
+      ),
+    );
+
+    expect(retries).toEqual(
+      Array.from({ length: 8 }, () => ({ count: 1, liked: true })),
+    );
     expect(await prisma.purchaseLike.count()).toBe(1);
   });
 
