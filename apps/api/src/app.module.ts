@@ -9,6 +9,7 @@ import { CheckoutModule } from './checkout/checkout.module';
 import { validateEnvironment } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
+import { LikesModule } from './likes/likes.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ProductAssetsModule } from './product-assets/product-assets.module';
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module';
     }),
     DatabaseModule,
     HealthModule,
+    LikesModule,
     CatalogModule,
     CartModule,
     CheckoutModule,

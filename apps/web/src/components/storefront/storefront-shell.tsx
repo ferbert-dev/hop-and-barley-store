@@ -1,6 +1,7 @@
 import { Suspense, type ReactNode } from 'react';
 
 import { logoutAction } from '../../features/auth/auth-actions';
+import { LikesSticker } from '../../features/likes/likes-sticker';
 import { SiteFooter } from './site-footer';
 import { SiteHeaderClient } from './site-header';
 import { SiteHeaderServer } from './site-header-server';
@@ -28,6 +29,7 @@ export function StorefrontShell({ children }: StorefrontShellProps) {
       <main id="main-content" tabIndex={-1}>
         {children}
       </main>
+      <LikesSticker />
       <SiteFooter />
     </>
   );
