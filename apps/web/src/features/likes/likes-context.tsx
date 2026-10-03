@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -45,18 +46,22 @@ export function LikesProvider({
   );
   const [count, setCount] = useState<number | null>(null);
   const [state, setState] = useState<LikesState>('loading');
+  const acceptedLikeRevision = useRef(0);
 
   useEffect(() => {
     let active = true;
+    const initialRevision = acceptedLikeRevision.current;
 
     void resolvedTransport.count().then(
       ({ count: nextCount }) => {
-        if (!active) return;
+        if (!active || acceptedLikeRevision.current !== initialRevision) return;
         setCount(nextCount);
         setState('ready');
       },
       () => {
-        if (active) setState('unavailable');
+        if (active && acceptedLikeRevision.current === initialRevision) {
+          setState('unavailable');
+        }
       },
     );
 
@@ -68,6 +73,7 @@ export function LikesProvider({
   const createLike = useCallback(
     async (paymentAttemptId: string) => {
       const result = await resolvedTransport.create(paymentAttemptId);
+      acceptedLikeRevision.current += 1;
       setCount(result.count);
       setState('ready');
     },

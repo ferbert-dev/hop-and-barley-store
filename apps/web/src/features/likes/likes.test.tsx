@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -94,6 +94,51 @@ describe('purchase likes', () => {
 
     resolveCreate(acceptedLike);
     expect(await screen.findByLabelText('13 likes')).toBeInTheDocument();
+  });
+
+  it('ignores a stale initial count after a Like is accepted', async () => {
+    let resolveInitialCount: (result: { count: number }) => void = () =>
+      undefined;
+    const initialCount = new Promise<{ count: number }>((resolve) => {
+      resolveInitialCount = resolve;
+    });
+    const transport: LikesTransport = {
+      count: vi.fn().mockReturnValue(initialCount),
+      create: vi.fn().mockResolvedValue({ count: 13 }),
+    };
+    const user = userEvent.setup();
+    renderLikes(transport);
+
+    await user.click(screen.getByRole('button', { name: 'Like this shop' }));
+    expect(await screen.findByLabelText('13 likes')).toBeInTheDocument();
+
+    await act(async () => resolveInitialCount({ count: 12 }));
+
+    expect(screen.getByLabelText('13 likes')).toBeInTheDocument();
+    expect(screen.queryByLabelText('12 likes')).not.toBeInTheDocument();
+  });
+
+  it('ignores a stale initial count failure after a Like is accepted', async () => {
+    let rejectInitialCount: (reason: Error) => void = () => undefined;
+    const initialCount = new Promise<{ count: number }>((_resolve, reject) => {
+      rejectInitialCount = reject;
+    });
+    const transport: LikesTransport = {
+      count: vi.fn().mockReturnValue(initialCount),
+      create: vi.fn().mockResolvedValue({ count: 13 }),
+    };
+    const user = userEvent.setup();
+    renderLikes(transport);
+
+    await user.click(screen.getByRole('button', { name: 'Like this shop' }));
+    expect(await screen.findByLabelText('13 likes')).toBeInTheDocument();
+
+    await act(async () => rejectInitialCount(new Error('unavailable')));
+
+    expect(screen.getByLabelText('13 likes')).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Community likes are temporarily unavailable'),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps the aggregate unchanged and offers a retry after a failed Like', async () => {
