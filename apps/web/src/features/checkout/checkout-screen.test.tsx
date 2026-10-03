@@ -33,7 +33,20 @@ describe('CheckoutScreen', () => {
     expect(
       screen.getByRole('link', { name: 'create an account' }),
     ).toHaveAttribute('href', '/register?next=%2Fcheckout');
-    expect(screen.getByLabelText('Debit Card')).toBeChecked();
+    expect(screen.getByLabelText('Debit/Credit Card')).toBeChecked();
+    expect(screen.getByText('Visa')).toBeVisible();
+    expect(screen.getByText('Mastercard')).toBeVisible();
+    expect(screen.getByText('Secure payment with Stripe')).toBeVisible();
+    expect(
+      screen.queryByText(
+        'Save your checkout details to receive the current order quote.',
+      ),
+    ).toBeNull();
+    expect(
+      screen.queryByText(
+        'Save your delivery details, then continue to secure payment.',
+      ),
+    ).toBeNull();
     expect(window.sessionStorage.getItem(CHECKOUT_HANDOFF_KEY)).toBeNull();
     await waitFor(() =>
       expect(screen.getByLabelText('Full Name')).toBeEnabled(),
@@ -495,14 +508,9 @@ describe('CheckoutScreen', () => {
     expect(screen.getByLabelText('Street')).toHaveValue('Hopfenstraße');
     expect(screen.getByLabelText('Postal code')).toHaveValue('10115');
     expect(screen.getByLabelText('Email')).toBeEnabled();
-    expect(
-      screen.getByText(
-        'Secure Stripe card payment. No payment is taken on this page.',
-      ),
-    ).toBeVisible();
-    expect(
-      screen.queryByText(/Guest checkout uses Stripe debit card/),
-    ).toBeNull();
+    expect(screen.getByText('Secure payment with Stripe')).toBeVisible();
+    expect(screen.getByText('Visa')).toBeVisible();
+    expect(screen.getByText('Mastercard')).toBeVisible();
   });
 
   it('shows the server-owned first-purchase discount separately from shipping', async () => {

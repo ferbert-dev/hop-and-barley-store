@@ -24,11 +24,20 @@ test.describe('O2G private checkout draft', () => {
     await expect(page.getByLabel('Full Name')).toBeVisible();
     await expect(page.getByLabel('Country')).toBeVisible();
     await expect(page.getByLabel('Delivery notes')).toBeVisible();
+    await expect(page.getByLabel('Debit/Credit Card')).toBeChecked();
+    await expect(page.getByText('Visa')).toBeVisible();
+    await expect(page.getByText('Mastercard')).toBeVisible();
+    await expect(page.getByText('Secure payment with Stripe')).toBeVisible();
     await expect(
       page.getByText(
         'Save your checkout details to receive the current order quote.',
       ),
-    ).toBeVisible();
+    ).toHaveCount(0);
+    await expect(
+      page.getByText(
+        'Save your delivery details, then continue to secure payment.',
+      ),
+    ).toHaveCount(0);
     await expect(
       page.getByRole('button', { name: 'Pay with Stripe' }),
     ).toBeDisabled();
@@ -277,7 +286,7 @@ test.describe('O3 payment handoff regressions', () => {
       page.getByText('Your payment is being confirmed.'),
     ).toBeVisible();
     await expect(page.getByLabel('Full Name')).toBeDisabled();
-    await expect(page.getByLabel('Debit Card')).toBeDisabled();
+    await expect(page.getByLabel('Debit/Credit Card')).toBeDisabled();
     await expect(
       page.getByRole('button', { name: 'Save checkout details' }),
     ).toBeDisabled();
@@ -388,7 +397,7 @@ test.describe('O3 payment handoff regressions', () => {
       page.getByText('We cannot confirm the payment result yet.'),
     ).toBeVisible();
     await expect(page.getByLabel('Full Name')).toBeDisabled();
-    await expect(page.getByLabel('Debit Card')).toBeDisabled();
+    await expect(page.getByLabel('Debit/Credit Card')).toBeDisabled();
     await expect(
       page.getByRole('button', { name: 'Save checkout details' }),
     ).toBeDisabled();

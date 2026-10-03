@@ -12,6 +12,9 @@
     "./next": "./next.mjs",
     "./test": "./test.mjs"
   },
+  "devDependencies": {
+    "eslint-config-next": "16.3.6"
+  },
   "peerDependencies": {
     "@eslint/js": ">=9",
     "eslint": ">=9",
@@ -19,5 +22,10 @@
     "eslint-config-prettier": ">=10",
     "globals": ">=16",
     "typescript-eslint": ">=8"
+  },
+  "peerDependenciesMeta": {
+    "eslint-config-next": {
+      "optional": true
+    }
   }
 }

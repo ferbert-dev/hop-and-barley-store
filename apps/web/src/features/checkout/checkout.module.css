@@ -72,6 +72,22 @@
 .summary {
   align-content: start;
 }
+.summaryCard,
+.paymentSection,
+.orderSection {
+  display: grid;
+}
+.summaryCard {
+  gap: var(--hb-space-6);
+}
+.paymentSection,
+.orderSection {
+  gap: var(--hb-space-4);
+}
+.orderSection {
+  border-top: 1px solid var(--hb-color-border);
+  padding-top: var(--hb-space-5);
+}
 .successLayout {
   display: grid;
   min-height: min(32rem, 60vh);
@@ -115,14 +131,51 @@
   width: 5rem;
 }
 .payment {
-  align-items: start;
-  display: flex;
+  align-items: center;
+  background: var(--hb-color-surface-muted);
+  border: 1px solid var(--hb-color-border-strong);
+  border-radius: var(--hb-radius-md);
+  display: grid;
   gap: var(--hb-space-3);
+  grid-template-columns: auto auto minmax(0, 1fr);
+  padding: var(--hb-space-4);
+}
+.payment input {
+  accent-color: var(--hb-color-brand);
+  margin: 0;
+}
+.paymentIcon {
+  color: var(--hb-color-brand);
+  flex: none;
+}
+.paymentDetails {
+  display: grid;
+  gap: var(--hb-space-2);
+  min-width: 0;
+}
+.paymentBrands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hb-space-2);
 }
 .payment small {
   color: var(--hb-color-text-muted);
   display: block;
-  margin-top: var(--hb-space-1);
+}
+.checkoutActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hb-space-3);
+}
+.checkoutAction {
+  display: grid;
+  flex: 1 1 11rem;
+}
+.checkoutAction > * {
+  width: 100%;
+}
+.successCard .checkoutActions {
+  display: block;
 }
 .summaryDetails {
   display: grid;
@@ -149,9 +202,6 @@
 .quoteTotal {
   border-top: 1px solid var(--hb-color-border);
   padding-top: var(--hb-space-3);
-}
-.muted {
-  color: var(--hb-color-text-muted);
 }
 @media (min-width: 48rem) {
   .fields {
