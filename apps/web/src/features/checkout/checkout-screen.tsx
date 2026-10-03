@@ -5,11 +5,13 @@ import {
   isValidPostalCode,
   normalizePostalCode,
 } from '@hop-and-barley/address-policy';
+import { CreditCardIcon } from '@phosphor-icons/react/dist/ssr';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 import type { components } from '@hop-and-barley/api-client';
 
+import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { Field, Select } from '../../components/ui/field';
@@ -442,13 +444,17 @@ export function CheckoutScreen({
         <aside
           className={paymentSucceeded ? styles.successPanel : styles.summary}
         >
-          <Card className={paymentSucceeded ? styles.successCard : undefined}>
+          <Card
+            className={
+              paymentSucceeded ? styles.successCard : styles.summaryCard
+            }
+          >
             {paymentSucceeded ? null : (
-              <>
+              <div className={styles.paymentSection}>
                 <h2>Payment Method</h2>
                 <label className={styles.payment}>
                   <input
-                    aria-label="Debit Card"
+                    aria-label="Debit/Credit Card"
                     checked
                     disabled={paymentAttemptUnsettled}
                     name="paymentMethod"
@@ -456,32 +462,27 @@ export function CheckoutScreen({
                     type="radio"
                     value="stripe_debit_card"
                   />
-                  <span>
-                    <strong>Debit Card</strong>
-                    <small>
-                      {accountCheckout
-                        ? 'Secure Stripe card payment. No payment is taken on this page.'
-                        : 'Guest checkout uses Stripe debit card. No payment is taken on this page.'}
-                    </small>
+                  <CreditCardIcon
+                    aria-hidden="true"
+                    className={styles.paymentIcon}
+                    size={28}
+                    weight="duotone"
+                  />
+                  <span className={styles.paymentDetails}>
+                    <strong>Debit/Credit Card</strong>
+                    <span className={styles.paymentBrands}>
+                      <Badge tone="neutral">Visa</Badge>
+                      <Badge tone="neutral">Mastercard</Badge>
+                    </span>
+                    <small>Secure payment with Stripe</small>
                   </span>
                 </label>
-              </>
+              </div>
             )}
             {paymentSucceeded ? null : (
-              <>
+              <div className={styles.orderSection}>
                 <h2>Order Summary</h2>
                 <CheckoutQuote quote={quote} />
-                <p className={styles.muted}>
-                  Save your delivery details, then continue to secure payment.
-                </p>
-                <Button
-                  disabled={paymentAttemptUnsettled}
-                  pending={saveState === 'saving'}
-                  pendingLabel="Saving checkout details…"
-                  type="submit"
-                >
-                  Save checkout details
-                </Button>
                 {saveState === 'saved' ? (
                   <p role="status">Checkout details saved privately.</p>
                 ) : null}
@@ -490,21 +491,39 @@ export function CheckoutScreen({
                     We couldn’t save your checkout details. Try again.
                   </p>
                 ) : null}
-              </>
+              </div>
             )}
-            <CheckoutPayment
-              canPay={
-                quote?.quoteStatus === 'ready' &&
-                saveState !== 'saving' &&
-                JSON.stringify(form) === JSON.stringify(formFromDraft(quote))
-              }
-              draftId={quote?.id ?? null}
-              onAttemptUnsettledChange={setPaymentAttemptUnsettled}
-              onSucceededChange={setPaymentSucceeded}
-              successCheckClassName={styles.successCheck}
-              successClassName={styles.successContent}
-              successHeadingId="payment-success-title"
-            />
+            <div className={styles.checkoutActions}>
+              {paymentSucceeded ? null : (
+                <div className={styles.checkoutAction}>
+                  <Button
+                    disabled={paymentAttemptUnsettled}
+                    pending={saveState === 'saving'}
+                    pendingLabel="Saving checkout details…"
+                    type="submit"
+                    variant="secondary"
+                  >
+                    Save checkout details
+                  </Button>
+                </div>
+              )}
+              <div className={styles.checkoutAction}>
+                <CheckoutPayment
+                  canPay={
+                    quote?.quoteStatus === 'ready' &&
+                    saveState !== 'saving' &&
+                    JSON.stringify(form) ===
+                      JSON.stringify(formFromDraft(quote))
+                  }
+                  draftId={quote?.id ?? null}
+                  onAttemptUnsettledChange={setPaymentAttemptUnsettled}
+                  onSucceededChange={setPaymentSucceeded}
+                  successCheckClassName={styles.successCheck}
+                  successClassName={styles.successContent}
+                  successHeadingId="payment-success-title"
+                />
+              </div>
+            </div>
           </Card>
         </aside>
       </form>
@@ -513,13 +532,7 @@ export function CheckoutScreen({
 }
 
 function CheckoutQuote({ quote }: Readonly<{ quote: CheckoutDraft | null }>) {
-  if (quote === null) {
-    return (
-      <p className={styles.muted} role="status">
-        Save your checkout details to receive the current order quote.
-      </p>
-    );
-  }
+  if (quote === null) return null;
   if (quote.quoteStatus === 'empty') {
     return (
       <p role="status">Your cart is empty. Return to cart to add items.</p>
