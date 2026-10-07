@@ -5,7 +5,8 @@ import { PrismaService } from '../src/database/prisma.service';
 const describePostgres =
   process.env.RUN_O1A_POSTGRES_INTEGRATION === '1' ? describe : describe.skip;
 
-const now = new Date('2026-09-03T17:40:00.000Z');
+// Align the injected service clock with database-created timestamps during the current run.
+const now = new Date();
 const userIds = [
   '91000000-0000-4000-8000-000000000001',
   '91000000-0000-4000-8000-000000000002',
