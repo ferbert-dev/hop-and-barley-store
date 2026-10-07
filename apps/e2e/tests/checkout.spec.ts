@@ -1,5 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
+import { SHOW_LIKES_BANNER } from '../../web/src/features/likes/likes-config';
+
 const csrfToken = `v1.${'A'.repeat(43)}`;
 const handoffKey = 'hb-checkout-draft-handoff-v2';
 const paymentHandoffKey = 'hb-checkout-payment-v1';
@@ -360,17 +362,39 @@ test.describe('O3 payment handoff regressions', () => {
     await expect(
       page.getByRole('heading', { name: 'Payment successful' }),
     ).toBeVisible();
-    await expect(page.getByLabel('41 likes')).toBeVisible();
+    if (SHOW_LIKES_BANNER) {
+      await expect(page.getByLabel('41 likes')).toBeVisible();
+    } else {
+      await expect(
+        page.getByRole('complementary', { name: 'Community likes' }),
+      ).toHaveCount(0);
+    }
     expect(likes.posts).toHaveLength(0);
 
     await page.getByRole('button', { name: 'Like this shop' }).click();
 
     await expect(page.getByText('Like sent — thank you.')).toBeVisible();
-    await expect(page.getByLabel('42 likes')).toBeVisible();
+    if (SHOW_LIKES_BANNER) {
+      await expect(page.getByLabel('42 likes')).toBeVisible();
+    } else {
+      await expect(
+        page.getByRole('complementary', { name: 'Community likes' }),
+      ).toHaveCount(0);
+    }
 
     await page.getByRole('button', { name: 'Like this shop again' }).click();
 
-    await expect(page.getByLabel('43 likes')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Like this shop again' }),
+    ).toBeEnabled();
+
+    if (SHOW_LIKES_BANNER) {
+      await expect(page.getByLabel('43 likes')).toBeVisible();
+    } else {
+      await expect(
+        page.getByRole('complementary', { name: 'Community likes' }),
+      ).toHaveCount(0);
+    }
     expect(likes.posts).toEqual([paymentAttemptId, paymentAttemptId]);
     expect(likes.csrfTokens).toEqual([csrfToken, csrfToken]);
   });

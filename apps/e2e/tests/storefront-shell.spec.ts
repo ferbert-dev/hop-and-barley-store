@@ -5,6 +5,7 @@ import {
   qualityGates,
   viewportProbes,
 } from '../../web/src/quality/acceptance-matrix';
+import { SHOW_LIKES_BANNER } from '../../web/src/features/likes/likes-config';
 
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
@@ -146,7 +147,7 @@ test('has no unexpected horizontal overflow at every Q1 viewport probe', async (
   }
 });
 
-test('keeps the community Like sticker prominent and within the viewport', async ({
+test('honours configured community Like sticker visibility and viewport layout', async ({
   page,
 }) => {
   await interceptLikes(page);
@@ -161,6 +162,12 @@ test('keeps the community Like sticker prominent and within the viewport', async
     const sticker = page.getByRole('complementary', {
       name: 'Community likes',
     });
+
+    if (!SHOW_LIKES_BANNER) {
+      await expect(sticker).toHaveCount(0);
+      continue;
+    }
+
     await expect(sticker).toBeVisible();
     await expect(page.getByLabel('41 likes')).toBeVisible();
     await expect(
