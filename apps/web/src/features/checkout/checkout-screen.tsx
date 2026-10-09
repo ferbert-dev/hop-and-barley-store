@@ -477,6 +477,16 @@ export function CheckoutScreen({
                     <small>Secure payment with Stripe</small>
                   </span>
                 </label>
+                <div className={styles.sandboxHint} role="note">
+                  <strong>Stripe Sandbox</strong>
+                  <span>
+                    Test card: <code>4242 4242 4242 4242</code>
+                  </span>
+                  <small>
+                    Use any future expiry date and any 3-digit CVC. No real
+                    charge will be made.
+                  </small>
+                </div>
               </div>
             )}
             {paymentSucceeded ? null : (

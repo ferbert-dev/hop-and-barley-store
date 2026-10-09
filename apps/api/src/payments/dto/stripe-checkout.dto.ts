@@ -21,6 +21,14 @@ export class StripeCheckoutSessionDto {
   status!: 'ready_for_redirect';
 }
 
+export class StripeCheckoutStartUnavailableDto {
+  @ApiProperty({
+    enum: ['payments-disabled', 'payment-unavailable'],
+    type: String,
+  })
+  status!: 'payments-disabled' | 'payment-unavailable';
+}
+
 export class StripePaymentStatusDto {
   @ApiProperty({ format: 'uuid', type: String })
   attemptId!: string;

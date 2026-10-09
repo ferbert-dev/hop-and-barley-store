@@ -34,6 +34,9 @@ const NOT_FOUND = Object.freeze({ status: 'not-found' as const });
 const PAYMENT_UNAVAILABLE = Object.freeze({
   status: 'payment-unavailable' as const,
 });
+const PAYMENTS_DISABLED = Object.freeze({
+  status: 'payments-disabled' as const,
+});
 const ATTEMPT_UNAVAILABLE = Object.freeze({
   status: 'payment-attempt-unavailable' as const,
 });
@@ -113,7 +116,10 @@ export class StripePaymentService {
     requestedNow = new Date(),
   ): Promise<StripeCheckoutSessionDto> {
     if (!this.stripe.enabled()) {
-      throw new ServiceUnavailableException(PAYMENT_UNAVAILABLE);
+      // This guard runs before prepare() for this invocation, so this request
+      // creates no attempt or provider call. An earlier request using the same
+      // idempotency key may already have created one.
+      throw new ServiceUnavailableException(PAYMENTS_DISABLED);
     }
     const principal =
       input.cart.kind === 'account'

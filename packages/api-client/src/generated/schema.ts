@@ -1204,6 +1204,10 @@ export interface components {
             /** @enum {string} */
             status: "ready_for_redirect";
         };
+        StripeCheckoutStartUnavailableDto: {
+            /** @enum {string} */
+            status: "payments-disabled" | "payment-unavailable";
+        };
         StripePaymentStatusDto: {
             /** Format: uuid */
             attemptId: string;
@@ -2659,12 +2663,14 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Stripe Sandbox is unavailable or disabled */
+            /** @description Stripe Sandbox starts are disabled before attempt creation by this invocation (an earlier request with the same idempotency key may already have started), or provider state is unavailable after a start may have begun */
             503: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["StripeCheckoutStartUnavailableDto"];
+                };
             };
         };
     };
