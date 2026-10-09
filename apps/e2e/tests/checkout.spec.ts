@@ -402,17 +402,18 @@ test.describe('O3 payment handoff regressions', () => {
     expect(likes.csrfTokens).toEqual([csrfToken, csrfToken]);
   });
 
-  test('locks the checkout for an unknown persisted payment without starting a fresh payment', async ({
+  test('locks the checkout for an unconfirmed persisted setup without starting a fresh payment', async ({
     page,
   }) => {
+    const persistedHandoff = {
+      draftId: '30000000-0000-4000-8000-000000000001',
+      key: paymentIdempotencyKey,
+    };
     await page.addInitScript(
       ({ key, value }) => window.sessionStorage.setItem(key, value),
       {
         key: paymentHandoffKey,
-        value: JSON.stringify({
-          draftId: '30000000-0000-4000-8000-000000000001',
-          key: paymentIdempotencyKey,
-        }),
+        value: JSON.stringify(persistedHandoff),
       },
     );
     await interceptCheckoutDraft(page);
@@ -421,13 +422,25 @@ test.describe('O3 payment handoff regressions', () => {
 
     await page.goto('/checkout');
     await expect(
-      page.getByText('We cannot confirm the payment result yet.'),
+      page.getByText(/We could not confirm whether payment setup finished/),
     ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Retry payment setup' }),
+    ).toBeEnabled();
+    await expect(
+      page.getByRole('button', { name: 'Continue existing payment' }),
+    ).toHaveCount(0);
     await expect(page.getByLabel('Full Name')).toBeDisabled();
     await expect(page.getByLabel('Debit/Credit Card')).toBeDisabled();
     await expect(
       page.getByRole('button', { name: 'Save checkout details' }),
     ).toBeDisabled();
+    expect(
+      await page.evaluate(
+        (key) => sessionStorage.getItem(key),
+        paymentHandoffKey,
+      ),
+    ).toBe(JSON.stringify(persistedHandoff));
     expect(starts).toHaveLength(0);
   });
 
