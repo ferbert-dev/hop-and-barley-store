@@ -131,7 +131,7 @@ describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
 
     await expect(
       start(fixture, 'o2p-disabled-start-0001'),
-    ).rejects.toMatchObject({ response: { status: 'payment-unavailable' } });
+    ).rejects.toMatchObject({ response: { status: 'payments-disabled' } });
     expect(await prisma.paymentAttempt.count()).toBe(0);
     expect(await prisma.firstPurchaseDiscountClaim.count()).toBe(0);
     expect(gateway.createCheckoutSession).not.toHaveBeenCalled();

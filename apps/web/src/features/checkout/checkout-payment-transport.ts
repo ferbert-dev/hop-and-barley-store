@@ -15,8 +15,13 @@ export type StripeCheckoutSession =
 export type StripePaymentStatus =
   components['schemas']['StripePaymentStatusDto'];
 
+export type CheckoutPaymentFailure = 'payments_disabled' | 'unknown';
+
 export class CheckoutPaymentTransportError extends Error {
-  constructor(readonly status: number) {
+  constructor(
+    readonly status: number,
+    readonly failure: CheckoutPaymentFailure = 'unknown',
+  ) {
     super(`Checkout payment request failed with ${status}`);
   }
 }
@@ -83,7 +88,12 @@ export function createBrowserCheckoutPaymentTransport(
         error !== undefined ||
         !isStripeCheckoutSession(data)
       ) {
-        throw new CheckoutPaymentTransportError(response.status);
+        throw new CheckoutPaymentTransportError(
+          response.status,
+          response.status === 503 && isPaymentsDisabled(error)
+            ? 'payments_disabled'
+            : 'unknown',
+        );
       }
       return data;
     },
@@ -215,6 +225,10 @@ function isCsrfToken(
     typeof value.csrfToken === 'string' &&
     /^[A-Za-z0-9_-]{1,16}\.[A-Za-z0-9_-]{43}$/u.test(value.csrfToken)
   );
+}
+
+function isPaymentsDisabled(value: unknown): boolean {
+  return isRecord(value) && value.status === 'payments-disabled';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

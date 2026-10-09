@@ -37,6 +37,9 @@ describe('CheckoutScreen', () => {
     expect(screen.getByText('Visa')).toBeVisible();
     expect(screen.getByText('Mastercard')).toBeVisible();
     expect(screen.getByText('Secure payment with Stripe')).toBeVisible();
+    expect(screen.getByText('Stripe Sandbox')).toBeVisible();
+    expect(screen.getByText('4242 4242 4242 4242')).toBeVisible();
+    expect(screen.getByText(/any future expiry date/)).toBeVisible();
     expect(
       screen.queryByText(
         'Save your checkout details to receive the current order quote.',
