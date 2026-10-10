@@ -37,6 +37,7 @@ import { IdempotencyKeyPipe } from '../orders/idempotency-key.pipe';
 import {
   StartStripeCheckoutDto,
   StripeCheckoutSessionDto,
+  StripeCheckoutStartUnavailableDto,
   StripePaymentStatusDto,
 } from './dto/stripe-checkout.dto';
 import { StripePaymentService } from './stripe-payment.service';
@@ -72,7 +73,9 @@ export class PaymentsController {
     description: 'Quote or stock is unavailable',
   })
   @ApiServiceUnavailableResponse({
-    description: 'Stripe Sandbox is unavailable or disabled',
+    description:
+      'Stripe Sandbox starts are disabled before attempt creation, or provider state is unavailable after a start may have begun',
+    type: StripeCheckoutStartUnavailableDto,
   })
   async start(
     @Headers('idempotency-key') rawIdempotencyKey: string | undefined,

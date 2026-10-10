@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '../../components/ui/button';
 import { PurchaseLikeCta } from '../likes/purchase-like-cta';
-import { createBrowserCheckoutPaymentTransport } from './checkout-payment-transport';
+import {
+  CheckoutPaymentTransportError,
+  createBrowserCheckoutPaymentTransport,
+} from './checkout-payment-transport';
 
 export const PAYMENT_HANDOFF_KEY = 'hb-checkout-payment-v1';
 type Attempt = { draftId: string; key: string; attemptId?: string };
@@ -17,6 +20,7 @@ type State =
   | 'succeeded'
   | 'failed'
   | 'cancelled'
+  | 'unavailable'
   | 'unknown';
 
 // No address, amount, credentials or hosted URL is persisted here. The server
@@ -62,6 +66,7 @@ export function CheckoutPayment({
 }>) {
   const [state, setState] = useState<State>('checking');
   const [hasAttempt, setHasAttempt] = useState(false);
+  const [hasConfirmedAttempt, setHasConfirmedAttempt] = useState(false);
   const [paymentReturn, setPaymentReturn] = useState(false);
   const [returnTimedOut, setReturnTimedOut] = useState(false);
   const [succeededAttemptId, setSucceededAttemptId] = useState<string | null>(
@@ -102,6 +107,7 @@ export function CheckoutPayment({
         const saved = readAttempt();
         attempt.current = saved;
         setHasAttempt(saved !== null);
+        setHasConfirmedAttempt(saved?.attemptId !== undefined);
         if (!saved) {
           if (!cancelled)
             setState(
@@ -154,8 +160,8 @@ export function CheckoutPayment({
     busy.current = true;
     operation.current++;
     setState('starting');
+    let saved = attempt.current;
     try {
-      let saved = attempt.current;
       if (!saved) {
         if (!canPay || !draftId) throw new Error('Save checkout first');
         saved = { draftId, key: window.crypto.randomUUID() };
@@ -175,9 +181,41 @@ export function CheckoutPayment({
       saved = { ...saved, attemptId: result.attemptId };
       window.sessionStorage.setItem(PAYMENT_HANDOFF_KEY, JSON.stringify(saved));
       attempt.current = saved;
+      setHasConfirmedAttempt(true);
       if (mounted.current) window.location.assign(result.checkoutUrl);
-    } catch {
-      if (mounted.current) setState('unknown');
+    } catch (error) {
+      if (
+        saved &&
+        !saved.attemptId &&
+        error instanceof CheckoutPaymentTransportError &&
+        error.failure === 'payments_disabled'
+      ) {
+        try {
+          const persisted = readAttempt();
+          if (
+            !persisted ||
+            persisted.attemptId ||
+            persisted.draftId !== saved.draftId ||
+            persisted.key !== saved.key
+          ) {
+            throw new Error('Payment handoff changed');
+          }
+          window.sessionStorage.removeItem(PAYMENT_HANDOFF_KEY);
+          if (window.sessionStorage.getItem(PAYMENT_HANDOFF_KEY) !== null) {
+            throw new Error('Payment handoff could not be cleared');
+          }
+          attempt.current = null;
+          if (mounted.current) {
+            setHasAttempt(false);
+            setHasConfirmedAttempt(false);
+            setState('unavailable');
+          }
+        } catch {
+          if (mounted.current) setState('unknown');
+        }
+      } else if (mounted.current) {
+        setState('unknown');
+      }
     } finally {
       busy.current = false;
     }
@@ -248,6 +286,7 @@ export function CheckoutPayment({
     );
 
   const terminal = state === 'failed' || state === 'cancelled';
+  const unavailable = state === 'unavailable';
   const returnedPending = paymentReturn && state === 'ready_for_redirect';
   return (
     <div aria-live="polite">
@@ -258,19 +297,23 @@ export function CheckoutPayment({
             ? 'Checking payment status…'
             : state === 'processing'
               ? 'Your payment is being confirmed. Please do not start another payment.'
-              : terminal
-                ? 'This payment was not completed. Your cart has been kept.'
-                : state === 'ready_for_redirect'
-                  ? returnedPending && returnTimedOut
-                    ? 'Your payment is still being confirmed. Check its status again before trying anything else.'
-                    : returnedPending
-                      ? 'Your payment is being confirmed. Please do not start another payment.'
-                      : 'Your secure payment is ready to continue.'
-                  : 'We cannot confirm the payment result yet. Check its status before trying again.'}
+              : unavailable
+                ? 'Test payment is currently unavailable. Your cart and checkout details are safe.'
+                : terminal
+                  ? 'This payment was not completed. Your cart has been kept.'
+                  : state === 'ready_for_redirect'
+                    ? returnedPending && returnTimedOut
+                      ? 'Your payment is still being confirmed. Check its status again before trying anything else.'
+                      : returnedPending
+                        ? 'Your payment is being confirmed. Please do not start another payment.'
+                        : 'Your secure payment is ready to continue.'
+                    : state === 'unknown' && hasAttempt && !hasConfirmedAttempt
+                      ? 'We could not confirm whether payment setup finished. Retry the same payment setup before starting a different payment.'
+                      : 'We cannot confirm the payment result yet. Check its status before trying again.'}
       </p>
       {state === 'starting' || state === 'checking' ? null : (
         <>
-          {!terminal ? (
+          {!terminal && !unavailable ? (
             <Button onClick={() => void reconcile()} variant="secondary">
               Check payment status
             </Button>
@@ -279,7 +322,14 @@ export function CheckoutPayment({
           (state === 'ready_for_redirect' || state === 'unknown') &&
           hasAttempt ? (
             <Button onClick={() => void start()}>
-              Continue existing payment
+              {hasConfirmedAttempt
+                ? 'Continue existing payment'
+                : 'Retry payment setup'}
+            </Button>
+          ) : null}
+          {unavailable ? (
+            <Button disabled={!canPay || !draftId} onClick={() => void start()}>
+              Try payment again
             </Button>
           ) : null}
           {terminal ? (
@@ -290,6 +340,7 @@ export function CheckoutPayment({
                   window.sessionStorage.removeItem(PAYMENT_HANDOFF_KEY);
                   attempt.current = null;
                   setHasAttempt(false);
+                  setHasConfirmedAttempt(false);
                   setState('idle');
                 } catch {
                   setState('unknown');

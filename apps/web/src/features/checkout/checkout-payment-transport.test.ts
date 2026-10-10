@@ -210,6 +210,48 @@ describe('checkout payment browser transport', () => {
       idempotencyKey,
     );
   });
+
+  it('classifies only the typed pre-attempt disabled response as definitive', async () => {
+    const fetch = vi
+      .fn<(request: Request) => Promise<Response>>()
+      .mockResolvedValueOnce(jsonResponse({ csrfToken }))
+      .mockResolvedValueOnce(
+        jsonResponse({ status: 'payments-disabled' }, 503),
+      );
+    vi.stubGlobal('fetch', fetch);
+
+    await expect(
+      createBrowserCheckoutPaymentTransport().start(
+        checkoutDraftId,
+        idempotencyKey,
+      ),
+    ).rejects.toMatchObject({
+      failure: 'payments_disabled',
+      status: 503,
+    });
+  });
+
+  it.each([
+    { status: 'payment-unavailable' },
+    { status: 'payments-disabled', httpStatus: 502 },
+    { status: 'unexpected' },
+  ])(
+    'keeps an ambiguous start response in unknown recovery: %o',
+    async ({ status, httpStatus = 503 }) => {
+      const fetch = vi
+        .fn<(request: Request) => Promise<Response>>()
+        .mockResolvedValueOnce(jsonResponse({ csrfToken }))
+        .mockResolvedValueOnce(jsonResponse({ status }, httpStatus));
+      vi.stubGlobal('fetch', fetch);
+
+      await expect(
+        createBrowserCheckoutPaymentTransport().start(
+          checkoutDraftId,
+          idempotencyKey,
+        ),
+      ).rejects.toMatchObject({ failure: 'unknown', status: httpStatus });
+    },
+  );
 });
 
 function jsonResponse(body: unknown, status = 200) {

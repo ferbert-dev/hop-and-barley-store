@@ -9,13 +9,15 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CheckoutPayment, PAYMENT_HANDOFF_KEY } from './checkout-payment';
+import { CheckoutPaymentTransportError } from './checkout-payment-transport';
 
 const transport = vi.hoisted(() => ({
   start: vi.fn(),
   status: vi.fn(),
   reconcile: vi.fn(),
 }));
-vi.mock('./checkout-payment-transport', () => ({
+vi.mock('./checkout-payment-transport', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./checkout-payment-transport')>()),
   createBrowserCheckoutPaymentTransport: () => transport,
 }));
 const draftId = '30000000-0000-4000-8000-000000000001';
@@ -207,18 +209,41 @@ describe('checkout payment', () => {
     await user.click(
       await screen.findByRole('button', { name: 'Pay with Stripe' }),
     );
-    await screen.findByText(/cannot confirm/);
+    await screen.findByText(/whether payment setup finished/);
     const saved = JSON.parse(
       window.sessionStorage.getItem(PAYMENT_HANDOFF_KEY)!,
     );
     expect(transport.start).toHaveBeenCalledWith(draftId, saved.key);
     await user.click(
-      screen.getByRole('button', { name: 'Continue existing payment' }),
+      screen.getByRole('button', { name: 'Retry payment setup' }),
     );
     await waitFor(() => expect(transport.start).toHaveBeenCalledTimes(2));
     expect(transport.start.mock.calls[1]).toEqual(
       transport.start.mock.calls[0],
     );
+  });
+
+  it('clears an unconfirmed handoff after a definitive disabled-start response', async () => {
+    transport.start.mockRejectedValue(
+      new CheckoutPaymentTransportError(503, 'payments_disabled'),
+    );
+    const user = userEvent.setup();
+    render(<CheckoutPayment canPay draftId={draftId} />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Pay with Stripe' }),
+    );
+
+    expect(
+      await screen.findByText(/Test payment is currently unavailable/),
+    ).toBeInTheDocument();
+    expect(window.sessionStorage.getItem(PAYMENT_HANDOFF_KEY)).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Try payment again' }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole('button', { name: 'Check payment status' }),
+    ).not.toBeInTheDocument();
   });
 
   it('issues only one start while a duplicate click is unresolved', async () => {
@@ -252,7 +277,7 @@ describe('checkout payment', () => {
     await user.click(
       await screen.findByRole('button', { name: 'Pay with Stripe' }),
     );
-    await screen.findByText(/cannot confirm/);
+    await screen.findByText(/whether payment setup finished/);
     const firstKey = JSON.parse(
       window.sessionStorage.getItem(PAYMENT_HANDOFF_KEY)!,
     ).key;
@@ -260,10 +285,29 @@ describe('checkout payment', () => {
 
     render(<CheckoutPayment canPay draftId={draftId} />);
     await user.click(
-      await screen.findByRole('button', { name: 'Continue existing payment' }),
+      await screen.findByRole('button', { name: 'Retry payment setup' }),
     );
     await waitFor(() => expect(transport.start).toHaveBeenCalledTimes(2));
     expect(transport.start.mock.calls[1]).toEqual([draftId, firstKey]);
+  });
+
+  it('labels a legacy handoff without an attempt id as unconfirmed setup', async () => {
+    window.sessionStorage.setItem(
+      PAYMENT_HANDOFF_KEY,
+      JSON.stringify({ draftId, key }),
+    );
+    transport.status.mockResolvedValue(null);
+    render(<CheckoutPayment canPay draftId={draftId} />);
+
+    expect(
+      await screen.findByText(/whether payment setup finished/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Retry payment setup' }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole('button', { name: 'Continue existing payment' }),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps processing distinct from failure and reconciles without a new charge', async () => {

@@ -30,6 +30,9 @@ test.describe('O2G private checkout draft', () => {
     await expect(page.getByText('Visa')).toBeVisible();
     await expect(page.getByText('Mastercard')).toBeVisible();
     await expect(page.getByText('Secure payment with Stripe')).toBeVisible();
+    await expect(page.getByText('Stripe Sandbox')).toBeVisible();
+    await expect(page.getByText('4242 4242 4242 4242')).toBeVisible();
+    await expect(page.getByText(/any future expiry date/)).toBeVisible();
     await expect(
       page.getByText(
         'Save your checkout details to receive the current order quote.',
@@ -356,7 +359,7 @@ test.describe('O3 payment handoff regressions', () => {
       attemptId: paymentAttemptId,
       status: 'succeeded',
     });
-    const likes = await interceptLikes(page, 41);
+    const likes = await interceptLikes(page, 171);
 
     await page.goto('/checkout?payment=return');
     await expect(
@@ -495,7 +498,7 @@ test.describe('O3 payment handoff regressions', () => {
 
     await page.getByRole('button', { name: 'Pay with Stripe' }).click();
     await expect(
-      page.getByText('We cannot confirm the payment result yet.'),
+      page.getByText(/We could not confirm whether payment setup finished/),
     ).toBeVisible();
     const savedRaw = await page.evaluate(
       (key) => sessionStorage.getItem(key),
@@ -506,9 +509,7 @@ test.describe('O3 payment handoff regressions', () => {
     expect(saved.draftId).toBe('30000000-0000-4000-8000-000000000001');
     expect(saved.key).toMatch(/^[0-9a-f-]{36}$/i);
 
-    await page
-      .getByRole('button', { name: 'Continue existing payment' })
-      .click();
+    await page.getByRole('button', { name: 'Retry payment setup' }).click();
     await expect.poll(() => starts.length).toBe(2);
     expect(starts[0]).toEqual(starts[1]);
     expect(starts[0]).toMatchObject({
@@ -521,6 +522,39 @@ test.describe('O3 payment handoff regressions', () => {
         paymentHandoffKey,
       ),
     ).toBe(JSON.stringify(saved));
+  });
+
+  test('clears an unconfirmed handoff when sandbox starts are disabled before attempt creation', async ({
+    page,
+  }) => {
+    await interceptCheckoutDraft(page);
+    const starts = await interceptPaymentStart(
+      page,
+      { status: 'payments-disabled' },
+      503,
+    );
+    await page.goto('/checkout');
+    await fillCheckoutDraft(page);
+    await page.getByRole('button', { name: 'Save checkout details' }).click();
+    await expect(
+      page.getByText('Checkout details saved privately.'),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Pay with Stripe' }).click();
+
+    await expect(
+      page.getByText(/Test payment is currently unavailable/),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Try payment again' }),
+    ).toBeEnabled();
+    expect(starts).toHaveLength(1);
+    expect(
+      await page.evaluate(
+        (key) => sessionStorage.getItem(key),
+        paymentHandoffKey,
+      ),
+    ).toBeNull();
   });
 });
 

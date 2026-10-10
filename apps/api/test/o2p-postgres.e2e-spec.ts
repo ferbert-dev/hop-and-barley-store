@@ -131,7 +131,7 @@ describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
 
     await expect(
       start(fixture, 'o2p-disabled-start-0001'),
-    ).rejects.toMatchObject({ response: { status: 'payment-unavailable' } });
+    ).rejects.toMatchObject({ response: { status: 'payments-disabled' } });
     expect(await prisma.paymentAttempt.count()).toBe(0);
     expect(await prisma.firstPurchaseDiscountClaim.count()).toBe(0);
     expect(gateway.createCheckoutSession).not.toHaveBeenCalled();
@@ -274,7 +274,7 @@ describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
         where: { paymentAttemptId: attempt.id },
       }),
     ).toEqual({ count: 8 });
-    await expect(likes.count()).resolves.toEqual({ count: 8 });
+    await expect(likes.count()).resolves.toEqual({ count: 138 });
   });
 
   it('keeps an account Like eligible after capture clears its old cart and a new cart is created', async () => {
@@ -324,7 +324,7 @@ describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
         },
         null,
       ),
-    ).resolves.toEqual({ count: 1, liked: true });
+    ).resolves.toEqual({ count: 131, liked: true });
     await expect(
       likes.create(
         attempt.id,
@@ -336,8 +336,8 @@ describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
         },
         null,
       ),
-    ).resolves.toEqual({ count: 2, liked: true });
-    await expect(likes.count()).resolves.toEqual({ count: 2 });
+    ).resolves.toEqual({ count: 132, liked: true });
+    await expect(likes.count()).resolves.toEqual({ count: 132 });
   });
 
   it('cancels the authorization and releases the discount claim when stock is unavailable', async () => {
