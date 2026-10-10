@@ -60,6 +60,9 @@ jobs:
       - name: Select the tagged source
         if: inputs.operation == 'release'
         run: git checkout --detach "$RELEASE_SHA"
+      - name: Prefer the managed public image mirror
+        if: inputs.operation == 'release'
+        run: sudo --preserve-env=CI,GITHUB_ACTIONS,RUNNER_ENVIRONMENT,RUNNER_OS python3 -B scripts/configure_ci_docker_mirror.py
       - name: Build immutable Linux images
         if: inputs.operation == 'release'
         run: |
