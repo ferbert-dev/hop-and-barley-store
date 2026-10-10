@@ -42,6 +42,8 @@ jobs:
         run: pnpm clean
       - name: Verify CI workflow contract
         run: pnpm ci:contract
+      - name: Test ephemeral Docker mirror safeguards
+        run: python3 -B -m unittest scripts/test_configure_ci_docker_mirror.py
       - name: Verify secret-protection hooks
         run: pnpm secret-hooks:check
       - name: Verify generated API contract stability
@@ -62,6 +64,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Prefer the managed public image mirror
+        run: sudo --preserve-env=CI,GITHUB_ACTIONS,RUNNER_ENVIRONMENT,RUNNER_OS python3 -B scripts/configure_ci_docker_mirror.py
       - name: Install pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
@@ -119,6 +123,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Prefer the managed public image mirror
+        run: sudo --preserve-env=CI,GITHUB_ACTIONS,RUNNER_ENVIRONMENT,RUNNER_OS python3 -B scripts/configure_ci_docker_mirror.py
       - name: Install pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
@@ -188,6 +194,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Prefer the managed public image mirror
+        run: sudo --preserve-env=CI,GITHUB_ACTIONS,RUNNER_ENVIRONMENT,RUNNER_OS python3 -B scripts/configure_ci_docker_mirror.py
       - name: Verify restricted deployment receiver
         run: python3 -B -m unittest discover -s deploy -p 'test_*.py'
       - name: Validate production topology and Caddy configuration

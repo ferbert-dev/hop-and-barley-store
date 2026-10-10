@@ -359,7 +359,7 @@ test.describe('O3 payment handoff regressions', () => {
       attemptId: paymentAttemptId,
       status: 'succeeded',
     });
-    const likes = await interceptLikes(page, 41);
+    const likes = await interceptLikes(page, 171);
 
     await page.goto('/checkout?payment=return');
     await expect(
@@ -569,7 +569,6 @@ test.describe('O3 payment handoff regressions', () => {
       ),
     ).toBeNull();
   });
-
   test('preserves a response-lost handoff when a same-key retry is later disabled', async ({
     page,
   }) => {

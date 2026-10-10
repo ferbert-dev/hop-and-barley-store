@@ -10,7 +10,7 @@ import { SHOW_LIKES_BANNER } from '../../web/src/features/likes/likes-config';
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
 
-async function interceptLikes(page: Page, count = 41) {
+async function interceptLikes(page: Page, count = 171) {
   await page.route('**/api/v1/likes', (route) =>
     route.fulfill({
       body: JSON.stringify({ count }),
@@ -169,7 +169,7 @@ test('honours configured community Like sticker visibility and viewport layout',
     }
 
     await expect(sticker).toBeVisible();
-    await expect(page.getByLabel('41 likes')).toBeVisible();
+    await expect(page.getByLabel('171 likes')).toBeVisible();
     await expect(
       sticker.getByText('Complete a test purchase to leave your like.'),
     ).toBeVisible();

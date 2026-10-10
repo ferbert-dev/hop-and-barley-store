@@ -13,6 +13,17 @@ function read(relativePath) {
   return readFileSync(join(repositoryRoot, relativePath), 'utf8');
 }
 
+function jobSection(workflow, jobName) {
+  const marker = `  ${jobName}:\n`;
+  const start = workflow.indexOf(marker);
+  assert.notEqual(start, -1, `${jobName} job must exist`);
+  const following = workflow.slice(start + marker.length);
+  const nextJob = following.search(/^  [a-z0-9-]+:\n/mu);
+  return nextJob === -1
+    ? workflow.slice(start)
+    : workflow.slice(start, start + marker.length + nextJob);
+}
+
 test('the PR CI workflow is pinned, least-privilege, and covers every merge gate', () => {
   const workflow = read('.github/workflows/ci.yml');
 
@@ -135,6 +146,47 @@ test('browser CI runs the behavioral disposable-settings contract', () => {
   );
   assert.match(workflow, /pnpm ci:contract/);
   assert.match(workflow, /node scripts\/configure-ci-browser-env\.mjs/);
+});
+
+test('Docker consumers configure the managed mirror before first use', () => {
+  const ciWorkflow = read('.github/workflows/ci.yml');
+  const deployWorkflow = read('.github/workflows/deploy.yml');
+  const mirrorCommand =
+    'sudo --preserve-env=CI,GITHUB_ACTIONS,RUNNER_ENVIRONMENT,RUNNER_OS python3 -B scripts/configure_ci_docker_mirror.py';
+
+  assert.ok(!jobSection(ciWorkflow, 'quality').includes(mirrorCommand));
+  assert.match(
+    jobSection(ciWorkflow, 'quality'),
+    /python3 -B -m unittest scripts\/test_configure_ci_docker_mirror\.py/,
+  );
+
+  for (const [jobName, firstDockerConsumer] of [
+    ['postgresql', 'pnpm test:catalog:postgres'],
+    ['browser', 'docker compose up -d --build --wait'],
+    ['deployment-config', 'sh deploy/test-config.sh'],
+  ]) {
+    const job = jobSection(ciWorkflow, jobName);
+    assert.equal(job.split(mirrorCommand).length - 1, 1, jobName);
+    assert.ok(
+      job.indexOf(mirrorCommand) > job.indexOf('actions/checkout@'),
+      jobName,
+    );
+    assert.ok(
+      job.indexOf(mirrorCommand) < job.indexOf(firstDockerConsumer),
+      jobName,
+    );
+  }
+
+  const deployJob = jobSection(deployWorkflow, 'deploy');
+  assert.equal(deployJob.split(mirrorCommand).length - 1, 1);
+  assert.match(
+    deployJob,
+    /- name: Prefer the managed public image mirror\n\s+if: inputs\.operation == 'release'\n\s+run: sudo --preserve-env=CI,GITHUB_ACTIONS,RUNNER_ENVIRONMENT,RUNNER_OS python3 -B scripts\/configure_ci_docker_mirror\.py/u,
+  );
+  assert.ok(
+    deployJob.indexOf(mirrorCommand) <
+      deployJob.indexOf('docker build --platform linux/amd64'),
+  );
 });
 
 test('the security override and Docker context privacy guards remain exact', () => {

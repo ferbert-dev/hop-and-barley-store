@@ -56,7 +56,7 @@ describe('LikesService', () => {
         },
         null,
       ),
-    ).resolves.toEqual({ count: 41, liked: true });
+    ).resolves.toEqual({ count: 171, liked: true });
     expect(findFirst).toHaveBeenCalledWith({
       select: {
         checkoutDraft: {
@@ -155,7 +155,7 @@ describe('LikesService', () => {
         },
         null,
       ),
-    ).resolves.toEqual({ count: 41, liked: true });
+    ).resolves.toEqual({ count: 171, liked: true });
     expect(upsert).toHaveBeenCalledTimes(2);
   });
 
@@ -197,13 +197,13 @@ describe('LikesService', () => {
   });
 
   it('returns only the summed aggregate count', async () => {
-    await expect(service.count()).resolves.toEqual({ count: 41 });
+    await expect(service.count()).resolves.toEqual({ count: 171 });
     expect(aggregate).toHaveBeenCalledWith({ _sum: { count: true } });
   });
 
-  it('returns zero when no purchase counter exists', async () => {
+  it('returns the public baseline when no purchase counter exists', async () => {
     aggregate.mockResolvedValue({ _sum: { count: null } });
 
-    await expect(service.count()).resolves.toEqual({ count: 0 });
+    await expect(service.count()).resolves.toEqual({ count: 130 });
   });
 });

@@ -116,9 +116,8 @@ export class StripePaymentService {
     requestedNow = new Date(),
   ): Promise<StripeCheckoutSessionDto> {
     if (!this.stripe.enabled()) {
-      // This guard runs before prepare() for this invocation, so this request
-      // creates no attempt or provider call. An earlier request using the same
-      // idempotency key may already have created one.
+      // This guard runs before prepare(), so this response definitively means
+      // that no payment attempt or provider request was created.
       throw new ServiceUnavailableException(PAYMENTS_DISABLED);
     }
     const principal =

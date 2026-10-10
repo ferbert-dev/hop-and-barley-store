@@ -18,12 +18,12 @@ describe('LikesController', () => {
       { getOrThrow: jest.fn().mockReturnValue('local-http') } as never,
     );
     jest.clearAllMocks();
-    count.mockResolvedValue({ count: 7 });
-    create.mockResolvedValue({ count: 8, liked: true });
+    count.mockResolvedValue({ count: 137 });
+    create.mockResolvedValue({ count: 138, liked: true });
   });
 
   it('serves the public aggregate', async () => {
-    await expect(controller.count()).resolves.toEqual({ count: 7 });
+    await expect(controller.count()).resolves.toEqual({ count: 137 });
     expect(count).toHaveBeenCalledWith();
   });
 
@@ -44,7 +44,7 @@ describe('LikesController', () => {
     const response = { setHeader: jest.fn() };
     await expect(
       controller.create(dto, request as never, response as never),
-    ).resolves.toEqual({ count: 8, liked: true });
+    ).resolves.toEqual({ count: 138, liked: true });
     expect(create).toHaveBeenCalledWith(
       '11111111-1111-4111-8111-111111111111',
       request.activeCart,

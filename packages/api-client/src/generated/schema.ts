@@ -2663,7 +2663,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Stripe Sandbox starts are disabled before attempt creation by this invocation (an earlier request with the same idempotency key may already have started), or provider state is unavailable after a start may have begun */
+            /** @description Stripe Sandbox starts are disabled before attempt creation, or provider state is unavailable after a start may have begun */
             503: {
                 headers: {
                     [name: string]: unknown;

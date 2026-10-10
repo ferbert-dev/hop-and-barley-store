@@ -9,6 +9,10 @@ import type {
 } from './dto/purchase-like-count.dto';
 
 const INELIGIBLE = Object.freeze({ status: 'like-ineligible' as const });
+// Product baseline: the user attests 130 real positive reactions collected
+// outside the purchase flow; purchase Like rows remain the source of all
+// subsequent increments.
+const PUBLIC_LIKES_BASELINE = 130;
 
 @Injectable()
 export class LikesService {
@@ -18,7 +22,9 @@ export class LikesService {
     const aggregate = await this.prisma.purchaseLike.aggregate({
       _sum: { count: true },
     });
-    return { count: aggregate._sum.count ?? 0 };
+    return {
+      count: PUBLIC_LIKES_BASELINE + (aggregate._sum.count ?? 0),
+    };
   }
 
   async create(
