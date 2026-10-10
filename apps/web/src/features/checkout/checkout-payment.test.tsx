@@ -246,6 +246,49 @@ describe('checkout payment', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('preserves an ambiguous handoff when a same-key retry is later disabled', async () => {
+    transport.start
+      .mockRejectedValueOnce(new Error('response lost'))
+      .mockRejectedValueOnce(
+        new CheckoutPaymentTransportError(503, 'payments_disabled'),
+      );
+    const user = userEvent.setup();
+    const payment = render(<CheckoutPayment canPay draftId={draftId} />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Pay with Stripe' }),
+    );
+    await screen.findByText(/whether payment setup finished/);
+    const saved = window.sessionStorage.getItem(PAYMENT_HANDOFF_KEY);
+    if (saved === null) throw new Error('Payment handoff was not persisted');
+    const parsed = JSON.parse(saved) as { draftId: string; key: string };
+
+    await user.click(
+      screen.getByRole('button', { name: 'Retry payment setup' }),
+    );
+    await waitFor(() => expect(transport.start).toHaveBeenCalledTimes(2));
+    expect(transport.start.mock.calls).toEqual([
+      [draftId, parsed.key],
+      [draftId, parsed.key],
+    ]);
+    expect(window.sessionStorage.getItem(PAYMENT_HANDOFF_KEY)).toBe(saved);
+    expect(
+      screen.getByText(/whether payment setup finished/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Test payment is currently unavailable/),
+    ).not.toBeInTheDocument();
+
+    payment.unmount();
+    transport.status.mockResolvedValue(null);
+    render(<CheckoutPayment canPay draftId={draftId} />);
+
+    expect(
+      await screen.findByRole('button', { name: 'Retry payment setup' }),
+    ).toBeEnabled();
+    expect(window.sessionStorage.getItem(PAYMENT_HANDOFF_KEY)).toBe(saved);
+  });
+
   it('issues only one start while a duplicate click is unresolved', async () => {
     let resolveStart!: (value: {
       attemptId: string;

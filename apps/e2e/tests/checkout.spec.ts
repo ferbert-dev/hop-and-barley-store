@@ -569,6 +569,60 @@ test.describe('O3 payment handoff regressions', () => {
       ),
     ).toBeNull();
   });
+  test('preserves a response-lost handoff when a same-key retry is later disabled', async ({
+    page,
+  }) => {
+    await interceptCheckoutDraft(page);
+    await interceptPaymentStatus(page, undefined, 404);
+    const starts = await interceptPaymentStart(page, undefined, 503, [
+      { body: undefined, status: 503 },
+      { body: { status: 'payments-disabled' }, status: 503 },
+    ]);
+    await page.goto('/checkout');
+    await fillCheckoutDraft(page);
+    await page.getByRole('button', { name: 'Save checkout details' }).click();
+    await expect(
+      page.getByText('Checkout details saved privately.'),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Pay with Stripe' }).click();
+    await expect(
+      page.getByText(/We could not confirm whether payment setup finished/),
+    ).toBeVisible();
+    const saved = await page.evaluate(
+      (key) => sessionStorage.getItem(key),
+      paymentHandoffKey,
+    );
+    if (saved === null) throw new Error('Payment handoff was not persisted');
+
+    await page.getByRole('button', { name: 'Retry payment setup' }).click();
+    await expect.poll(() => starts.length).toBe(2);
+    expect(starts[0]).toEqual(starts[1]);
+    expect(
+      await page.evaluate(
+        (key) => sessionStorage.getItem(key),
+        paymentHandoffKey,
+      ),
+    ).toBe(saved);
+    await expect(
+      page.getByText(/We could not confirm whether payment setup finished/),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Test payment is currently unavailable/),
+    ).toHaveCount(0);
+
+    await page.reload();
+
+    await expect(
+      page.getByRole('button', { name: 'Retry payment setup' }),
+    ).toBeEnabled();
+    expect(
+      await page.evaluate(
+        (key) => sessionStorage.getItem(key),
+        paymentHandoffKey,
+      ),
+    ).toBe(saved);
+  });
 });
 
 async function interceptSuccessfulLogin(
@@ -600,6 +654,7 @@ async function interceptPaymentStart(
   page: Page,
   body: unknown = undefined,
   status = 503,
+  responses?: ReadonlyArray<Readonly<{ body: unknown; status: number }>>,
 ) {
   const starts: Array<{ draftId: string; idempotencyKey: string }> = [];
   await page.route(
@@ -616,7 +671,8 @@ async function interceptPaymentStart(
         draftId: payload.checkoutDraftId,
         idempotencyKey: route.request().headers()['idempotency-key'] ?? '',
       });
-      await fulfill(route, body, status);
+      const response = responses?.[starts.length - 1] ?? { body, status };
+      await fulfill(route, response.body, response.status);
     },
   );
   return starts;

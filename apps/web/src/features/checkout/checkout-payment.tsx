@@ -161,6 +161,7 @@ export function CheckoutPayment({
     operation.current++;
     setState('starting');
     let saved = attempt.current;
+    let createdNewHandoff = false;
     try {
       if (!saved) {
         if (!canPay || !draftId) throw new Error('Save checkout first');
@@ -170,6 +171,7 @@ export function CheckoutPayment({
           JSON.stringify(saved),
         );
         attempt.current = saved;
+        createdNewHandoff = true;
         setHasAttempt(true);
       }
       const result = await createBrowserCheckoutPaymentTransport().start(
@@ -185,6 +187,7 @@ export function CheckoutPayment({
       if (mounted.current) window.location.assign(result.checkoutUrl);
     } catch (error) {
       if (
+        createdNewHandoff &&
         saved &&
         !saved.attemptId &&
         error instanceof CheckoutPaymentTransportError &&

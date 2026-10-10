@@ -144,6 +144,9 @@ describe('auth environment validation', () => {
   });
 
   it('fails closed unless the complete test-only Stripe contract is configured', () => {
+    expect(validateEnvironment(BASE)).toMatchObject({
+      STRIPE_PAYMENTS_ENABLED: false,
+    });
     expect(() =>
       validateEnvironment({ ...BASE, STRIPE_PAYMENTS_ENABLED: true }),
     ).toThrow(/Stripe Sandbox configuration is incomplete/);

@@ -4,10 +4,12 @@ set -eu
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 temporary_dir=$(mktemp -d)
 trap 'rm -rf "$temporary_dir"' EXIT HUP INT TERM
-env_file="$temporary_dir/env"
-rendered_file="$temporary_dir/compose.json"
+default_env_file="$temporary_dir/default.env"
+default_rendered_file="$temporary_dir/default-compose.json"
+sandbox_env_file="$temporary_dir/sandbox.env"
+sandbox_rendered_file="$temporary_dir/sandbox-compose.json"
 
-cat >"$env_file" <<'EOF'
+cat >"$default_env_file" <<'EOF'
 COMPOSE_PROJECT_NAME=hopbarley
 RELEASE_ID=0123456789abcdef0123456789abcdef01234567
 WEB_IMAGE=hopbarley/web:0123456789abcdef0123456789abcdef01234567
@@ -22,10 +24,17 @@ DATABASE_URL=postgresql://hopbarley:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 AUTH_CSRF_KEYRING=v1:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 CART_CSRF_KEYRING=v1:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 EOF
-chmod 600 "$env_file"
+chmod 600 "$default_env_file"
 
-docker compose --env-file "$env_file" -f "$script_dir/compose.prod.yaml" \
-  --profile operations config --format json >"$rendered_file"
+env \
+  -u STRIPE_PAYMENTS_ENABLED \
+  -u STRIPE_SANDBOX_SECRET_KEY \
+  -u STRIPE_SANDBOX_WEBHOOK_SECRET \
+  -u STRIPE_PAYMENT_METHOD_CONFIGURATION_ID \
+  -u STRIPE_CHECKOUT_SUCCESS_URL \
+  -u STRIPE_CHECKOUT_CANCEL_URL \
+  docker compose --env-file "$default_env_file" -f "$script_dir/compose.prod.yaml" \
+  --profile operations config --format json >"$default_rendered_file"
 
 jq -e '
   .name == "hopbarley" and
@@ -40,12 +49,46 @@ jq -e '
   .services.api.environment.AUTH_COOKIE_MODE == "secure-https" and
   .services.api.environment.CART_COOKIE_MODE == "secure-https" and
   .services.api.environment.STRIPE_PAYMENTS_ENABLED == "false" and
+  .services.api.environment.STRIPE_SANDBOX_SECRET_KEY == "" and
+  .services.api.environment.STRIPE_SANDBOX_WEBHOOK_SECRET == "" and
+  .services.api.environment.STRIPE_PAYMENT_METHOD_CONFIGURATION_ID == "" and
+  .services.api.environment.STRIPE_CHECKOUT_SUCCESS_URL == "https://hopbarley.shop/checkout?payment=return" and
+  .services.api.environment.STRIPE_CHECKOUT_CANCEL_URL == "https://hopbarley.shop/checkout?payment=cancelled" and
   .services.web.environment.NEXT_PUBLIC_API_URL == "https://hopbarley.shop" and
   .services.web.environment.API_INTERNAL_URL == "http://api:3001/api/v1" and
   .services.migrate.profiles == ["operations"] and
   .services.seed.profiles == ["operations"] and
   (.volumes | keys | sort) == ["caddy-config", "caddy-data", "postgres-data", "product-assets"]
-' "$rendered_file" >/dev/null
+' "$default_rendered_file" >/dev/null
+
+cp "$default_env_file" "$sandbox_env_file"
+cat >>"$sandbox_env_file" <<'EOF'
+STRIPE_PAYMENTS_ENABLED=true
+STRIPE_SANDBOX_SECRET_KEY=sandbox-secret-key-sentinel
+STRIPE_SANDBOX_WEBHOOK_SECRET=sandbox-webhook-secret-sentinel
+STRIPE_PAYMENT_METHOD_CONFIGURATION_ID=sandbox-payment-method-sentinel
+STRIPE_CHECKOUT_SUCCESS_URL=https://hopbarley.shop/checkout?sandbox=return
+STRIPE_CHECKOUT_CANCEL_URL=https://hopbarley.shop/checkout?sandbox=cancelled
+EOF
+
+env \
+  -u STRIPE_PAYMENTS_ENABLED \
+  -u STRIPE_SANDBOX_SECRET_KEY \
+  -u STRIPE_SANDBOX_WEBHOOK_SECRET \
+  -u STRIPE_PAYMENT_METHOD_CONFIGURATION_ID \
+  -u STRIPE_CHECKOUT_SUCCESS_URL \
+  -u STRIPE_CHECKOUT_CANCEL_URL \
+  docker compose --env-file "$sandbox_env_file" -f "$script_dir/compose.prod.yaml" \
+  --profile operations config --format json >"$sandbox_rendered_file"
+
+jq -e '
+  .services.api.environment.STRIPE_PAYMENTS_ENABLED == "true" and
+  .services.api.environment.STRIPE_SANDBOX_SECRET_KEY == "sandbox-secret-key-sentinel" and
+  .services.api.environment.STRIPE_SANDBOX_WEBHOOK_SECRET == "sandbox-webhook-secret-sentinel" and
+  .services.api.environment.STRIPE_PAYMENT_METHOD_CONFIGURATION_ID == "sandbox-payment-method-sentinel" and
+  .services.api.environment.STRIPE_CHECKOUT_SUCCESS_URL == "https://hopbarley.shop/checkout?sandbox=return" and
+  .services.api.environment.STRIPE_CHECKOUT_CANCEL_URL == "https://hopbarley.shop/checkout?sandbox=cancelled"
+' "$sandbox_rendered_file" >/dev/null
 
 docker run --rm --entrypoint caddy \
   -v "$script_dir/Caddyfile:/etc/caddy/Caddyfile:ro" \

@@ -146,7 +146,17 @@ registration, login, and an uploaded product image. Verify that PostgreSQL and
 application ports are absent from the host's published-port list and that only
 Hop & Barley containers use its four named volumes.
 
-Payments must remain unavailable because Stripe is deliberately disabled.
+Payments are disabled by default. For the authorized Sandbox demonstration,
+configure complete test-only Stripe values in the protected
+`/etc/hopbarley/production.env`, including the dedicated webhook signing secret
+and public checkout return URLs, before setting `STRIPE_PAYMENTS_ENABLED=true`
+and deploying a reviewed new release. Never copy credentials into Git, Notion,
+or logs, and never substitute live keys. Missing or invalid Sandbox settings
+must fail closed. Verify the hosted test-card flow, actual signed public webhook
+receipts, captured allocation, paid database order and browser success; mocks
+or a success redirect alone do not prove provider acceptance. Disabling new
+starts must preserve existing attempts and their reconciliation history.
+
 External email delivery is not configured. Login and registration rate limits
 currently see Caddy's Docker address because the API deliberately does not
 trust proxy headers, so users share those endpoint buckets. Do not enable broad
