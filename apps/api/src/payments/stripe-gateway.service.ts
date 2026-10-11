@@ -97,6 +97,7 @@ export class StripeGatewayService {
           payment_attempt_id: attempt.id,
         },
         mode: 'payment',
+        locale: 'en',
         payment_intent_data: {
           capture_method: 'manual',
           metadata: {
