@@ -45,6 +45,9 @@ it('provides one labelled storefront landmark structure around page content', ()
     screen.getByRole('banner', { name: 'Hop and Barley storefront' }),
   ).toBeInTheDocument();
   expect(screen.getByRole('navigation', { name: 'Storefront' })).toBeVisible();
+  expect(
+    screen.getByRole('complementary', { name: 'Community likes' }),
+  ).toBeInTheDocument();
   expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
   expect(screen.getByRole('main')).toContainElement(
     screen.getByRole('heading', { name: 'Page content' }),

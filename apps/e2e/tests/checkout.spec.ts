@@ -359,7 +359,7 @@ test.describe('O3 payment handoff regressions', () => {
       attemptId: paymentAttemptId,
       status: 'succeeded',
     });
-    const likes = await interceptLikes(page, 171);
+    const likes = await interceptLikes(page, 41);
 
     await page.goto('/checkout?payment=return');
     await expect(

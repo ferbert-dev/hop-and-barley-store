@@ -75,6 +75,7 @@ describe('StripeGatewayService', () => {
         payment_attempt_id: ATTEMPT.id,
       },
       mode: 'payment',
+      locale: 'en',
       payment_intent_data: {
         capture_method: 'manual',
         metadata: {
