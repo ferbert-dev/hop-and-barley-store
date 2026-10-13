@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { timingSafeEqual } from 'node:crypto';
 import {
   addMoneyMinor,
   calculateLineTotalMinor,
@@ -94,6 +95,13 @@ const cartProductSelect = {
 type StoredCart = Prisma.CartGetPayload<{ select: typeof cartSelect }>;
 type CartProduct = Prisma.ProductGetPayload<{
   select: typeof cartProductSelect;
+}>;
+
+type LockedCartForAdd = Readonly<{
+  expiresAt: Date;
+  id: string;
+  tokenDigest: Uint8Array;
+  userId: string | null;
 }>;
 
 export type CreatedCart = Readonly<{
@@ -357,33 +365,38 @@ export class CartService {
     requestedNow?: Date,
   ): Promise<CartDto> {
     const now = requestedNow ?? new Date();
+    const archiveTokenDigest = toPrismaBytes(generateCartToken());
     const cart = await runCartSerializable(this.prisma, async (transaction) => {
-      const cartExpiresAt = await lockCart(transaction, capability.cartId);
-      requireActiveCart(capability, cartExpiresAt, now);
+      const cartId = await lockAddCart(
+        transaction,
+        capability,
+        archiveTokenDigest,
+        now,
+      );
       const product = await requireCartProduct(
         transaction,
         dto.productSlug,
         now,
       );
       const existing = await transaction.cartItem.findUnique({
-        select: { amount: true, id: true },
+        select: { amount: true },
         where: {
           cartId_productId: {
-            cartId: capability.cartId,
+            cartId,
             productId: product.id,
           },
         },
       });
       if (!existing) {
         const count = await transaction.cartItem.count({
-          where: { cartId: capability.cartId },
+          where: { cartId },
         });
         if (count >= MAX_DISTINCT_ITEMS) unavailable();
         requireValidCartAmount(dto.amount, product);
         await transaction.cartItem.create({
           data: {
             amount: dto.amount,
-            cartId: capability.cartId,
+            cartId,
             productId: product.id,
           },
         });
@@ -392,10 +405,10 @@ export class CartService {
         requireValidCartAmount(requestedAmount, product);
         await transaction.cartItem.update({
           data: { amount: requestedAmount },
-          where: { id: existing.id },
+          where: { cartId_productId: { cartId, productId: product.id } },
         });
       }
-      return loadCart(transaction, capability.cartId);
+      return loadCart(transaction, cartId);
     });
     return toCartDto(cart, now);
   }
@@ -540,6 +553,137 @@ async function lockCart(
   if (rows.length !== 1) throw new UnauthorizedException(UNAUTHORIZED);
   if (rows[0].hasOrder) unavailable();
   return rows[0].expiresAt;
+}
+
+async function lockAddCart(
+  transaction: Prisma.TransactionClient,
+  capability: ActiveCartAccess,
+  archiveTokenDigest: Uint8Array<ArrayBuffer>,
+  now: Date,
+): Promise<string> {
+  const rows = await transaction.$queryRaw<LockedCartForAdd[]>`
+    SELECT cart."id", cart."expiresAt", cart."tokenDigest", cart."userId"
+    FROM "Cart" cart
+    WHERE cart."id" = ${capability.cartId}::uuid
+    FOR UPDATE
+  `;
+  if (rows.length !== 1) throw new UnauthorizedException(UNAUTHORIZED);
+  const locked = rows[0];
+  requireActiveCart(capability, locked.expiresAt, now);
+
+  const orders = await transaction.order.findMany({
+    select: {
+      paymentAttempt: {
+        select: {
+          allocation: { select: { status: true } },
+          status: true,
+        },
+      },
+      paymentMethod: true,
+      paymentState: true,
+      status: true,
+    },
+    where: { cartId: locked.id },
+  });
+  if (orders.length === 0) return locked.id;
+  if (
+    capability.kind === 'account' ||
+    locked.userId !== null ||
+    orders.length !== 1 ||
+    !isCompletedStripeOrder(orders[0])
+  ) {
+    unavailable();
+  }
+
+  const suppliedDigest = toPrismaBytes(capability.rawToken);
+  if (!sameDigest(locked.tokenDigest, suppliedDigest)) {
+    // Another add may have completed the rollover after this request's guard
+    // resolved the old cart. Follow the same opaque capability to that already
+    // created cart instead of minting a second replacement or failing 401.
+    return lockCurrentGuestCart(transaction, suppliedDigest, now);
+  }
+
+  const retainedItems = await transaction.cartItem.findMany({
+    select: { amount: true, productId: true },
+    where: { cartId: locked.id },
+  });
+  await transaction.cart.update({
+    data: { tokenDigest: archiveTokenDigest },
+    where: { id: locked.id },
+  });
+  const replacement = await transaction.cart.create({
+    data: {
+      // Rebind the existing browser-only capability rather than exposing a new
+      // token or relying on a non-idempotent client retry. Its original expiry
+      // remains authoritative. The historical cart/order/draft stay intact;
+      // after this explicit next-shopping action, guest payment status and Like
+      // access for that old checkout intentionally end with the old cart.
+      expiresAt: locked.expiresAt,
+      tokenDigest: suppliedDigest,
+    },
+    select: { id: true },
+  });
+  if (retainedItems.length > 0) {
+    await transaction.cartItem.createMany({
+      data: retainedItems.map((item) => ({
+        ...item,
+        cartId: replacement.id,
+      })),
+    });
+  }
+  return replacement.id;
+}
+
+async function lockCurrentGuestCart(
+  transaction: Prisma.TransactionClient,
+  tokenDigest: Uint8Array,
+  now: Date,
+): Promise<string> {
+  const rows = await transaction.$queryRaw<
+    Array<{ expiresAt: Date; id: string }>
+  >`
+    SELECT cart."id", cart."expiresAt"
+    FROM "Cart" cart
+    WHERE cart."tokenDigest" = ${tokenDigest} AND cart."userId" IS NULL
+    FOR UPDATE
+  `;
+  if (rows.length !== 1 || rows[0].expiresAt.getTime() <= now.getTime()) {
+    throw new UnauthorizedException(UNAUTHORIZED);
+  }
+  const linkedOrders = await transaction.order.count({
+    where: { cartId: rows[0].id },
+  });
+  if (linkedOrders !== 0) unavailable();
+  return rows[0].id;
+}
+
+function isCompletedStripeOrder(
+  order: Readonly<{
+    paymentAttempt: null | Readonly<{
+      allocation: null | Readonly<{ status: string }>;
+      status: string;
+    }>;
+    paymentMethod: string;
+    paymentState: string;
+    status: string;
+  }>,
+): boolean {
+  return (
+    order.paymentMethod === 'STRIPE_DEBIT_CARD' &&
+    order.paymentState === 'PAID' &&
+    ['PAID', 'SHIPPED', 'DELIVERED'].includes(order.status) &&
+    order.paymentAttempt?.status === 'SUCCEEDED' &&
+    order.paymentAttempt.allocation?.status === 'CAPTURED'
+  );
+}
+
+function sameDigest(left: Uint8Array, right: Uint8Array): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return (
+    leftBuffer.length === rightBuffer.length &&
+    timingSafeEqual(leftBuffer, rightBuffer)
+  );
 }
 
 async function lockActiveUser(

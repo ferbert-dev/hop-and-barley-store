@@ -10,7 +10,12 @@ import {
 } from './checkout-payment-transport';
 
 export const PAYMENT_HANDOFF_KEY = 'hb-checkout-payment-v1';
-type Attempt = { draftId: string; key: string; attemptId?: string };
+type Attempt = {
+  draftId: string;
+  key: string;
+  attemptId?: string;
+  settled?: 'succeeded';
+};
 type State =
   | 'idle'
   | 'checking'
@@ -40,7 +45,9 @@ function readAttempt(): Attempt | null {
     typeof record.key !== 'string' ||
     !uuid.test(record.key) ||
     (record.attemptId !== undefined &&
-      (typeof record.attemptId !== 'string' || !uuid.test(record.attemptId)))
+      (typeof record.attemptId !== 'string' || !uuid.test(record.attemptId))) ||
+    (record.settled !== undefined &&
+      (record.settled !== 'succeeded' || record.attemptId === undefined))
   ) {
     throw new Error('Invalid payment handoff');
   }
@@ -96,6 +103,7 @@ export function CheckoutPayment({
     const generation = ++operation.current;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let saved: Attempt | null = null;
     // The initial status read happens immediately; ten three-second waits then
     // cover the complete 30-second return-confirmation window.
     let remainingPolls = 10;
@@ -104,7 +112,7 @@ export function CheckoutPayment({
     const check = async () => {
       if (cancelled || generation !== operation.current) return;
       try {
-        const saved = readAttempt();
+        saved = readAttempt();
         attempt.current = saved;
         setHasAttempt(saved !== null);
         setHasConfirmedAttempt(saved?.attemptId !== undefined);
@@ -124,13 +132,25 @@ export function CheckoutPayment({
           !saved.attemptId ||
           result.attemptId !== saved.attemptId
         ) {
+          if (saved.settled === 'succeeded') {
+            clearSettledAttempt(saved);
+            attempt.current = null;
+            setHasAttempt(false);
+            setHasConfirmedAttempt(false);
+            setState('idle');
+            return;
+          }
           setState('unknown');
           return;
         }
         if (returned) setPaymentReturn(true);
         setState(result.status);
-        if (result.status === 'succeeded')
-          setSucceededAttemptId(saved.attemptId);
+        if (result.status === 'succeeded') {
+          const settled = markAttemptSucceeded(saved);
+          saved = settled;
+          attempt.current = settled;
+          setSucceededAttemptId(settled.attemptId);
+        }
         const pendingReturn =
           returned &&
           (result.status === 'processing' ||
@@ -143,8 +163,25 @@ export function CheckoutPayment({
         } else if (pendingReturn) {
           setReturnTimedOut(true);
         }
-      } catch {
-        if (!cancelled && generation === operation.current) setState('unknown');
+      } catch (error) {
+        if (cancelled || generation !== operation.current) return;
+        if (
+          saved?.settled === 'succeeded' &&
+          error instanceof CheckoutPaymentTransportError &&
+          error.status === 401
+        ) {
+          try {
+            clearSettledAttempt(saved);
+            attempt.current = null;
+            setHasAttempt(false);
+            setHasConfirmedAttempt(false);
+            setState('idle');
+            return;
+          } catch {
+            // A concurrently replaced handoff is ambiguous and must be kept.
+          }
+        }
+        setState('unknown');
       }
     };
     void check();
@@ -239,7 +276,9 @@ export function CheckoutPayment({
       }
       if (mounted.current) setState(result.status);
       if (mounted.current && result.status === 'succeeded') {
-        setSucceededAttemptId(attempt.current.attemptId);
+        const settled = markAttemptSucceeded(attempt.current);
+        attempt.current = settled;
+        setSucceededAttemptId(settled.attemptId);
       }
     } catch {
       if (mounted.current) setState('unknown');
@@ -356,5 +395,45 @@ export function CheckoutPayment({
         </>
       )}
     </div>
+  );
+}
+
+function markAttemptSucceeded(
+  saved: Attempt | null,
+): Attempt & { attemptId: string; settled: 'succeeded' } {
+  if (!saved?.attemptId) throw new Error('Missing correlated payment attempt');
+  const persisted = readAttempt();
+  if (!persisted || !sameAttempt(persisted, saved)) {
+    throw new Error('Payment handoff changed');
+  }
+  const settled = {
+    ...persisted,
+    attemptId: saved.attemptId,
+    settled: 'succeeded' as const,
+  };
+  window.sessionStorage.setItem(PAYMENT_HANDOFF_KEY, JSON.stringify(settled));
+  return settled;
+}
+
+function clearSettledAttempt(saved: Attempt): void {
+  const persisted = readAttempt();
+  if (
+    saved.settled !== 'succeeded' ||
+    persisted?.settled !== 'succeeded' ||
+    !sameAttempt(persisted, saved)
+  ) {
+    throw new Error('Payment handoff changed');
+  }
+  window.sessionStorage.removeItem(PAYMENT_HANDOFF_KEY);
+  if (window.sessionStorage.getItem(PAYMENT_HANDOFF_KEY) !== null) {
+    throw new Error('Payment handoff could not be cleared');
+  }
+}
+
+function sameAttempt(left: Attempt | null, right: Attempt): boolean {
+  return (
+    left?.attemptId === right.attemptId &&
+    left?.draftId === right.draftId &&
+    left?.key === right.key
   );
 }

@@ -1,9 +1,12 @@
 import { BadRequestException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import type Stripe from 'stripe';
+import { CartService } from '../src/cart/cart.service';
 import { hashCheckoutCapability } from '../src/checkout/checkout-capability-token';
+import { CheckoutService } from '../src/checkout/checkout.service';
 import { PrismaService } from '../src/database/prisma.service';
 import { LikesService } from '../src/likes/likes.service';
+import { CheckoutPaymentMethod } from '../src/orders/dto/create-order.dto';
 import { PaymentAttemptService } from '../src/payments/payment-attempt.service';
 import type { StripeGatewayService } from '../src/payments/stripe-gateway.service';
 import { StripePaymentService } from '../src/payments/stripe-payment.service';
@@ -19,6 +22,8 @@ let sequence = 0;
 
 describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
   let attempts: PaymentAttemptService;
+  let carts: CartService;
+  let checkout: CheckoutService;
   let gateway: jest.Mocked<
     Pick<
       StripeGatewayService,
@@ -38,6 +43,8 @@ describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
   beforeAll(() => {
     prisma = new PrismaService();
     attempts = new PaymentAttemptService(prisma);
+    carts = new CartService(prisma);
+    checkout = new CheckoutService(prisma);
     likes = new LikesService(prisma);
   });
 
@@ -275,6 +282,211 @@ describePostgres('O2P Stripe Sandbox orchestration with PostgreSQL', () => {
       }),
     ).toEqual({ count: 8 });
     await expect(likes.count()).resolves.toEqual({ count: 138 });
+  });
+
+  it('rebinds a completed guest capability to an independent next cart and checkout', async () => {
+    const fixture = await prepareSession('guest-cart-rollover', 'guest');
+    const firstAttempt = await prisma.paymentAttempt.findFirstOrThrow();
+    gateway.constructEvent.mockReturnValue(
+      event(
+        'evt_guest_cart_rollover',
+        'payment_intent.amount_capturable_updated',
+        paymentIntent(firstAttempt, 'requires_capture'),
+      ),
+    );
+    gateway.capturePaymentIntent.mockResolvedValue(
+      paymentIntent(firstAttempt, 'succeeded'),
+    );
+    await payments.acceptWebhook(
+      Buffer.from('{"id":"evt_guest_cart_rollover"}'),
+      'test-signature',
+      now,
+    );
+    await likes.create(
+      firstAttempt.id,
+      fixture.cartAccess,
+      fixture.rawGuestCapability,
+    );
+
+    const oldOrder = await prisma.order.findUniqueOrThrow({
+      where: { paymentAttemptId: firstAttempt.id },
+    });
+    const oldDraft = await prisma.checkoutDraft.findUniqueOrThrow({
+      where: { id: fixture.draftId },
+    });
+    const oldLike = await prisma.purchaseLike.findUniqueOrThrow({
+      where: { paymentAttemptId: firstAttempt.id },
+    });
+
+    await expect(
+      carts.add(
+        fixture.cartAccess,
+        { amount: 0, productSlug },
+        new Date(now.getTime() + 1),
+      ),
+    ).rejects.toMatchObject({ response: { status: 'unavailable' } });
+    await expect(
+      carts.authenticate(
+        fixture.cartAccess.rawToken,
+        new Date(now.getTime() + 1),
+      ),
+    ).resolves.toMatchObject({ cartId: fixture.cartAccess.cartId });
+    expect(await prisma.cart.count()).toBe(1);
+
+    await Promise.all([
+      carts.add(
+        fixture.cartAccess,
+        { amount: 1, productSlug },
+        new Date(now.getTime() + 2),
+      ),
+      carts.add(
+        fixture.cartAccess,
+        { amount: 1, productSlug },
+        new Date(now.getTime() + 2),
+      ),
+    ]);
+    const nextAccess = await carts.authenticate(
+      fixture.cartAccess.rawToken,
+      new Date(now.getTime() + 2),
+    );
+    expect(nextAccess).not.toBeNull();
+    expect(nextAccess!.cartId).not.toBe(fixture.cartAccess.cartId);
+    await expect(carts.getCart(nextAccess!)).resolves.toMatchObject({
+      items: [{ amount: 2, productSlug }],
+    });
+
+    // This access was resolved before the first request committed. It follows
+    // the same raw capability to the replacement instead of minting another.
+    await carts.add(
+      fixture.cartAccess,
+      { amount: 1, productSlug },
+      new Date(now.getTime() + 3),
+    );
+    await expect(carts.getCart(nextAccess!)).resolves.toMatchObject({
+      items: [{ amount: 3, productSlug }],
+    });
+    expect(await prisma.cart.count()).toBe(2);
+
+    expect(
+      await prisma.order.findUniqueOrThrow({
+        where: { paymentAttemptId: firstAttempt.id },
+      }),
+    ).toEqual(oldOrder);
+    expect(
+      await prisma.checkoutDraft.findUniqueOrThrow({
+        where: { id: fixture.draftId },
+      }),
+    ).toEqual(oldDraft);
+    expect(
+      await prisma.purchaseLike.findUniqueOrThrow({
+        where: { paymentAttemptId: firstAttempt.id },
+      }),
+    ).toEqual(oldLike);
+
+    const saved = await checkout.saveDraft(
+      nextAccess!,
+      null,
+      'guest-cart-rollover-draft-0002',
+      {
+        delivery: {
+          city: 'Berlin',
+          countryCode: 'DE',
+          postalCode: '10115',
+          street: 'Next O2P Street',
+        },
+        email: 'guest-cart-rollover-next@example.test',
+        fullName: 'Next O2P Customer',
+        paymentMethod: CheckoutPaymentMethod.STRIPE_DEBIT_CARD,
+        phoneNumber: '+49 30 654321',
+      },
+      new Date(now.getTime() + 4),
+    );
+    expect(saved.issuedCapability?.rawToken).toEqual(expect.any(String));
+    expect(saved.issuedCapability?.rawToken).not.toBe(
+      fixture.rawGuestCapability,
+    );
+    expect(saved.draft.id).not.toBe(fixture.draftId);
+
+    gateway.createCheckoutSession.mockImplementation((snapshot) =>
+      Promise.resolve({
+        amountTotal: snapshot.totalMinor,
+        attemptId: snapshot.id,
+        checkoutUrl: 'https://checkout.stripe.test/c/next-session',
+        currency: 'eur',
+        expiresAt: new Date(now.getTime() + 31 * 60 * 1_000),
+        ownerReference: snapshot.ownerReference,
+        paymentIntentId: null,
+        paymentStatus: 'unpaid',
+        sessionId: `cs_test_${snapshot.id}`,
+        sessionStatus: 'open',
+      }),
+    );
+    await expect(
+      payments.startCheckout(
+        {
+          cart: nextAccess!,
+          checkoutDraftId: saved.draft.id,
+          idempotencyKey: 'o2p-guest-cart-rollover-0002',
+          rawGuestCapability: saved.issuedCapability!.rawToken,
+        },
+        new Date(now.getTime() + 5),
+      ),
+    ).resolves.toMatchObject({ status: 'ready_for_redirect' });
+    const attemptsAfterRestart = await prisma.paymentAttempt.findMany({
+      orderBy: { createdAt: 'asc' },
+      select: { checkoutDraftId: true, id: true, status: true },
+    });
+    expect(attemptsAfterRestart).toEqual([
+      {
+        checkoutDraftId: fixture.draftId,
+        id: firstAttempt.id,
+        status: 'SUCCEEDED',
+      },
+      {
+        checkoutDraftId: saved.draft.id,
+        id: expect.any(String) as string,
+        status: 'PENDING',
+      },
+    ]);
+  });
+
+  it('keeps an ambiguous guest payment cart locked to its original capability', async () => {
+    const fixture = await prepareSession('guest-cart-pending', 'guest');
+    const attempt = await prisma.paymentAttempt.findFirstOrThrow();
+    gateway.constructEvent.mockReturnValue(
+      event(
+        'evt_guest_cart_pending',
+        'payment_intent.amount_capturable_updated',
+        paymentIntent(attempt, 'requires_capture'),
+      ),
+    );
+    gateway.capturePaymentIntent.mockRejectedValue(new Error('timeout'));
+    await payments.acceptWebhook(
+      Buffer.from('{"id":"evt_guest_cart_pending"}'),
+      'test-signature',
+      now,
+    );
+
+    await expect(
+      carts.add(
+        fixture.cartAccess,
+        { amount: 1, productSlug },
+        new Date(now.getTime() + 1),
+      ),
+    ).rejects.toMatchObject({ response: { status: 'unavailable' } });
+    await expect(
+      carts.authenticate(
+        fixture.cartAccess.rawToken,
+        new Date(now.getTime() + 1),
+      ),
+    ).resolves.toMatchObject({ cartId: fixture.cartAccess.cartId });
+    expect(await prisma.cart.count()).toBe(1);
+    expect(
+      await prisma.paymentAttempt.findUniqueOrThrow({
+        select: { status: true },
+        where: { id: attempt.id },
+      }),
+    ).toEqual({ status: 'RECONCILIATION_REQUIRED' });
   });
 
   it('keeps an account Like eligible after capture clears its old cart and a new cart is created', async () => {
