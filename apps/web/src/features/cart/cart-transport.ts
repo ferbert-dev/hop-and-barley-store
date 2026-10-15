@@ -3,6 +3,11 @@
 import { createApiClient, type components } from '@hop-and-barley/api-client';
 import { resolveBrowserApiUrl } from '../../lib/browser-api-url';
 import { isProductImagePath } from '../../lib/product-image';
+import {
+  markPaymentHandoffSucceeded,
+  readPaymentHandoff,
+} from '../checkout/checkout-payment-handoff';
+import { createBrowserCheckoutPaymentTransport } from '../checkout/checkout-payment-transport';
 import { readQuantityMetadata } from '../quantity/quantity-model';
 
 const DEFAULT_API_URL = 'http://localhost:3001';
@@ -32,6 +37,7 @@ export function createBrowserCartTransport(
   requestOrigin: () => string = () => window.location.origin,
   apiUrl = process.env.NEXT_PUBLIC_API_URL ?? DEFAULT_API_URL,
   apiHostAliases = process.env.NEXT_PUBLIC_API_HOST_ALIASES ?? '',
+  paymentHandoffStorage?: Pick<Storage, 'getItem' | 'removeItem' | 'setItem'>,
 ): CartTransport {
   const requestContext = () => {
     const origin = requestOrigin();
@@ -65,6 +71,14 @@ export function createBrowserCartTransport(
 
   return {
     async add(productSlug, amount) {
+      await markLegacyPaymentSuccessBeforeAdd(
+        paymentHandoffStorage ?? window.sessionStorage,
+        createBrowserCheckoutPaymentTransport(
+          requestOrigin,
+          apiUrl,
+          apiHostAliases,
+        ).status,
+      );
       const { client, origin } = requestContext();
       const csrfToken = await withCsrf(client);
       const { data, error, response } = await client.POST(
@@ -144,6 +158,37 @@ export function createBrowserCartTransport(
       return cartFromResponse(data, error, response);
     },
   };
+}
+
+async function markLegacyPaymentSuccessBeforeAdd(
+  storage: Pick<Storage, 'getItem' | 'removeItem' | 'setItem'>,
+  loadPaymentStatus: ReturnType<
+    typeof createBrowserCheckoutPaymentTransport
+  >['status'],
+): Promise<void> {
+  let saved;
+  try {
+    saved = readPaymentHandoff(storage);
+  } catch {
+    throw new CartTransportError(409);
+  }
+  if (!saved || saved.settled === 'succeeded') return;
+  if (!saved.attemptId) throw new CartTransportError(409);
+
+  try {
+    const status = await loadPaymentStatus();
+    if (
+      !status ||
+      status.status !== 'succeeded' ||
+      status.attemptId !== saved.attemptId
+    ) {
+      throw new CartTransportError(409);
+    }
+    markPaymentHandoffSucceeded(storage, saved);
+  } catch (error) {
+    if (error instanceof CartTransportError) throw error;
+    throw new CartTransportError(409);
+  }
 }
 
 async function requireCsrf(loadCsrf: () => Promise<string | null>) {
