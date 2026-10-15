@@ -49,19 +49,25 @@ Do not blindly retry ambiguous mutations or change payment, stock or Like data.
 The browser also records a server-confirmed successful payment handoff so that
 its obsolete session-storage record does not block the next checkout after
 rollover. Pending or unconfirmed handoffs and network failures remain protected.
-An older unmarked handoff cannot safely be inferred successful: revisit the
-original success page before resuming shopping, or use its Continue shopping
-action to clear that handoff.
+For an older unmarked handoff, the add transport first checks payment status
+while the original cart is still accessible. Only an exact matching successful
+attempt can be marked; the marker must be persisted and verified before the
+add is sent. Pending, mismatched or unavailable status and ambiguous storage
+abort the add without replacing the old cart. A lost add response therefore
+does not lose the confirmed-success marker needed by the next checkout.
 
-The pull request must include regression evidence for this lifecycle, including
-invalid input and historical-order preservation. Production inspection was
-read-only. No production repair, release or deployment is part of this ticket.
+The pull request includes regression evidence for this lifecycle, including
+invalid input and historical-order preservation. Production diagnosis was
+read-only. Any authorized release follows exact-head green CI, independent
+review and the existing immutable deployment/backup workflow; no database reset
+or production seed is required.
 
 ## Verification
 
 The isolated local stack passed the completed-purchase-to-new-cart browser
-flow: server-confirmed success, header navigation retaining the handoff,
-adding 0.7 kg Centennial Hops, cart reload, and saving a new checkout draft.
+flow, including an unmarked legacy payment handoff: confirm the matching old
+payment before adding 0.7 kg Centennial Hops, persist the success marker,
+reload the cart, clear only that obsolete marker, and save a new checkout draft.
 The old Order and PurchaseLike row fingerprints remained unchanged. PostgreSQL
 regressions cover simultaneous rollover adds, stale pre-resolved access,
 invalid-add rollback, pending-payment protection and independent next checkout.

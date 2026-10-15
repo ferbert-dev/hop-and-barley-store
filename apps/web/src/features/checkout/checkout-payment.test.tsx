@@ -111,6 +111,33 @@ describe('checkout payment', () => {
     expect(window.sessionStorage.getItem(PAYMENT_HANDOFF_KEY)).toBe(saved);
   });
 
+  it('does not clear a replacement handoff when unauthorized status arrives for the prior settled attempt', async () => {
+    settledHandoff();
+    let rejectStatus!: (error: Error) => void;
+    transport.status.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectStatus = reject;
+      }),
+    );
+    render(<CheckoutPayment canPay draftId={draftId} />);
+    await waitFor(() => expect(transport.status).toHaveBeenCalledTimes(1));
+    const replacement = {
+      attemptId: '60000000-0000-4000-8000-000000000001',
+      draftId: '70000000-0000-4000-8000-000000000001',
+      key: '80000000-0000-4000-8000-000000000001',
+    };
+    window.sessionStorage.setItem(
+      PAYMENT_HANDOFF_KEY,
+      JSON.stringify(replacement),
+    );
+    rejectStatus(new CheckoutPaymentTransportError(401));
+
+    expect(await screen.findByText(/cannot confirm/)).toBeInTheDocument();
+    expect(
+      JSON.parse(window.sessionStorage.getItem(PAYMENT_HANDOFF_KEY)!),
+    ).toEqual(replacement);
+  });
+
   it('preserves a confirmed-success marker during a transient status failure', async () => {
     settledHandoff();
     const saved = window.sessionStorage.getItem(PAYMENT_HANDOFF_KEY);

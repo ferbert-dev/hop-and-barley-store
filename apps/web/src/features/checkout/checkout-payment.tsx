@@ -8,14 +8,15 @@ import {
   CheckoutPaymentTransportError,
   createBrowserCheckoutPaymentTransport,
 } from './checkout-payment-transport';
+import {
+  clearSucceededPaymentHandoff,
+  markPaymentHandoffSucceeded,
+  PAYMENT_HANDOFF_KEY,
+  readPaymentHandoff,
+  type CheckoutPaymentHandoff,
+} from './checkout-payment-handoff';
 
-export const PAYMENT_HANDOFF_KEY = 'hb-checkout-payment-v1';
-type Attempt = {
-  draftId: string;
-  key: string;
-  attemptId?: string;
-  settled?: 'succeeded';
-};
+export { PAYMENT_HANDOFF_KEY } from './checkout-payment-handoff';
 type State =
   | 'idle'
   | 'checking'
@@ -27,32 +28,6 @@ type State =
   | 'cancelled'
   | 'unavailable'
   | 'unknown';
-
-// No address, amount, credentials or hosted URL is persisted here. The server
-// remains authoritative; this record only correlates an idempotent request.
-function readAttempt(): Attempt | null {
-  const raw = window.sessionStorage.getItem(PAYMENT_HANDOFF_KEY);
-  if (!raw) return null;
-  const value: unknown = JSON.parse(raw);
-  if (!value || typeof value !== 'object')
-    throw new Error('Invalid payment handoff');
-  const record = value as Record<string, unknown>;
-  const uuid =
-    /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i;
-  if (
-    typeof record.draftId !== 'string' ||
-    !uuid.test(record.draftId) ||
-    typeof record.key !== 'string' ||
-    !uuid.test(record.key) ||
-    (record.attemptId !== undefined &&
-      (typeof record.attemptId !== 'string' || !uuid.test(record.attemptId))) ||
-    (record.settled !== undefined &&
-      (record.settled !== 'succeeded' || record.attemptId === undefined))
-  ) {
-    throw new Error('Invalid payment handoff');
-  }
-  return record as Attempt;
-}
 
 export function CheckoutPayment({
   draftId,
@@ -79,7 +54,7 @@ export function CheckoutPayment({
   const [succeededAttemptId, setSucceededAttemptId] = useState<string | null>(
     null,
   );
-  const attempt = useRef<Attempt | null>(null);
+  const attempt = useRef<CheckoutPaymentHandoff | null>(null);
   const operation = useRef(0);
   const busy = useRef(false);
   const mounted = useRef(false);
@@ -103,7 +78,7 @@ export function CheckoutPayment({
     const generation = ++operation.current;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let saved: Attempt | null = null;
+    let saved: CheckoutPaymentHandoff | null = null;
     // The initial status read happens immediately; ten three-second waits then
     // cover the complete 30-second return-confirmation window.
     let remainingPolls = 10;
@@ -112,7 +87,7 @@ export function CheckoutPayment({
     const check = async () => {
       if (cancelled || generation !== operation.current) return;
       try {
-        saved = readAttempt();
+        saved = readPaymentHandoff(window.sessionStorage);
         attempt.current = saved;
         setHasAttempt(saved !== null);
         setHasConfirmedAttempt(saved?.attemptId !== undefined);
@@ -133,7 +108,7 @@ export function CheckoutPayment({
           result.attemptId !== saved.attemptId
         ) {
           if (saved.settled === 'succeeded') {
-            clearSettledAttempt(saved);
+            clearSucceededPaymentHandoff(window.sessionStorage, saved);
             attempt.current = null;
             setHasAttempt(false);
             setHasConfirmedAttempt(false);
@@ -146,7 +121,10 @@ export function CheckoutPayment({
         if (returned) setPaymentReturn(true);
         setState(result.status);
         if (result.status === 'succeeded') {
-          const settled = markAttemptSucceeded(saved);
+          const settled = markPaymentHandoffSucceeded(
+            window.sessionStorage,
+            saved,
+          );
           saved = settled;
           attempt.current = settled;
           setSucceededAttemptId(settled.attemptId);
@@ -171,7 +149,7 @@ export function CheckoutPayment({
           error.status === 401
         ) {
           try {
-            clearSettledAttempt(saved);
+            clearSucceededPaymentHandoff(window.sessionStorage, saved);
             attempt.current = null;
             setHasAttempt(false);
             setHasConfirmedAttempt(false);
@@ -231,7 +209,7 @@ export function CheckoutPayment({
         error.failure === 'payments_disabled'
       ) {
         try {
-          const persisted = readAttempt();
+          const persisted = readPaymentHandoff(window.sessionStorage);
           if (
             !persisted ||
             persisted.attemptId ||
@@ -276,7 +254,10 @@ export function CheckoutPayment({
       }
       if (mounted.current) setState(result.status);
       if (mounted.current && result.status === 'succeeded') {
-        const settled = markAttemptSucceeded(attempt.current);
+        const settled = markPaymentHandoffSucceeded(
+          window.sessionStorage,
+          attempt.current,
+        );
         attempt.current = settled;
         setSucceededAttemptId(settled.attemptId);
       }
@@ -395,45 +376,5 @@ export function CheckoutPayment({
         </>
       )}
     </div>
-  );
-}
-
-function markAttemptSucceeded(
-  saved: Attempt | null,
-): Attempt & { attemptId: string; settled: 'succeeded' } {
-  if (!saved?.attemptId) throw new Error('Missing correlated payment attempt');
-  const persisted = readAttempt();
-  if (!persisted || !sameAttempt(persisted, saved)) {
-    throw new Error('Payment handoff changed');
-  }
-  const settled = {
-    ...persisted,
-    attemptId: saved.attemptId,
-    settled: 'succeeded' as const,
-  };
-  window.sessionStorage.setItem(PAYMENT_HANDOFF_KEY, JSON.stringify(settled));
-  return settled;
-}
-
-function clearSettledAttempt(saved: Attempt): void {
-  const persisted = readAttempt();
-  if (
-    saved.settled !== 'succeeded' ||
-    persisted?.settled !== 'succeeded' ||
-    !sameAttempt(persisted, saved)
-  ) {
-    throw new Error('Payment handoff changed');
-  }
-  window.sessionStorage.removeItem(PAYMENT_HANDOFF_KEY);
-  if (window.sessionStorage.getItem(PAYMENT_HANDOFF_KEY) !== null) {
-    throw new Error('Payment handoff could not be cleared');
-  }
-}
-
-function sameAttempt(left: Attempt | null, right: Attempt): boolean {
-  return (
-    left?.attemptId === right.attemptId &&
-    left?.draftId === right.draftId &&
-    left?.key === right.key
   );
 }

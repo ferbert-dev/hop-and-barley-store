@@ -16,6 +16,10 @@ import {
 const unavailable = process.env.E2E_EXPECT_API_STATUS === 'API unavailable';
 const connectedApiUrl = process.env.E2E_API_URL ?? null;
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
+const paymentHandoffKey = 'hb-checkout-payment-v1';
+const paymentAttemptId = '40000000-0000-4000-8000-000000000001';
+const paymentDraftId = '30000000-0000-4000-8000-000000000001';
+const paymentIdempotencyKey = '50000000-0000-4000-8000-000000000001';
 
 test.describe('API-backed guest cart', () => {
   test.skip(unavailable, 'runs only against the connected cart API');
@@ -152,6 +156,89 @@ test.describe('API-backed guest cart', () => {
       page.getByRole('heading', { name: 'Citra Hops' }),
     ).toBeVisible();
     await assertNoBlockingAxeViolations(page, 'ready cart');
+  });
+
+  test('preflights an unmarked legacy success before add, then clears only its marker after cart rollover', async ({
+    page,
+  }) => {
+    const cartLifecycle = await interceptLegacyPaymentCartLifecycle(page);
+    const checkoutDraft = await interceptCartRecoveryCheckoutDraft(page);
+    let paymentStatusRequests = 0;
+    await page.route('**/api/v1/payments/stripe/status', async (route) => {
+      paymentStatusRequests += 1;
+      if (paymentStatusRequests === 1) {
+        await route.fulfill({
+          body: JSON.stringify({
+            attemptId: paymentAttemptId,
+            status: 'succeeded',
+          }),
+          contentType: 'application/json',
+          headers: privateCartHeaders(route.request()),
+        });
+        return;
+      }
+      await route.fulfill({
+        contentType: 'application/json',
+        headers: privateCartHeaders(route.request()),
+        status: 401,
+      });
+    });
+
+    await page.goto('/product/citra-hops', { waitUntil: 'commit' });
+    await page.evaluate(
+      ({ attemptId, draftId, handoffKey, key }) => {
+        window.sessionStorage.setItem(
+          handoffKey,
+          JSON.stringify({ attemptId, draftId, key }),
+        );
+      },
+      {
+        attemptId: paymentAttemptId,
+        draftId: paymentDraftId,
+        handoffKey: paymentHandoffKey,
+        key: paymentIdempotencyKey,
+      },
+    );
+    await page.getByRole('button', { name: 'Add Citra Hops to Cart' }).click();
+    await expect(
+      page.getByRole('dialog', { name: 'Citra Hops added to your cart' }),
+    ).toBeVisible();
+    expect(cartLifecycle.adds).toBe(1);
+    expect(paymentStatusRequests).toBe(1);
+    expect(
+      await page.evaluate(
+        (key) => JSON.parse(sessionStorage.getItem(key) ?? 'null'),
+        paymentHandoffKey,
+      ),
+    ).toEqual({
+      attemptId: paymentAttemptId,
+      draftId: paymentDraftId,
+      key: paymentIdempotencyKey,
+      settled: 'succeeded',
+    });
+
+    await page.goto('/checkout');
+    await expect.poll(() => paymentStatusRequests).toBe(2);
+    await expect
+      .poll(() =>
+        page.evaluate((key) => sessionStorage.getItem(key), paymentHandoffKey),
+      )
+      .toBeNull();
+    await page.getByLabel('Full Name').fill('Alex Brewer');
+    await page.getByLabel('Email').fill('brewer@example.com');
+    await page.getByLabel('Phone number').fill('+4912345678');
+    await page.getByLabel('Street').fill('Hopfenstraße');
+    await page.getByLabel('City').fill('Berlin');
+    await page.getByLabel('Postal code').fill('10115');
+    await page.getByRole('button', { name: 'Save checkout details' }).click();
+
+    await expect(
+      page.getByText('Checkout details saved privately.'),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Pay with Stripe' }),
+    ).toBeEnabled();
+    expect(checkoutDraft.posts).toBe(1);
   });
 });
 
@@ -596,6 +683,122 @@ async function interceptCart(
 
   await page.route('**/api/v1/cart', handleCartRequest);
   await page.route('**/api/v1/cart/**', handleCartRequest);
+}
+
+async function interceptLegacyPaymentCartLifecycle(page: Page) {
+  let adds = 0;
+  const emptyCart = cartFixture({ items: [] });
+  const addedCart = cartFixture({
+    items: [cartLine({ name: 'Citra Hops', productSlug: 'citra-hops' })],
+  });
+  const handleCartRequest = async (route: Route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({
+        headers: cartPreflightHeaders(request),
+        status: 204,
+      });
+      return;
+    }
+    if (pathname.endsWith('/csrf') && request.method() === 'GET') {
+      await route.fulfill({
+        body: JSON.stringify({
+          csrfToken: 'fixture.1234567890123456789012345678901234567890123',
+        }),
+        contentType: 'application/json',
+        headers: privateCartHeaders(request),
+      });
+      return;
+    }
+    if (pathname.endsWith('/items') && request.method() === 'POST') {
+      adds += 1;
+      await fulfillCart(route, addedCart);
+      return;
+    }
+    if (pathname.endsWith('/items') && request.method() === 'DELETE') {
+      await fulfillCart(route, emptyCart);
+      return;
+    }
+    if (pathname.endsWith('/cart') && request.method() === 'GET') {
+      await fulfillCart(route, adds === 0 ? emptyCart : addedCart);
+      return;
+    }
+    await route.fallback();
+  };
+  await page.route('**/api/v1/cart', handleCartRequest);
+  await page.route('**/api/v1/cart/**', handleCartRequest);
+  return {
+    get adds() {
+      return adds;
+    },
+  };
+}
+
+async function interceptCartRecoveryCheckoutDraft(page: Page) {
+  let saved: Record<string, unknown> | null = null;
+  let posts = 0;
+  await page.route('**/api/v1/checkout/draft', async (route) => {
+    const request = route.request();
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({
+        headers: cartPreflightHeaders(request),
+        status: 204,
+      });
+      return;
+    }
+    if (request.method() === 'GET') {
+      if (!saved) {
+        await route.fulfill({
+          contentType: 'application/json',
+          headers: privateCartHeaders(request),
+          status: 404,
+        });
+        return;
+      }
+    } else {
+      posts += 1;
+      saved = request.postDataJSON() as Record<string, unknown>;
+    }
+    await route.fulfill({
+      body: JSON.stringify(checkoutDraftFixture(saved ?? {})),
+      contentType: 'application/json',
+      headers: privateCartHeaders(request),
+    });
+  });
+  return {
+    get posts() {
+      return posts;
+    },
+  };
+}
+
+function checkoutDraftFixture(saved: Record<string, unknown>) {
+  return {
+    currency: 'EUR',
+    discountBasisPoints: 0,
+    discountMinor: 0,
+    discountPolicyVersion: 'no-discount-v1',
+    itemSubtotalMinor: 599,
+    ...saved,
+    delivery: {
+      additionalInfo: null,
+      administrativeArea: null,
+      apartmentUnit: null,
+      floor: null,
+      houseNumber: null,
+      postalCode: null,
+      ...(saved.delivery as Record<string, unknown> | undefined),
+    },
+    expiresAt: null,
+    id: paymentDraftId,
+    quoteStatus: 'ready',
+    quotedAt: '2026-10-15T08:00:00.000Z',
+    shippingMinor: 500,
+    status: 'pre_payment',
+    totalMinor: 1099,
+    updatedAt: '2026-10-15T08:00:00.000Z',
+  };
 }
 
 function privateCartHeaders(request: PlaywrightRequest) {
